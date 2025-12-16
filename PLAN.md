@@ -16,31 +16,37 @@ This document outlines the implementation plan for a production-grade Terraform 
 ```
 rosa-hcp-infrastructure/
 ├── modules/
-│   ├── network-public/        # Public VPC with NAT Gateways
-│   ├── network-private/       # Private VPC (PrivateLink API, no public subnets)
-│   ├── network-egress-zero/   # Egress Zero VPC (no internet egress)
-│   ├── iam/              # IAM & OIDC module
-│   └── cluster/          # ROSA HCP Cluster module
+│   ├── infrastructure/         # Infrastructure modules
+│   │   ├── network-public/     # Public VPC with NAT Gateways
+│   │   ├── network-private/    # Private VPC (PrivateLink API, no public subnets)
+│   │   ├── network-egress-zero/# Egress Zero VPC (no internet egress)
+│   │   ├── iam/                # IAM & OIDC module
+│   │   ├── cluster/            # ROSA HCP Cluster module
+│   │   └── bastion/            # Bastion host for private cluster access
+│   └── configuration/          # Configuration modules
+│       ├── gitops/             # OpenShift GitOps operator
+│       └── identity-admin/     # Admin user creation (temporary bootstrap)
 └── clusters/
     └── examples/
         └── public/
-            ├── 10-main.tf
-            ├── 90-outputs.tf
-            ├── 01-variables.tf
-            ├── 00-providers.tf
-            └── terraform.tfvars
-        └── private/
-            ├── 10-main.tf
-            ├── 90-outputs.tf
-            ├── 01-variables.tf
-            ├── 00-providers.tf
-            └── terraform.tfvars
-        └── egress-zero/
-            ├── 10-main.tf
-            ├── 90-outputs.tf
-            ├── 01-variables.tf
-            ├── 00-providers.tf
+            ├── infrastructure/  # Infrastructure state (network, iam, cluster)
+            │   ├── 00-providers.tf
+            │   ├── 01-variables.tf
+            │   ├── 10-main.tf
+            │   ├── 90-outputs.tf
+            │   └── terraform.tfvars
+            └── configuration/   # Configuration state (gitops, identity-admin)
+                ├── 00-providers.tf
+                ├── 01-variables.tf
+                ├── 10-main.tf   # Uses terraform_remote_state to read infrastructure
+                ├── 90-outputs.tf
                 └── terraform.tfvars
+        └── private/
+            ├── infrastructure/
+            └── configuration/
+        └── egress-zero/
+            ├── infrastructure/
+            └── configuration/
 ```
 
 ---
@@ -49,7 +55,7 @@ rosa-hcp-infrastructure/
 
 ### 2.1 Network Module: Public
 
-**Path**: `modules/network-public/`
+**Path**: `modules/infrastructure/network-public/`
 
 **Provider**: `hashicorp/aws`
 
@@ -102,7 +108,7 @@ rosa-hcp-infrastructure/
 
 ### 2.2 Network Module: Private
 
-**Path**: `modules/network-private/`
+**Path**: `modules/infrastructure/network-private/`
 
 **Provider**: `hashicorp/aws`
 
@@ -139,7 +145,7 @@ rosa-hcp-infrastructure/
 
 ### 2.3 Network Module: Egress Zero
 
-**Path**: `modules/network-egress-zero/`
+**Path**: `modules/infrastructure/network-egress-zero/`
 
 **Provider**: `hashicorp/aws`
 
@@ -179,7 +185,7 @@ rosa-hcp-infrastructure/
 
 ## Step 3: IAM Module
 
-**Path**: `modules/iam/`
+**Path**: `modules/infrastructure/iam/`
 
 **Provider**: `terraform-redhat/rhcs`
 
@@ -223,7 +229,7 @@ rosa-hcp-infrastructure/
 
 ## Step 4: Cluster Module (Thin Wrapper with Organizational Defaults)
 
-**Path**: `modules/cluster/`
+**Path**: `modules/infrastructure/cluster/`
 
 **Provider**: `terraform-redhat/rhcs`
 
@@ -323,15 +329,15 @@ This step creates **three example clusters** demonstrating different network top
 
 ### 5.1 Example 1: Public Cluster (Development)
 
-**Path**: `clusters/examples/public/`
+**Path**: `clusters/examples/public/infrastructure/` and `clusters/examples/public/configuration/`
 
 **Purpose**: Development/Testing cluster with internet access via NAT Gateway
 
-**Main Configuration** (`10-main.tf`):
+**Infrastructure Configuration** (`infrastructure/10-main.tf`):
 
 ```hcl
 module "network" {
-  source = "../../../../modules/network-public"
+  source = "../../../../modules/infrastructure/network-public"
 
   vpc_cidr           = var.vpc_cidr
   availability_zones = var.availability_zones
@@ -385,13 +391,13 @@ module "cluster" {
 }
 ```
 
-**State Management** (`00-providers.tf`):
+**Infrastructure State Management** (`infrastructure/00-providers.tf`):
 
 ```hcl
 terraform {
   backend "s3" {
     bucket         = "my-org-terraform-state"
-    key            = "examples/public/terraform.tfstate"
+    key            = "examples/public/infrastructure/terraform.tfstate"
     region         = "us-east-1"
     dynamodb_table = "terraform-locks"
     encrypt        = true
@@ -400,7 +406,32 @@ terraform {
 }
 ```
 
-**Terraform Variables** (`terraform.tfvars`):
+**Configuration State Management** (`configuration/00-providers.tf`):
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "my-org-terraform-state"
+    key            = "examples/public/configuration/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "terraform-locks"
+    encrypt        = true
+  }
+  # ... providers
+}
+
+# Read infrastructure outputs
+data "terraform_remote_state" "infrastructure" {
+  backend = "s3"
+  config = {
+    bucket = "my-org-terraform-state"
+    key    = "examples/public/infrastructure/terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+```
+
+**Infrastructure Variables** (`infrastructure/terraform.tfvars`):
 
 ```hcl
 cluster_name      = "dev-public-01"
@@ -415,7 +446,7 @@ instance_type     = "m5.large"  # Smaller instance for dev
 
 ### 5.2 Example 2: Private Cluster (Development)
 
-**Path**: `clusters/examples/private/`
+**Path**: `clusters/examples/private/infrastructure/` and `clusters/examples/private/configuration/`
 
 **Purpose**: Development cluster with PrivateLink API but VPC endpoints for AWS services
 
@@ -504,7 +535,7 @@ instance_type     = "m5.large"
 
 ### 5.3 Example 3: Egress-Zero Cluster (Production-Ready)
 
-**Path**: `clusters/examples/egress-zero/`
+**Path**: `clusters/examples/egress-zero/infrastructure/` and `clusters/examples/egress-zero/configuration/`
 
 **Purpose**: Production-ready cluster with maximum security hardening and zero internet egress
 

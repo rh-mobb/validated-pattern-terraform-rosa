@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **BREAKING**: Reorganized repository structure to separate infrastructure and configuration:
+  - Modules reorganized: `modules/infrastructure/` (network, iam, cluster, bastion) and `modules/configuration/` (gitops, identity-admin)
+  - Cluster examples reorganized: Each cluster now has `infrastructure/` and `configuration/` subdirectories with separate state files
+  - Configuration uses `terraform_remote_state` data source to read infrastructure outputs
+  - Updated Makefile with infrastructure/configuration specific targets
+  - Module source paths updated: `modules/infrastructure/...` and `modules/configuration/...`
+  - **Migration required**: Existing clusters need to be migrated to new structure (see README.md for migration guide)
+
+### Added
+- Created gitops module (`modules/configuration/gitops/`) for deploying OpenShift GitOps operator:
+  - Deploys OpenShift GitOps operator (ArgoCD) via OperatorHub using oc CLI
+  - Uses terraform_data with local-exec provisioner to avoid Kubernetes provider interpolation issues
+  - Configurable operator channel, source, and install plan approval
+  - Waits for operator installation to complete and verifies deployment
+  - Supports custom namespace configuration
+  - Handles cluster authentication via oc CLI
+  - Comprehensive error handling and timeout configuration
+  - Full documentation with usage examples and troubleshooting guide
+
 ### ⚠️ Work in Progress - Egress-Zero Cluster
 - **Egress-zero cluster configuration is currently non-functional**
 - Worker nodes are not starting successfully (0/1 replicas)

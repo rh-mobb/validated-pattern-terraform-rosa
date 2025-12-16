@@ -32,6 +32,18 @@ This file tracks work items and improvements for the ROSA HCP Terraform infrastr
 
 ## Network Modules
 
+- [ ] 🟡 **Investigate and implement Network ACLs for egress-zero module**
+  - Currently using security groups only for access control
+  - NACLs provide stateless filtering at subnet level (defense-in-depth)
+  - Considerations:
+    - NACLs are stateless (require explicit allow rules for both directions)
+    - Must allow ephemeral ports for return traffic
+    - Must allow DNS (UDP and TCP port 53) to VPC CIDR
+    - Must allow HTTPS (443 TCP) to VPC CIDR for VPC endpoints
+    - Must account for ROSA-created VPC endpoint for API server access
+    - Need to handle dynamic VPC endpoint IP addresses (all within VPC CIDR)
+  - Reference: Previous implementation removed due to complexity, needs investigation
+
 - [ ] 🟡 **Add support for custom VPC endpoint policies**
   - Allow users to specify custom policies for VPC endpoints
   - Useful for compliance and security requirements
@@ -299,4 +311,3 @@ _Items will be moved here as they are completed_
 - Feel free to add items or update priorities
 - Link to related issues or PRs when available
 - Update status as work progresses
-

@@ -4,7 +4,16 @@ Production-grade Terraform repository for deploying Red Hat OpenShift Service on
 
 ## Overview
 
-This repository provides reusable Terraform modules and example configurations for deploying ROSA HCP clusters with different network topologies and security postures. The architecture follows a **Directory-Per-Cluster** pattern to ensure state isolation.
+This repository provides reusable Terraform modules and example configurations for deploying ROSA HCP clusters with different network topologies and security postures. The architecture follows a **Directory-Per-Cluster** pattern with **Infrastructure/Configuration separation** to ensure state isolation and proper lifecycle management.
+
+### Repository Structure
+
+The repository is organized into two main categories:
+
+- **Infrastructure**: Foundational AWS and ROSA resources (VPC, IAM roles, cluster)
+- **Configuration**: Cluster configuration and Day 2 operations (GitOps, identity providers, bastion)
+
+Each cluster example has separate `infrastructure/` and `configuration/` directories with independent Terraform state files. Configuration reads infrastructure outputs via `terraform_remote_state` data sources.
 
 > **⚠️ Known Issue**: The egress-zero cluster example (`clusters/examples/egress-zero/`) is currently non-functional. Worker nodes are not starting successfully. Investigation is ongoing. See [CHANGELOG.md](CHANGELOG.md) for details.
 
@@ -115,24 +124,54 @@ make destroy.private
 
 ## Repository Structure
 
-The repository is organized to support both **example deployments** and **custom infrastructure composition**:
+The repository is organized to separate **infrastructure** (foundational AWS/ROSA resources) from **configuration** (cluster configuration, GitOps, identity providers) with independent state files:
 
 ```
 rosa-hcp-infrastructure/
 ├── modules/                    # Reusable Terraform modules
-│   ├── network-public/         # Public VPC with NAT Gateways
-│   ├── network-private/        # Private VPC (PrivateLink API)
-│   ├── network-egress-zero/    # Egress Zero VPC (⚠️ WIP)
-│   ├── iam/                   # IAM roles and OIDC configuration
-│   ├── cluster/               # ROSA HCP Cluster module
-│   ├── identity-admin/        # Admin user creation (temporary bootstrap)
-│   └── bastion/               # Bastion host for private cluster access
-└── clusters/                  # Cluster configurations
-    └── examples/              # Example cluster configurations
-        ├── public/            # Development example (public API)
-        ├── private/           # Development example (private API)
-        └── egress-zero/       # Production-ready example (⚠️ WIP)
+│   ├── infrastructure/         # Infrastructure modules
+│   │   ├── network-public/     # Public VPC with NAT Gateways
+│   │   ├── network-private/    # Private VPC (PrivateLink API)
+│   │   ├── network-egress-zero/# Egress Zero VPC (⚠️ WIP)
+│   │   ├── iam/                # IAM roles and OIDC configuration
+│   │   ├── cluster/            # ROSA HCP Cluster module
+│   │   └── bastion/            # Bastion host for private cluster access
+│   └── configuration/          # Configuration modules
+│       ├── gitops/             # OpenShift GitOps operator
+│       └── identity-admin/     # Admin user creation (temporary bootstrap)
+└── clusters/                   # Cluster configurations
+    └── examples/               # Example cluster configurations
+        ├── public/             # Development example (public API)
+        │   ├── infrastructure/ # Infrastructure state (network, iam, cluster)
+        │   └── configuration/  # Configuration state (gitops, identity-admin)
+        ├── private/            # Development example (private API)
+        │   ├── infrastructure/
+        │   └── configuration/
+        └── egress-zero/        # Production-ready example (⚠️ WIP)
+            ├── infrastructure/
+            └── configuration/
 ```
+
+### Infrastructure vs Configuration
+
+**Infrastructure** (`infrastructure/` directory):
+- Creates foundational AWS and ROSA resources
+- Network (VPC, subnets, NAT gateways, VPC endpoints)
+- IAM roles and OIDC configuration
+- ROSA HCP cluster
+- Bastion host (optional, for access)
+
+**Configuration** (`configuration/` directory):
+- Configures cluster after it's created
+- OpenShift GitOps operator deployment
+- Identity providers (admin user, external IDP)
+- Reads infrastructure outputs via `terraform_remote_state` data source
+
+**Benefits of Separation**:
+- **Different Lifecycles**: Infrastructure changes infrequently; configuration changes more often
+- **Reduced Blast Radius**: Configuration changes don't risk infrastructure resources
+- **Independent Updates**: Update GitOps/identity without touching infrastructure
+- **State Isolation**: Each has its own state file for better management
 
 ### Module Architecture
 
@@ -152,9 +191,9 @@ The modules are designed to be **composable** and **reusable**. You can mix and 
 Here's how the example clusters compose modules:
 
 ```hcl
-# clusters/examples/public/10-main.tf
+# clusters/examples/public/infrastructure/10-main.tf
 module "network" {
-  source = "../../../modules/network-public"
+  source = "../../../../modules/infrastructure/network-public"
 
   name_prefix = var.cluster_name
   vpc_cidr    = var.vpc_cidr
@@ -163,7 +202,7 @@ module "network" {
 }
 
 module "iam" {
-  source = "../../../modules/iam"
+  source = "../../../../modules/infrastructure/iam"
 
   cluster_name         = var.cluster_name
   account_role_prefix  = var.cluster_name
@@ -172,7 +211,7 @@ module "iam" {
 }
 
 module "cluster" {
-  source = "../../../modules/cluster"
+  source = "../../../../modules/infrastructure/cluster"
 
   cluster_name       = var.cluster_name
   region             = var.region
@@ -184,6 +223,37 @@ module "cluster" {
   oidc_config_id     = module.iam.oidc_config_id
   oidc_endpoint_url  = module.iam.oidc_endpoint_url
   # ... other cluster configuration
+}
+```
+
+```hcl
+# clusters/examples/public/configuration/10-main.tf
+# Read infrastructure outputs via remote state
+data "terraform_remote_state" "infrastructure" {
+  backend = "local"
+  config = {
+    path = "../infrastructure/terraform.tfstate"
+  }
+}
+
+# Deploy GitOps operator
+module "gitops" {
+  source = "../../../../modules/configuration/gitops"
+
+  cluster_id   = data.terraform_remote_state.infrastructure.outputs.cluster_id
+  cluster_name = data.terraform_remote_state.infrastructure.outputs.cluster_name
+  api_url      = data.terraform_remote_state.infrastructure.outputs.api_url
+
+  admin_username = var.admin_username
+  admin_password = var.admin_password
+}
+
+# Create admin user
+module "identity_admin" {
+  source = "../../../../modules/configuration/identity-admin"
+
+  cluster_id     = data.terraform_remote_state.infrastructure.outputs.cluster_id
+  admin_password = var.admin_password
 }
 ```
 
@@ -508,11 +578,23 @@ make tunnel-start.private
 
 ### Available Actions
 
-**Cluster Management:**
-- `init.<cluster>` - Initialize Terraform
-- `plan.<cluster>` - Create and save plan file
-- `apply.<cluster>` - Apply saved plan
-- `destroy.<cluster>` - Destroy cluster
+**Cluster Management (Infrastructure + Configuration):**
+- `init.<cluster>` - Initialize both infrastructure and configuration
+- `plan.<cluster>` - Plan both (infrastructure first, then configuration)
+- `apply.<cluster>` - Apply both (infrastructure first, then configuration)
+- `destroy.<cluster>` - Destroy both (configuration first, then infrastructure)
+
+**Infrastructure Management:**
+- `init-infrastructure.<cluster>` - Initialize infrastructure only
+- `plan-infrastructure.<cluster>` - Plan infrastructure changes
+- `apply-infrastructure.<cluster>` - Apply infrastructure
+- `destroy-infrastructure.<cluster>` - Destroy infrastructure
+
+**Configuration Management:**
+- `init-configuration.<cluster>` - Initialize configuration only
+- `plan-configuration.<cluster>` - Plan configuration changes
+- `apply-configuration.<cluster>` - Apply configuration
+- `destroy-configuration.<cluster>` - Destroy configuration
 
 **Cluster Access:**
 - `login.<cluster>` - Login to cluster using `oc`
