@@ -1,0 +1,614 @@
+# Terraform Best Practices - ROSA HCP Infrastructure
+
+This project follows Terraform best practices based on Red Hat MOBB Rules.
+Reference: https://github.com/rh-mobb/mobb-rules/blob/main/content/languages/terraform/_index.md
+
+## Project Plan and Architecture
+
+### PLAN.md Compliance
+
+**CRITICAL**: Always reference and follow `PLAN.md` for this project.
+
+**MANDATORY Rules**:
+1. **Before making changes**: Review `PLAN.md` to understand the intended architecture and design decisions
+2. **During implementation**: Ensure all code aligns with the specifications in `PLAN.md`
+3. **If deviating**:
+   - **STOP and QUESTION**: Why are we deviating from the plan?
+   - **Document the deviation**: Explain the reason in code comments or commit messages
+   - **Update PLAN.md**: Keep the plan synchronized with actual implementation
+   - **Get approval**: For significant deviations, ensure stakeholders are aware
+
+4. **When updating PLAN.md**:
+   - Update relevant sections when architecture changes
+   - Document new decisions in the Architecture Decisions section
+   - Keep examples and code snippets current
+   - Update the Implementation Checklist as work progresses
+
+**Best Practice**: `PLAN.md` is the source of truth. Code should reflect the plan, and the plan should reflect reality.
+
+## Documentation Requirements
+
+### Code Documentation
+
+**MANDATORY**: All code must be well-documented:
+
+1. **Module README.md**: Every module MUST have a README.md with:
+   - Purpose and use case
+   - Input variables (with descriptions)
+   - Outputs (with descriptions)
+   - Usage examples
+   - Dependencies
+   - Requirements
+
+2. **Inline Comments**: Document:
+   - Complex logic or non-obvious decisions
+   - Workarounds for provider limitations
+   - Why certain patterns are used
+   - Resource lifecycle decisions
+   - Deviations from PLAN.md (with explanation)
+
+3. **Variable and Output Descriptions**: Every variable and output MUST have a clear description
+
+### Project Documentation
+
+**REQUIRED Files**:
+- `README.md` - Project overview, quick start, architecture summary
+- `PLAN.md` - Detailed implementation plan and architecture decisions
+- `CHANGELOG.md` - Version history and changes (see Changelog section below)
+- `ARCHITECTURE.md` - High-level architecture diagrams and decisions (if separate from PLAN.md)
+- `.cursorrules` - Development guidelines (this file)
+
+**Module Documentation**:
+- Each module in `modules/` MUST have a `README.md`
+- Document all inputs, outputs, and usage examples
+- Include architecture diagrams if helpful
+
+## Versioning and Changelog
+
+### Semantic Versioning
+
+**MANDATORY**: Use Semantic Versioning (SemVer) for modules and releases:
+- Format: `MAJOR.MINOR.PATCH` (e.g., `1.2.3`)
+- **MAJOR**: Breaking changes (incompatible API changes)
+- **MINOR**: New features (backward compatible)
+- **PATCH**: Bug fixes (backward compatible)
+
+**Versioning Strategy**:
+- Modules: Version in `versions.tf` or module metadata
+- Releases: Tag Git commits with version numbers
+- Document version compatibility in README files
+
+### CHANGELOG.md
+
+**MANDATORY**: Maintain a `CHANGELOG.md` file following [Keep a Changelog](https://keepachangelog.com/) format:
+
+**Format**:
+```markdown
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+- New features
+
+### Changed
+- Changes to existing functionality
+
+### Deprecated
+- Soon-to-be removed features
+
+### Removed
+- Removed features
+
+### Fixed
+- Bug fixes
+
+### Security
+- Security fixes
+
+## [1.0.0] - 2024-01-15
+
+### Added
+- Initial release
+- Network modules (public, private, egress-zero)
+- IAM module
+- Cluster module
+- Example cluster configurations
+```
+
+**Changelog Rules**:
+1. **Every change MUST be documented** in CHANGELOG.md
+2. **Group changes by type**: Added, Changed, Deprecated, Removed, Fixed, Security
+3. **Link to issues/PRs**: Reference related issues or pull requests
+4. **Date format**: Use YYYY-MM-DD format
+5. **Unreleased section**: Keep an "Unreleased" section for upcoming changes
+6. **Update on every commit**: Add entries as you make changes
+
+**When to update CHANGELOG.md**:
+- Adding new features or modules
+- Changing existing functionality
+- Fixing bugs
+- Deprecating features
+- Removing features
+- Security updates
+- **Any deviation from PLAN.md** (document why)
+
+### Version Tags
+
+**Best Practice**: Tag releases in Git:
+```bash
+git tag -a v1.0.0 -m "Release version 1.0.0"
+git push origin v1.0.0
+```
+
+Tag format: `vMAJOR.MINOR.PATCH` (e.g., `v1.2.3`)
+
+## File Organization
+
+### File Naming and Structure
+
+**MANDATORY**: Use numeric prefixes to control execution order:
+- `00-providers.tf` - Provider configuration and Terraform settings (ALWAYS FIRST)
+- `01-variables.tf` - Variable definitions
+- `02-data.tf` - Data sources (if many exist)
+- `03-network.tf` - Network resources
+- `04-compute.tf` - Compute resources
+- `05-storage.tf` - Storage resources
+- `06-security.tf` - Security groups, IAM, etc.
+- `10-main.tf` - Main resources (if not using numbered files)
+- `90-outputs.tf` - Output values (ALWAYS LAST, use 90-99 range)
+
+**File Naming Rules**:
+- Use lowercase with underscores: `network_resources.tf`
+- Be descriptive: `database_cluster.tf` not `db.tf`
+- Group by resource type or function, not by provider
+- Keep related resources in the same file
+
+## Code Style and Conventions
+
+### Provider Configuration
+
+**REQUIRED**: Always pin provider versions:
+```hcl
+terraform {
+  required_version = ">= 1.5.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"  # Use ~> to allow patch updates but not minor version changes
+    }
+    rhcs = {
+      source  = "terraform-redhat/rhcs"
+      version = "~> 1.7"
+    }
+  }
+}
+```
+
+**Best Practice**: Pin provider versions to avoid unexpected changes. Use `~>` to allow patch updates but not minor version changes.
+
+### Resource Naming
+
+- Use descriptive names: `aws_vpc.main` not `aws_vpc.vpc1`
+- Follow Terraform conventions: lowercase with underscores
+- Include resource type in name when helpful: `aws_security_group.web_server`
+
+### Variable Definitions
+
+**MANDATORY**: All variables MUST include:
+- `description` - Always include a description
+- `type` - Explicit type declaration
+- `nullable` - Explicit nullability (use `nullable = true` with `default = null` for optional)
+- `sensitive = true` - For passwords, tokens, and secrets
+- `validation` blocks - For input validation when appropriate
+
+**Example**:
+```hcl
+variable "cluster_name" {
+  description = "The name of the ROSA HCP cluster"
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^[a-z0-9-]+$", var.cluster_name))
+    error_message = "Cluster name must contain only lowercase letters, numbers, and hyphens."
+  }
+}
+
+variable "admin_password" {
+  description = "Password for the admin user"
+  type        = string
+  sensitive   = true
+  nullable    = false
+
+  validation {
+    condition     = length(var.admin_password) >= 14
+    error_message = "Password must be at least 14 characters long."
+  }
+}
+
+variable "kms_key_arn" {
+  description = "KMS key ARN for encryption (optional)"
+  type        = string
+  nullable    = true
+  default     = null
+}
+```
+
+**Best Practices**:
+- Always include `description` for all variables and outputs
+- Use `sensitive = true` for passwords, tokens, and secrets
+- Use `nullable = true` with `default = null` for optional variables
+- Provide meaningful default values when appropriate
+- Use `validation` blocks for input validation
+
+### Output Definitions
+
+**MANDATORY**: All outputs MUST include:
+- `description` - Always include a description
+- `sensitive` - Mark as `true` for sensitive outputs (passwords, tokens, kubeconfigs)
+
+**Example**:
+```hcl
+output "vpc_id" {
+  description = "The ID of the VPC"
+  value       = aws_vpc.main.id
+  sensitive   = false
+}
+
+output "kubeconfig" {
+  description = "Kubernetes configuration file"
+  value       = module.cluster.kubeconfig
+  sensitive   = true
+}
+```
+
+### Locals for Computed Values
+
+Use locals for computed values and conditional logic:
+```hcl
+locals {
+  # Use locals for computed values and conditional logic
+  environment = var.environment != null ? var.environment : "dev"
+  common_tags = merge(var.tags, {
+    Environment = local.environment
+    ManagedBy   = "Terraform"
+    Project     = "rosa-hcp"
+  })
+}
+```
+
+## Resource Lifecycle
+
+Use lifecycle blocks appropriately:
+```hcl
+resource "aws_instance" "example" {
+  # ...
+
+  lifecycle {
+    # Use create_before_destroy for resources that can't be replaced in-place
+    create_before_destroy = true
+
+    # Use prevent_destroy sparingly for critical resources
+    # prevent_destroy = true
+
+    # Ignore changes for attributes managed outside Terraform
+    ignore_changes = [tags]
+  }
+}
+```
+
+## Dependencies
+
+- **Prefer implicit dependencies** (references) over explicit `depends_on`
+- Use `depends_on` only when dependencies aren't obvious
+- **Document why `depends_on` is needed** if you use it
+
+## Conditional Resources
+
+**Best Practice**: Prefer `for_each` over `count` when possible for more stable resource addressing.
+
+```hcl
+# Use count for simple conditionals
+resource "aws_instance" "bastion" {
+  count = var.create_bastion ? 1 : 0
+  # ...
+}
+
+# Use for_each for multiple resources (more stable addressing)
+resource "aws_instance" "workers" {
+  for_each = var.worker_configs
+  # ...
+}
+```
+
+## Error Handling
+
+Provide clear, actionable error messages using preconditions and postconditions:
+```hcl
+resource "aws_instance" "example" {
+  # ...
+
+  lifecycle {
+    precondition {
+      condition     = var.instance_type != "t2.micro" || var.environment == "dev"
+      error_message = "t2.micro instances are only allowed in dev environment. Current: ${var.environment}"
+    }
+
+    postcondition {
+      condition     = self.private_ip != null
+      error_message = "Instance must have a private IP address"
+    }
+  }
+}
+```
+
+## State Management
+
+### Remote State
+
+**MANDATORY**: Always use remote state for production:
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "my-terraform-state"
+    key            = "production/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "terraform-state-lock"
+  }
+}
+```
+
+### State Locking
+
+- Always enable state locking (automatic with S3 backend + DynamoDB)
+- Configure appropriate lock timeouts
+- **Never disable locking in production**
+
+### State File Hygiene
+
+- **Never commit state files** to version control (add to `.gitignore`)
+- Use `.terraformignore` to exclude unnecessary files
+- Regularly review state file size
+- Use `terraform state list` to audit resources
+
+## Module Development
+
+### Module Structure
+
+**REQUIRED** structure:
+```
+modules/my-module/
+├── main.tf           # Primary resources
+├── variables.tf       # Input variables
+├── outputs.tf         # Output values
+├── README.md          # Module documentation (REQUIRED)
+└── versions.tf         # Provider requirements (optional)
+```
+
+### Module Best Practices
+
+**Version Pinning**:
+- Pin module versions when using from registry: `source = "terraform-aws-modules/vpc/aws?ref=v5.0.0"`
+- Use version constraints: `version = "~> 5.0"` (allows patch updates)
+- Document version compatibility
+
+**Module Interface**:
+- Keep interfaces simple and focused
+- Use consistent variable naming
+- Provide sensible defaults
+- **Document all inputs and outputs**
+
+**Example Module**:
+```hcl
+# modules/vpc/main.tf
+resource "aws_vpc" "this" {
+  cidr_block = var.cidr_block
+  tags       = var.tags
+}
+
+# modules/vpc/variables.tf
+variable "cidr_block" {
+  description = "CIDR block for the VPC"
+  type        = string
+  nullable    = false
+}
+
+variable "tags" {
+  description = "Tags to apply to resources"
+  type        = map(string)
+  default     = {}
+  nullable    = false
+}
+
+# modules/vpc/outputs.tf
+output "vpc_id" {
+  description = "ID of the VPC"
+  value       = aws_vpc.this.id
+  sensitive   = false
+}
+```
+
+## Security Practices
+
+### Secrets Management
+
+**CRITICAL**: Never commit secrets:
+- Use environment variables: `TF_VAR_password`
+- Use secret management systems (AWS Secrets Manager, HashiCorp Vault)
+- Mark sensitive variables: `sensitive = true`
+- Mark sensitive outputs: `sensitive = true`
+
+**Example**:
+```hcl
+variable "api_key" {
+  description = "API key for external service"
+  type        = string
+  sensitive   = true
+  nullable    = false
+}
+```
+
+### IAM and Permissions
+
+- Follow principle of least privilege
+- Review IAM policies regularly
+- Use separate service accounts/roles for CI/CD
+- Document why specific permissions are needed
+
+### Security Scanning
+
+Use checkov or similar tools to scan for security issues:
+```bash
+checkov -d . --framework terraform
+```
+
+**Suppressing False Positives**:
+Use inline comments in your code:
+```hcl
+resource "aws_s3_bucket" "public" {
+  # checkov:skip=CKV_AWS_20:This bucket is intentionally public for static content
+  bucket = "public-static-content"
+  acl    = "public-read"
+}
+```
+
+**Best Practice**: Document why you're skipping checks. If a check is frequently skipped, consider if the configuration should be changed.
+
+## Resource Tagging
+
+**MANDATORY**: Use consistent tagging strategy:
+```hcl
+locals {
+  common_tags = {
+    Environment   = var.environment
+    Project       = var.project_name
+    ManagedBy     = "Terraform"
+    CreatedDate   = timestamp()
+  }
+}
+
+resource "aws_instance" "example" {
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-web-server"
+  })
+}
+```
+
+### Provider Configuration
+
+Use `default_tags` for AWS provider:
+```hcl
+provider "aws" {
+  region = var.region
+
+  default_tags {
+    tags = var.tags
+  }
+}
+```
+
+## Performance
+
+- Use `for_each` instead of `count` when possible (more stable resource addressing)
+- Avoid unnecessary `depends_on` (Terraform usually infers dependencies)
+- Use `-target` sparingly and only for debugging
+- Consider `terraform plan -refresh=false` for faster plans when state is current
+
+## Code Organization
+
+- Group related resources together
+- Use data sources to avoid hardcoding values
+- Cache data source results when appropriate
+- Organize data sources in a `data.tf` file if many exist
+
+## Code Comments
+
+**When to comment**:
+- Complex logic or non-obvious decisions
+- Workarounds for provider limitations
+- Why certain patterns are used
+- Resource lifecycle decisions
+
+**Example**:
+```hcl
+# Use create_before_destroy because this resource can't be replaced in-place
+resource "aws_instance" "example" {
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+```
+
+## ROSA HCP Specific Rules
+
+### Network Modules
+
+- **MANDATORY**: Apply ROSA-required tags to subnets:
+  - Private Subnets: `kubernetes.io/role/internal-elb = "1"`
+  - Public Subnets: `kubernetes.io/role/elb = "1"`
+
+### Cluster Module
+
+- Always use `multi_az = true` for production clusters
+- Set `private = true` for production (PrivateLink API)
+- Enable `etcd_encryption = true` for production
+- Use customer-managed KMS keys for encryption in production
+
+### IAM Module
+
+- Use prefixes for account roles to ensure uniqueness: `account_role_prefix = "${var.cluster_name}-"`
+- Document all operator roles created
+- Use least privilege principles
+
+## Checklist for New Code
+
+When writing new Terraform code, ensure:
+- [ ] **PLAN.md reviewed** - Changes align with project plan
+- [ ] **PLAN.md updated** - If architecture changed, update the plan
+- [ ] **CHANGELOG.md updated** - Document all changes
+- [ ] File uses numeric prefix (00-99) for execution order
+- [ ] File name uses lowercase with underscores
+- [ ] Provider versions are pinned
+- [ ] All variables have descriptions, types, and nullable flags
+- [ ] Sensitive variables marked with `sensitive = true`
+- [ ] All outputs have descriptions
+- [ ] Sensitive outputs marked with `sensitive = true`
+- [ ] Resources use descriptive names
+- [ ] Common tags are applied to all resources
+- [ ] No secrets are hardcoded
+- [ ] State backend is configured (for cluster directories)
+- [ ] Validation blocks added where appropriate
+- [ ] Comments added for complex logic or non-obvious decisions
+- [ ] Module README.md created/updated (if creating/updating a module)
+- [ ] Documentation updated for any new features or changes
+
+## Workflow Checklist
+
+Before committing code, ensure:
+1. [ ] Code follows PLAN.md specifications
+2. [ ] PLAN.md updated if architecture changed
+3. [ ] CHANGELOG.md updated with changes
+4. [ ] All documentation updated (README.md, module docs)
+5. [ ] Code passes linting/validation
+6. [ ] Security scanning completed (checkov)
+7. [ ] Variables and outputs documented
+8. [ ] Sensitive data properly handled
+9. [ ] Version numbers updated if needed
+10. [ ] Git commit message references PLAN.md if deviating
+
+## References
+
+- **Project Plan**: See `PLAN.md` in repository root
+- Red Hat MOBB Terraform Rules: https://github.com/rh-mobb/mobb-rules/blob/main/content/languages/terraform/_index.md
+- Terraform Best Practices: https://www.terraform.io/docs/language/best-practices
+- ROSA HCP Documentation: https://docs.redhat.com/en/documentation/red_hat_openshift_service_on_aws/
+- Keep a Changelog: https://keepachangelog.com/
+- Semantic Versioning: https://semver.org/

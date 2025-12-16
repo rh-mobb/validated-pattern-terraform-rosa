@@ -1,0 +1,12 @@
+# Ignore documentation files
+*.md
+!modules/*/README.md
+
+# Ignore example tfvars (they're in examples)
+clusters/examples/**/*.tfvars
+
+# Ignore plan files
+*.tfplan
+
+# Ignore backup files
+*.backup
