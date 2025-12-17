@@ -275,7 +275,7 @@ tunnel-start.%:
 			exit 0; \
 		fi && \
 		echo "$(YELLOW)Note: sshuttle requires sudo privileges. You will be prompted for your local sudo password.$(NC)" && \
-		sudo sshuttle --ssh-cmd "ssh -o ProxyCommand='aws --region $$REGION ssm start-session --target $$BASTION_ID --document-name AWS-StartSSHSession --parameters portNumber=22' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+		sudo sshuttle --ssh-cmd "ssh -i $(HOME)/.ssh/id_rsa -o ProxyCommand='aws --region $$REGION ssm start-session --target $$BASTION_ID --document-name AWS-StartSSHSession --parameters portNumber=22' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
 			--remote ec2-user@$$BASTION_ID \
 			--dns $$VPC_CIDR \
 			$$VPC_CIDR \
