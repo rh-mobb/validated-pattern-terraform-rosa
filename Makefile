@@ -299,10 +299,10 @@ tunnel-stop.%:
 			PID=$$(cat $$PIDFILE 2>/dev/null) && \
 			if [ -n "$$PID" ] && kill -0 $$PID 2>/dev/null; then \
 				sudo kill $$PID && \
-				rm -f $$PIDFILE && \
+				sudo rm -f $$PIDFILE && \
 				echo "$(GREEN)Tunnel stopped$(NC)"; \
 			else \
-				rm -f $$PIDFILE && \
+				sudo rm -f $$PIDFILE && \
 				echo "$(YELLOW)Tunnel process not found (cleaned up PID file)$(NC)"; \
 			fi; \
 		else \
