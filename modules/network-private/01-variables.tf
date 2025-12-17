@@ -36,7 +36,7 @@ variable "subnet_cidr_size" {
   nullable    = true
 
   validation {
-    condition     = var.subnet_cidr_size == null || (var.subnet_cidr_size > 16 && var.subnet_cidr_size <= 28)
+    condition     = var.subnet_cidr_size == null ? true : (var.subnet_cidr_size > 16 && var.subnet_cidr_size <= 28)
     error_message = "Subnet CIDR size must be between 17 and 28 if provided."
   }
 }
