@@ -1,12 +1,24 @@
 output "gitops_deployed" {
   description = "Whether GitOps operator was deployed"
-  value       = var.deploy_gitops && length(module.gitops) > 0
+  value       = var.gitops_enabled && length(openshift_operator.gitops) > 0
   sensitive   = false
 }
 
 output "gitops_namespace" {
   description = "Namespace where GitOps operator is installed"
-  value       = var.deploy_gitops && length(module.gitops) > 0 ? module.gitops[0].gitops_namespace : null
+  value       = var.gitops_enabled && length(openshift_operator.gitops) > 0 ? openshift_operator.gitops[0].namespace : null
+  sensitive   = false
+}
+
+output "gitops_csv" {
+  description = "Name of the installed GitOps operator CSV"
+  value       = var.gitops_enabled && length(openshift_operator.gitops) > 0 ? openshift_operator.gitops[0].installed_csv : null
+  sensitive   = false
+}
+
+output "gitops_csv_phase" {
+  description = "Current phase of the GitOps operator CSV"
+  value       = var.gitops_enabled && length(openshift_operator.gitops) > 0 ? openshift_operator.gitops[0].csv_phase : null
   sensitive   = false
 }
 
@@ -26,19 +38,19 @@ output "bastion_deployed" {
 
 output "bastion_instance_id" {
   description = "Bastion instance ID (from infrastructure)"
-  value       = data.terraform_remote_state.infrastructure.outputs.bastion_instance_id
+  value       = try(data.terraform_remote_state.infrastructure.outputs.bastion_instance_id, null)
   sensitive   = false
 }
 
 output "bastion_ssm_command" {
   description = "Command to connect to bastion via SSM Session Manager (from infrastructure)"
-  value       = data.terraform_remote_state.infrastructure.outputs.bastion_ssm_command
+  value       = try(data.terraform_remote_state.infrastructure.outputs.bastion_ssm_command, null)
   sensitive   = false
 }
 
 output "bastion_sshuttle_command" {
   description = "Command to create VPN-like access via sshuttle (from infrastructure)"
-  value       = data.terraform_remote_state.infrastructure.outputs.bastion_sshuttle_command
+  value       = try(data.terraform_remote_state.infrastructure.outputs.bastion_sshuttle_command, null)
   sensitive   = false
 }
 

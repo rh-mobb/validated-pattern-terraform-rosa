@@ -1,16 +1,26 @@
 # GitOps Module
 
-This module deploys the OpenShift GitOps operator (ArgoCD) to a ROSA HCP cluster using the Kubernetes provider. It uses Terraform-native Kubernetes resources for proper state management, dependency handling, and idempotency.
+This module creates the namespace for the OpenShift GitOps operator (ArgoCD) on a ROSA HCP cluster using the Kubernetes provider.
+
+## Current Status
+
+**Currently, this module only creates the GitOps namespace.** The operator installation resources (OperatorGroup, Subscription, CSV) are not yet implemented due to a known limitation with `kubernetes_manifest` resources that require API schema validation during planning, which currently fails with authentication errors even though the provider is correctly configured.
+
+The namespace resource (`kubernetes_namespace_v1`) works correctly, confirming that Kubernetes provider authentication is functioning properly. The issue is specific to `kubernetes_manifest` resources.
 
 ## Features
 
-- Deploys OpenShift GitOps operator via OperatorHub using Kubernetes provider
+- Creates namespace for GitOps operator with proper labels
+- Supports custom namespace configuration
+- Proper Terraform state management
+
+## Planned Features (Not Yet Implemented)
+
+- Deploy OpenShift GitOps operator via OperatorHub using Kubernetes provider
 - Configurable operator channel and source
 - Automatic or manual install plan approval
-- Waits for operator installation to complete (CSV in Succeeded phase)
-- Verifies operator deployment is available
-- Supports custom namespace configuration
-- Proper Terraform state management and dependency handling
+- Wait for operator installation to complete (CSV in Succeeded phase)
+- Verify operator deployment is available
 
 ## Usage
 
@@ -85,9 +95,9 @@ module "gitops" {
   install_plan_approval = "Automatic"  # or "Manual"
   skip_tls_verify       = false  # Not recommended for production
 
-  tags = {
-    Environment = "production"
-    ManagedBy   = "Terraform"
+  labels = {
+    "environment" = "production"
+    "managed-by"  = "terraform"
   }
 }
 ```
@@ -145,7 +155,7 @@ module "gitops" {
 | operator_source | Operator source catalog | `string` | `"redhat-operators"` |
 | install_plan_approval | Install plan approval strategy (Automatic or Manual) | `string` | `"Automatic"` |
 | skip_tls_verify | Skip TLS verification for Kubernetes API connection | `bool` | `false` |
-| tags | Tags to apply to resources (for documentation) | `map(string)` | `{}` |
+| labels | Labels to apply to Kubernetes resources | `map(string)` | `{}` |
 
 ## Outputs
 
@@ -251,9 +261,21 @@ module "gitops" {
 }
 ```
 
+## Known Limitations
+
+### kubernetes_manifest Authentication Issue
+
+The `kubernetes_manifest` resource type requires API schema validation during Terraform planning, which makes an authenticated API call to discover the schema. Even though the Kubernetes provider is correctly configured with username/password credentials (as evidenced by `kubernetes_namespace_v1` working correctly), `kubernetes_manifest` resources fail with "system:anonymous" errors during the schema discovery phase.
+
+This is a known limitation of `kubernetes_manifest` - it needs API access during planning, not just during apply. Until this is resolved, operator resources (OperatorGroup, Subscription, CSV) cannot be managed via Terraform.
+
+**Workaround**: After the namespace is created, install the operator manually:
+- **OpenShift Console**: Operators → OperatorHub → Search "OpenShift GitOps" → Install
+- **oc CLI**: Create OperatorGroup and Subscription YAML files and apply them manually
+
 ## Post-Deployment
 
-After the GitOps operator is deployed, you can:
+After the namespace is created, you can manually install the GitOps operator. Once installed, you can:
 
 1. **Access ArgoCD Console**: The operator creates an ArgoCD instance in the `openshift-gitops` namespace
 2. **Get ArgoCD Admin Password**:

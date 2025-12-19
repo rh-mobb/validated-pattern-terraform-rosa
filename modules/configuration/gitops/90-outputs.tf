@@ -6,25 +6,31 @@ output "gitops_deployed" {
 
 output "gitops_namespace" {
   description = "Namespace where GitOps operator is installed"
-  value       = var.deploy_gitops ? kubernetes_namespace.gitops[0].metadata[0].name : null
+  value       = var.deploy_gitops ? openshift_operator.gitops[0].namespace : null
   sensitive   = false
 }
 
 output "operator_channel" {
   description = "Channel used for GitOps operator subscription"
-  value       = var.deploy_gitops ? var.operator_channel : null
+  value       = var.deploy_gitops ? openshift_operator.gitops[0].channel : null
   sensitive   = false
 }
 
 output "installed_csv" {
   description = "Name of the installed ClusterServiceVersion (CSV)"
-  value       = var.deploy_gitops ? try(local.installed_csv_name, null) : null
+  value       = var.deploy_gitops ? openshift_operator.gitops[0].installed_csv : null
+  sensitive   = false
+}
+
+output "csv_phase" {
+  description = "Current phase of the CSV (e.g., 'Succeeded', 'Installing', 'Failed')"
+  value       = var.deploy_gitops ? openshift_operator.gitops[0].csv_phase : null
   sensitive   = false
 }
 
 output "operator_deployment_ready" {
   description = "Whether the GitOps operator deployment is ready (true when CSV is Succeeded)"
-  value       = var.deploy_gitops ? (local.installed_csv_name != null) : false
+  value       = var.deploy_gitops && length(openshift_operator.gitops) > 0 ? openshift_operator.gitops[0].csv_phase == "Succeeded" : false
   sensitive   = false
 }
 

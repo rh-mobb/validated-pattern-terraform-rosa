@@ -48,8 +48,14 @@ output "private_subnet_ids" {
 
 output "admin_user_created" {
   description = "Whether admin user was created"
-  value       = var.admin_password != null && length(module.identity_admin) > 0
+  value       = length(module.identity_admin) > 0
   sensitive   = false
+}
+
+output "admin_password" {
+  description = "Admin password (sensitive - only output if admin user was created)"
+  value       = var.admin_password
+  sensitive   = true
 }
 
 output "bastion_deployed" {

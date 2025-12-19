@@ -36,10 +36,10 @@ rosa-hcp-infrastructure/
             │   ├── 90-outputs.tf
             │   └── terraform.tfvars
             └── configuration/   # Configuration state (gitops, identity-admin)
-                ├── 00-providers.tf
-                ├── 01-variables.tf
+            ├── 00-providers.tf
+            ├── 01-variables.tf
                 ├── 10-main.tf   # Uses terraform_remote_state to read infrastructure
-                ├── 90-outputs.tf
+            ├── 90-outputs.tf
                 └── terraform.tfvars
         └── private/
             ├── infrastructure/

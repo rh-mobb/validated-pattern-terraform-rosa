@@ -17,21 +17,6 @@ variable "api_url" {
   nullable    = false
 }
 
-# Authentication (Required)
-variable "admin_username" {
-  description = "Admin username for cluster authentication"
-  type        = string
-  default     = "admin"
-  nullable    = false
-}
-
-variable "admin_password" {
-  description = "Admin password for cluster authentication"
-  type        = string
-  sensitive   = true
-  nullable    = false
-}
-
 # GitOps Configuration
 variable "deploy_gitops" {
   description = "Whether to deploy the OpenShift GitOps operator"
@@ -54,6 +39,17 @@ variable "operator_channel" {
   nullable    = false
 }
 
+variable "operator_version" {
+  description = <<EOF
+  Specific version of the GitOps operator to install (e.g., "1.18.2").
+  If specified, this will pin the operator to this exact version via startingCSV.
+  If null, the latest version from the specified channel will be installed.
+  EOF
+  type        = string
+  default     = "1.18.2"
+  nullable    = true
+}
+
 variable "operator_source" {
   description = "Operator source catalog (redhat-operators, certified-operators, etc.)"
   type        = string
@@ -64,7 +60,7 @@ variable "operator_source" {
 variable "install_plan_approval" {
   description = "Install plan approval strategy (Automatic or Manual)"
   type        = string
-  default     = "Automatic"
+  default     = "Manual"
   nullable    = false
 
   validation {
@@ -73,20 +69,25 @@ variable "install_plan_approval" {
   }
 }
 
-# Note: wait_timeout removed - Kubernetes provider handles waiting automatically
-# The provider will wait for resources to be ready based on wait conditions
+# Note: The OpenShift provider must be configured at the root level with:
+#   provider "openshift" {
+#     host     = var.api_url
+#     token    = var.k8s_token  # Bearer token for authentication
+#     insecure = var.skip_tls_verify
+#   }
+# This module does not configure the provider - it inherits from the root configuration.
 
-# Kubernetes Provider Configuration
+# Provider Configuration (for documentation - actual provider config is at root level)
 variable "skip_tls_verify" {
-  description = "Skip TLS verification for Kubernetes API connection (not recommended for production)"
+  description = "Skip TLS verification for OpenShift API connection (not recommended for production). This should match the root-level provider configuration."
   type        = bool
   default     = false
   nullable    = false
 }
 
-# Tags
-variable "tags" {
-  description = "Tags to apply to resources (for documentation purposes)"
+# Labels
+variable "labels" {
+  description = "Labels to apply to Kubernetes resources"
   type        = map(string)
   default     = {}
   nullable    = false

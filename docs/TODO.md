@@ -278,6 +278,33 @@ This file tracks work items and improvements for the ROSA HCP Terraform infrastr
   - Module registry setup
   - Version pinning examples
 
+- [ ] 🟡 **Explore exec plugin for OpenShift token authentication**
+  - Currently using `oc login` to obtain token and passing it as a variable
+  - Investigate using Kubernetes exec plugin pattern (similar to EKS) for automatic token refresh
+  - Example EKS pattern:
+    ```hcl
+    provider "kubernetes" {
+      host                   = var.cluster_endpoint
+      cluster_ca_certificate = base64decode(var.cluster_ca_cert)
+      exec {
+        api_version = "client.authentication.k8s.io/v1beta1"
+        args        = ["eks", "get-token", "--cluster-name", var.cluster_name]
+        command     = "aws"
+      }
+    }
+    ```
+  - Benefits:
+    - Automatic token refresh (no manual `oc login` required)
+    - No need to pass tokens as variables (improved security)
+    - Better integration with CI/CD pipelines
+    - Token refresh handled by provider automatically
+  - Considerations:
+    - OpenShift/ROSA equivalent of `aws eks get-token` (likely `oc` CLI)
+    - Exec plugin API version compatibility
+    - Support in both `kubernetes` and `openshift-operator` providers
+    - Fallback to current method if exec plugin not available
+  - Reference: [Kubernetes Exec Credential Provider](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins)
+
 ---
 
 ## Developer Experience

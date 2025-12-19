@@ -1,38 +1,16 @@
-variable "admin_username" {
-  description = "Admin username for cluster authentication"
-  type        = string
-  default     = "admin"
-  nullable    = false
-}
-
-variable "admin_password" {
+variable "k8s_token" {
   description = <<EOF
-  Password for the 'admin' user. Identity provider is not created if unspecified.
-  Password must be 14 characters or more, contain one uppercase letter and a symbol or number.
+  Kubernetes bearer token for cluster authentication.
+  Automatically obtained by Makefile via 'oc login' using admin username/password from infrastructure state.
 
   Can be provided via:
-  - terraform.tfvars file (not recommended for production)
-  - Environment variable: TF_VAR_admin_password
-  EOF
-  type        = string
-  sensitive   = true
-  default     = null
-  nullable    = true
-}
-
-variable "token" {
-  description = <<EOF
-  OCM token used to authenticate against the OpenShift Cluster Manager API.
-  See https://console.redhat.com/openshift/token/rosa/show to access your token.
-
-  Can be provided via:
-  - terraform.tfvars file (not recommended for production)
-  - Environment variable: TF_VAR_token
-  - Environment variable: OCM_TOKEN or ROSA_TOKEN (provider will check these if token is not set)
+  - Environment variable: TF_VAR_k8s_token
+  - Automatically set by Makefile from infrastructure credentials
   EOF
   type        = string
   sensitive   = true
   nullable    = false
+  ephemeral   = true  # Don't save in plan files - tokens expire/rotate
 }
 
 variable "skip_tls_verify" {
@@ -42,15 +20,22 @@ variable "skip_tls_verify" {
   nullable    = false
 }
 
-variable "deploy_gitops" {
+variable "gitops_enabled" {
   description = "Whether to deploy the OpenShift GitOps operator"
   type        = bool
   default     = true
   nullable    = false
 }
 
-variable "tags" {
-  description = "Tags to apply to all resources"
+variable "gitops_operator_version" {
+  description = "Specific version of the GitOps operator to install (e.g., \"1.18.2\"). If null, uses latest from channel."
+  type        = string
+  default     = "1.18.2"
+  nullable    = true
+}
+
+variable "labels" {
+  description = "Labels to apply to Kubernetes resources (e.g., GitOps operator)"
   type        = map(string)
   default     = {}
   nullable    = false

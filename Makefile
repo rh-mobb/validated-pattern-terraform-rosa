@@ -26,6 +26,44 @@ get_infrastructure_dir = $(call cluster_dir,$1)/infrastructure
 # Helper function to get configuration directory
 get_configuration_dir = $(call cluster_dir,$1)/configuration
 
+# Shell function to get Kubernetes token with retry logic (5 minute timeout)
+# Usage: Call this function within a shell command block
+# Sets K8S_TOKEN variable in the shell context
+define get_k8s_token_with_retry
+	if [ -z "$$TF_VAR_k8s_token" ]; then \
+		echo "$(BLUE)Obtaining Kubernetes token via oc login...$(NC)"; \
+		if ! command -v oc >/dev/null 2>&1; then \
+			echo "$(YELLOW)Error: oc CLI not found. Required for authentication.$(NC)"; \
+			echo "$(YELLOW)Install OpenShift CLI: https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/$(NC)"; \
+			exit 1; \
+		fi; \
+		TIMEOUT=300; \
+		ELAPSED=0; \
+		INTERVAL=10; \
+		K8S_TOKEN=""; \
+		while [ $$ELAPSED -lt $$TIMEOUT ]; do \
+			if oc login $$API_URL --username=admin --password=$$ADMIN_PASSWORD --insecure-skip-tls-verify=true >/dev/null 2>&1 || \
+			   oc login $$API_URL --username=admin --password=$$ADMIN_PASSWORD --insecure-skip-tls-verify=false >/dev/null 2>&1; then \
+				K8S_TOKEN=$$(oc whoami --show-token 2>/dev/null); \
+				if [ -n "$$K8S_TOKEN" ]; then \
+					echo "$(GREEN)Successfully obtained Kubernetes token$(NC)"; \
+					break; \
+				fi; \
+			fi; \
+			printf "$(YELLOW)Waiting for cluster to be ready... (%ds/%ds)$(NC)\n" $$ELAPSED $$TIMEOUT; \
+			sleep $$INTERVAL; \
+			ELAPSED=$$((ELAPSED + INTERVAL)); \
+		done; \
+		if [ -z "$$K8S_TOKEN" ]; then \
+			echo "$(YELLOW)Error: Failed to login to cluster after $$TIMEOUT seconds$(NC)"; \
+			exit 1; \
+		fi; \
+	else \
+		echo "$(YELLOW)Note: Using TF_VAR_k8s_token from environment.$(NC)"; \
+		K8S_TOKEN=$$TF_VAR_k8s_token; \
+	fi
+endef
+
 # Backwards compatibility - explicit cluster directories
 CLUSTER_PUBLIC := clusters/examples/public
 CLUSTER_PRIVATE := clusters/examples/private
@@ -63,6 +101,7 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(GREEN)Utilities:$(NC)"
 	@echo "  make clean                Clean Terraform files (.terraform, .terraform.lock.hcl)"
+	@echo "  make install-provider     Install OpenShift operator provider from GitHub releases"
 	@echo "  make init-all             Initialize all clusters (infrastructure + configuration)"
 	@echo "  make plan-all             Plan all clusters"
 	@echo ""
@@ -91,7 +130,7 @@ init-infrastructure.%:
 	@cd $(call get_infrastructure_dir,$*) && terraform init -reconfigure
 
 # Initialize Configuration
-init-configuration.%: init-infrastructure.%
+init-configuration.%: install-provider
 	@echo "$(BLUE)Initializing $* cluster configuration...$(NC)"
 	@cd $(call get_configuration_dir,$*) && terraform init -reconfigure
 
@@ -112,9 +151,28 @@ plan-infrastructure.%: init-infrastructure.%
 	@cd $(call get_infrastructure_dir,$*) && terraform plan -out=terraform.tfplan
 
 # Plan Configuration
-plan-configuration.%: init-configuration.% plan-infrastructure.%
+plan-configuration.%: init-configuration.%
 	@echo "$(BLUE)Planning $* cluster configuration...$(NC)"
-	@cd $(call get_configuration_dir,$*) && terraform plan -out=terraform.tfplan
+	@INFRA_DIR="$(call get_infrastructure_dir,$*)" && \
+		CONFIG_DIR="$(call get_configuration_dir,$*)" && \
+		cd $$INFRA_DIR && \
+		API_URL=$$(terraform output -raw api_url 2>/dev/null) && \
+		ADMIN_PASSWORD=$$(terraform output -raw admin_password 2>/dev/null || echo "") && \
+		cd - >/dev/null && \
+		if [ -z "$$API_URL" ]; then \
+			echo "$(YELLOW)Error: Cluster not deployed or api_url output not available$(NC)"; \
+			exit 1; \
+		fi && \
+		if [ -z "$$ADMIN_PASSWORD" ] && [ -z "$$TF_VAR_k8s_token" ]; then \
+			echo "$(YELLOW)Warning: admin_password not found in infrastructure state and TF_VAR_k8s_token not set.$(NC)"; \
+			echo "$(YELLOW)You may need to:$(NC)"; \
+			echo "$(YELLOW)  1. Re-apply infrastructure to add admin_password output: make apply-infrastructure.$*$(NC)"; \
+			echo "$(YELLOW)  2. Or set TF_VAR_k8s_token environment variable$(NC)"; \
+			exit 1; \
+		fi && \
+		$(call get_k8s_token_with_retry) && \
+		cd $$CONFIG_DIR && \
+		TF_VAR_k8s_token=$$K8S_TOKEN terraform plan -out=terraform.tfplan
 
 # Plan both (infrastructure first, then configuration)
 plan.%: plan-infrastructure.% plan-configuration.%
@@ -133,9 +191,29 @@ apply-infrastructure.%: plan-infrastructure.%
 	@cd $(call get_infrastructure_dir,$*) && terraform apply terraform.tfplan
 
 # Apply Configuration (depends on infrastructure being applied)
-apply-configuration.%: plan-configuration.% apply-infrastructure.%
+# Note: Infrastructure state must exist (run apply-infrastructure first if needed)
+apply-configuration.%: plan-configuration.%
 	@echo "$(YELLOW)Applying $* cluster configuration...$(NC)"
-	@cd $(call get_configuration_dir,$*) && terraform apply terraform.tfplan
+	@INFRA_DIR="$(call get_infrastructure_dir,$*)" && \
+		CONFIG_DIR="$(call get_configuration_dir,$*)" && \
+		cd $$INFRA_DIR && \
+		API_URL=$$(terraform output -raw api_url 2>/dev/null) && \
+		ADMIN_PASSWORD=$$(terraform output -raw admin_password 2>/dev/null || echo "") && \
+		cd - >/dev/null && \
+		if [ -z "$$API_URL" ]; then \
+			echo "$(YELLOW)Error: Cluster not deployed or api_url output not available$(NC)"; \
+			exit 1; \
+		fi && \
+		if [ -z "$$ADMIN_PASSWORD" ] && [ -z "$$TF_VAR_k8s_token" ]; then \
+			echo "$(YELLOW)Warning: admin_password not found in infrastructure state and TF_VAR_k8s_token not set.$(NC)"; \
+			echo "$(YELLOW)You may need to:$(NC)"; \
+			echo "$(YELLOW)  1. Re-apply infrastructure to add admin_password output: make apply-infrastructure.$*$(NC)"; \
+			echo "$(YELLOW)  2. Or set TF_VAR_k8s_token environment variable$(NC)"; \
+			exit 1; \
+		fi && \
+		$(call get_k8s_token_with_retry) && \
+		cd $$CONFIG_DIR && \
+		TF_VAR_k8s_token=$$K8S_TOKEN terraform apply terraform.tfplan
 
 # Apply both (infrastructure first, then configuration)
 apply.%: apply-infrastructure.% apply-configuration.%
@@ -149,7 +227,26 @@ apply-egress-zero: apply.egress-zero ## Apply egress-zero cluster configuration
 # Destroy Configuration (must be destroyed first)
 destroy-configuration.%:
 	@echo "$(YELLOW)WARNING: This will destroy the $* cluster configuration!$(NC)"
-	@cd $(call get_configuration_dir,$*) && terraform destroy -auto-approve
+	@INFRA_DIR="$(call get_infrastructure_dir,$*)" && \
+		CONFIG_DIR="$(call get_configuration_dir,$*)" && \
+		cd $$INFRA_DIR && \
+		API_URL=$$(terraform output -raw api_url 2>/dev/null) && \
+		ADMIN_PASSWORD=$$(terraform output -raw admin_password 2>/dev/null || echo "") && \
+		cd - >/dev/null && \
+		if [ -z "$$API_URL" ]; then \
+			echo "$(YELLOW)Error: Cluster not deployed or api_url output not available$(NC)"; \
+			exit 1; \
+		fi && \
+		if [ -z "$$ADMIN_PASSWORD" ] && [ -z "$$TF_VAR_k8s_token" ]; then \
+			echo "$(YELLOW)Warning: admin_password not found in infrastructure state and TF_VAR_k8s_token not set.$(NC)"; \
+			echo "$(YELLOW)You may need to:$(NC)"; \
+			echo "$(YELLOW)  1. Re-apply infrastructure to add admin_password output: make apply-infrastructure.$*$(NC)"; \
+			echo "$(YELLOW)  2. Or set TF_VAR_k8s_token environment variable$(NC)"; \
+			exit 1; \
+		fi && \
+		$(call get_k8s_token_with_retry) && \
+		cd $$CONFIG_DIR && \
+		TF_VAR_k8s_token=$$K8S_TOKEN terraform destroy -auto-approve
 
 # Destroy Infrastructure (must be destroyed after configuration)
 destroy-infrastructure.%: destroy-configuration.%
@@ -258,23 +355,16 @@ login.%:
 		if [ -n "$$VPC_CIDR" ] && pgrep -f "sshuttle.*$$VPC_CIDR" >/dev/null 2>&1; then \
 			echo "$(GREEN)sshuttle tunnel active - using direct API URL (traffic routed through bastion)$(NC)"; \
 		fi && \
-		LOGIN_URL=$$API_URL && \
-		cd $(call get_configuration_dir,$*) && \
-		if [ -z "$$TF_VAR_admin_password" ]; then \
-			if [ -f "terraform.tfvars" ]; then \
-				ADMIN_PASSWORD=$$(grep -E "^admin_password\s*=" terraform.tfvars | sed -E "s/^[^=]*=\s*['\"]?([^'\"]+)['\"]?/\1/" | head -1); \
-				if [ -z "$$ADMIN_PASSWORD" ]; then \
-					echo "$(YELLOW)Error: Admin password not found. Set TF_VAR_admin_password or add to configuration/terraform.tfvars$(NC)"; \
-					exit 1; \
-				fi; \
-			else \
-				echo "$(YELLOW)Error: Admin password required. Set TF_VAR_admin_password or add to configuration/terraform.tfvars$(NC)"; \
-				exit 1; \
-			fi; \
-		else \
-			ADMIN_PASSWORD=$$TF_VAR_admin_password; \
+		ADMIN_PASSWORD=$$(terraform output -raw admin_password 2>/dev/null || echo "") && \
+		if [ -z "$$ADMIN_PASSWORD" ] && [ -z "$$TF_VAR_admin_password" ]; then \
+			echo "$(YELLOW)Error: Admin password not found in infrastructure state and TF_VAR_admin_password not set.$(NC)"; \
+			echo "$(YELLOW)You may need to:$(NC)"; \
+			echo "$(YELLOW)  1. Re-apply infrastructure to add admin_password output: make apply-infrastructure.$*$(NC)"; \
+			echo "$(YELLOW)  2. Or set TF_VAR_admin_password environment variable$(NC)"; \
+			exit 1; \
 		fi && \
-		oc login $$LOGIN_URL --username admin --password $$ADMIN_PASSWORD --insecure-skip-tls-verify=false || \
+		PASSWORD=$${ADMIN_PASSWORD:-$$TF_VAR_admin_password} && \
+		oc login $$API_URL --username admin --password $$PASSWORD --insecure-skip-tls-verify=false || \
 		(echo "$(YELLOW)Login failed. Check credentials and cluster status.$(NC)" && exit 1)
 
 # Explicit targets for backwards compatibility
@@ -423,6 +513,19 @@ tunnel-status-private: tunnel-status.private ## Check tunnel status for private 
 tunnel-status-egress-zero: tunnel-status.egress-zero ## Check tunnel status for egress-zero cluster
 bastion-connect-private: bastion-connect.private ## Connect to private cluster bastion
 bastion-connect-egress-zero: bastion-connect.egress-zero ## Connect to egress-zero cluster bastion
+
+# Install OpenShift Provider
+PROVIDER_VERSION ?= 0.1.1
+install-provider: ## Install OpenShift operator provider from GitHub releases (default: v0.1.1, override with PROVIDER_VERSION=0.1.1)
+	@echo "$(BLUE)Installing OpenShift operator provider v$(PROVIDER_VERSION)...$(NC)"
+	@if [ ! -f scripts/install-openshift-provider.sh ]; then \
+		echo "$(YELLOW)Error: Installation script not found at scripts/install-openshift-provider.sh$(NC)"; \
+		exit 1; \
+	fi
+	@chmod +x scripts/install-openshift-provider.sh
+	@scripts/install-openshift-provider.sh $(PROVIDER_VERSION)
+	@echo "$(GREEN)Provider installation complete$(NC)"
+	@echo "$(BLUE)Next steps: Run 'terraform init' in your configuration directory$(NC)"
 
 # Cleanup
 clean: ## Clean Terraform files (.terraform directories and lock files)

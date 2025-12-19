@@ -15,12 +15,24 @@ terraform {
   required_providers {
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "~> 2.30"
+      version = "~> 3.0.0"
     }
-    rhcs = {
-      source  = "terraform-redhat/rhcs"
-      version = "~> 1.7"
+    openshift = {
+      source  = "registry.terraform.io/rh-mobb/openshift"
+      version = "0.1.1"
     }
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.13"
+    }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.2"
+    }
+    # rhcs = {
+    #   source  = "terraform-redhat/rhcs"
+    #   version = "~> 1.7"
+    # }
   }
 }
 
@@ -33,15 +45,23 @@ data "terraform_remote_state" "infrastructure" {
 }
 
 # Configure Kubernetes provider for OpenShift cluster
+# Token is obtained via 'oc login' by the Makefile and passed as TF_VAR_k8s_token
 provider "kubernetes" {
   host     = data.terraform_remote_state.infrastructure.outputs.api_url
-  username = var.admin_username
-  password = var.admin_password
+  token    = var.k8s_token
   insecure = var.skip_tls_verify
 }
 
-# RHCS provider for identity-admin module
-provider "rhcs" {
-  token = var.token
-  url   = "https://api.openshift.com"
+# Configure OpenShift Operator provider
+# Uses the same credentials as Kubernetes provider
+provider "openshift" {
+  host     = data.terraform_remote_state.infrastructure.outputs.api_url
+  token    = var.k8s_token
+  insecure = var.skip_tls_verify
 }
+
+# # RHCS provider for identity-admin module
+# provider "rhcs" {
+#   token = var.token
+#   url   = "https://api.openshift.com"
+# }
