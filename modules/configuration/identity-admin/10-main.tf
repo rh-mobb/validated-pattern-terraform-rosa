@@ -2,6 +2,8 @@
 # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/05-identity.tf
 # HTPasswd Identity Provider for Admin User
 resource "rhcs_identity_provider" "admin" {
+  count = var.enable_destroy == false ? 1 : 0
+
   cluster = var.cluster_id
   name    = var.admin_username
   htpasswd = {
@@ -16,7 +18,9 @@ resource "rhcs_identity_provider" "admin" {
 # Note: Using group membership resource is deprecated, but still functional
 # Consider migrating to group membership via OCM API or console when available
 resource "rhcs_group_membership" "admin" {
-  user    = rhcs_identity_provider.admin.htpasswd.users[0].username
+  count = var.enable_destroy == false ? 1 : 0
+
+  user    = one(rhcs_identity_provider.admin[*].htpasswd.users[0].username)
   group   = var.admin_group
   cluster = var.cluster_id
 

@@ -94,3 +94,32 @@ variable "bastion_public_ssh_key" {
   default     = "~/.ssh/id_rsa.pub"
   nullable    = false
 }
+
+# Destroy Protection Variables
+variable "enable_destroy" {
+  description = "Set to true to allow resource destruction. Default false prevents accidental destroys. To destroy resources, set this to true and run terraform apply, then terraform destroy."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "enable_destroy_cluster" {
+  description = "Override enable_destroy for cluster resources. If null, uses enable_destroy value."
+  type        = bool
+  default     = null
+  nullable    = true
+}
+
+variable "enable_destroy_iam" {
+  description = "Override enable_destroy for IAM resources. If null, uses enable_destroy value."
+  type        = bool
+  default     = null
+  nullable    = true
+}
+
+variable "enable_destroy_network" {
+  description = "Override enable_destroy for network resources. If null, uses enable_destroy value."
+  type        = bool
+  default     = null
+  nullable    = true
+}

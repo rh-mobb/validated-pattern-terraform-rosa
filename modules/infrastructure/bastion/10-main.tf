@@ -41,6 +41,8 @@ locals {
 
 # IAM Role for Bastion (enables SSM Session Manager)
 resource "aws_iam_role" "bastion" {
+  count = var.enable_destroy == false ? 1 : 0
+
   name        = "${var.name_prefix}-bastion-iam-role"
   description = "IAM role for bastion host with SSM Session Manager access"
 
@@ -62,20 +64,26 @@ resource "aws_iam_role" "bastion" {
 
 # Attach SSM Managed Instance Core policy (required for Session Manager)
 resource "aws_iam_role_policy_attachment" "bastion_ssm" {
-  role       = aws_iam_role.bastion.name
+  count = var.enable_destroy == false ? 1 : 0
+
+  role       = one(aws_iam_role.bastion[*].name)
   policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 # Instance Profile for Bastion
 resource "aws_iam_instance_profile" "bastion" {
+  count = var.enable_destroy == false ? 1 : 0
+
   name = "${var.name_prefix}-bastion-instance-profile"
-  role = aws_iam_role.bastion.name
+  role = one(aws_iam_role.bastion[*].name)
 
   tags = local.common_tags
 }
 
 # SSH Key Pair for Bastion
 resource "aws_key_pair" "bastion" {
+  count = var.enable_destroy == false ? 1 : 0
+
   key_name   = "${var.name_prefix}-bastion"
   public_key = file(var.bastion_public_ssh_key)
 
@@ -84,6 +92,8 @@ resource "aws_key_pair" "bastion" {
 
 # Security Group for Bastion
 resource "aws_security_group" "bastion" {
+  count = var.enable_destroy == false ? 1 : 0
+
   name        = "${var.name_prefix}-bastion-sg"
   description = "Security group for bastion host"
   vpc_id      = var.vpc_id
@@ -113,6 +123,8 @@ resource "aws_security_group" "bastion" {
 
 # Security Group for SSM VPC Endpoints
 resource "aws_security_group" "ssm_endpoint" {
+  count = var.enable_destroy == false ? 1 : 0
+
   name        = "${var.name_prefix}-bastion-ssm-endpoint-sg"
   description = "Security group for SSM VPC endpoints (required for Session Manager)"
   vpc_id      = var.vpc_id
@@ -140,11 +152,13 @@ resource "aws_security_group" "ssm_endpoint" {
 
 # SSM Endpoint (required for SSM Session Manager)
 resource "aws_vpc_endpoint" "ssm" {
+  count = var.enable_destroy == false ? 1 : 0
+
   vpc_id              = var.vpc_id
   service_name        = "com.amazonaws.${data.aws_region.current.id}.ssm"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = var.private_subnet_ids
-  security_group_ids  = [aws_security_group.ssm_endpoint.id]
+  security_group_ids  = [one(aws_security_group.ssm_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -154,11 +168,13 @@ resource "aws_vpc_endpoint" "ssm" {
 
 # EC2 Messages Endpoint (required for SSM Session Manager)
 resource "aws_vpc_endpoint" "ec2messages" {
+  count = var.enable_destroy == false ? 1 : 0
+
   vpc_id              = var.vpc_id
   service_name        = "com.amazonaws.${data.aws_region.current.id}.ec2messages"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = var.private_subnet_ids
-  security_group_ids  = [aws_security_group.ssm_endpoint.id]
+  security_group_ids  = [one(aws_security_group.ssm_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -168,11 +184,13 @@ resource "aws_vpc_endpoint" "ec2messages" {
 
 # SSM Messages Endpoint (required for SSM Session Manager)
 resource "aws_vpc_endpoint" "ssmmessages" {
+  count = var.enable_destroy == false ? 1 : 0
+
   vpc_id              = var.vpc_id
   service_name        = "com.amazonaws.${data.aws_region.current.id}.ssmmessages"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = var.private_subnet_ids
-  security_group_ids  = [aws_security_group.ssm_endpoint.id]
+  security_group_ids  = [one(aws_security_group.ssm_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -182,13 +200,15 @@ resource "aws_vpc_endpoint" "ssmmessages" {
 
 # Bastion EC2 Instance
 resource "aws_instance" "bastion" {
+  count = var.enable_destroy == false ? 1 : 0
+
   ami                         = data.aws_ami.rhel9.id
   instance_type               = var.instance_type
   subnet_id                   = var.subnet_id
-  vpc_security_group_ids      = [aws_security_group.bastion.id]
-  iam_instance_profile        = aws_iam_instance_profile.bastion.name
+  vpc_security_group_ids      = [one(aws_security_group.bastion[*].id)]
+  iam_instance_profile        = one(aws_iam_instance_profile.bastion[*].name)
   associate_public_ip_address = var.bastion_public_ip
-  key_name                    = aws_key_pair.bastion.key_name
+  key_name                    = one(aws_key_pair.bastion[*].key_name)
 
   tags = local.common_tags
 

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Destroy Protection Pattern**: Implemented `enable_destroy` pattern to prevent accidental resource destruction:
+  - Global `enable_destroy` variable (default: `false`) controls all resources by default
+  - Per-resource override variables: `enable_destroy_cluster`, `enable_destroy_iam`, `enable_destroy_network`
+  - When `enable_destroy = false`, resources are removed from Terraform state but not destroyed in AWS
+  - To destroy resources: Set `enable_destroy = true`, run `terraform apply`, then `terraform destroy`
+  - OIDC configuration and provider are never gated (preserved for reuse across clusters)
+  - Subnet tags in `network-existing` module are never gated (read-only, managed by ROSA)
+  - All modules updated: cluster, IAM, network (public/private/egress-zero), bastion
+  - All example clusters updated with `enable_destroy = false` by default
+  - Module outputs updated to handle conditional resources (return null when gated)
+  - Example cluster module calls updated to use `try()` for conditional dependencies
+  - Comprehensive documentation added to README.md with usage examples and workflow
+  - Designed for enterprise environments with strict change control and permission constraints
+
 ### Changed
 - **BREAKING**: Reorganized repository structure to separate infrastructure and configuration:
   - Modules reorganized: `modules/infrastructure/` (network, iam, cluster, bastion) and `modules/configuration/` (gitops, identity-admin)

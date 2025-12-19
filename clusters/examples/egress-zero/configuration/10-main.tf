@@ -5,7 +5,7 @@
 resource "openshift_operator" "gitops" {
   provider = openshift
 
-  count = var.gitops_enabled ? 1 : 0
+  count = var.gitops_enabled && var.enable_destroy == false ? 1 : 0
 
   name      = "openshift-gitops-operator"
   namespace = "openshift-gitops-operator"

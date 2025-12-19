@@ -1,4 +1,7 @@
 locals {
+  # Determine if destroy is enabled (use override if provided, else global)
+  destroy_enabled = var.enable_destroy_network != null ? var.enable_destroy_network : var.enable_destroy
+
   # Determine number of AZs based on multi_az
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/modules/terraform-rosa-networking/data.tf
   az_count = var.multi_az ? 3 : 1
@@ -38,6 +41,8 @@ locals {
 
 # VPC
 resource "aws_vpc" "main" {
+  count = local.destroy_enabled == false ? 1 : 0
+
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
@@ -49,9 +54,9 @@ resource "aws_vpc" "main" {
 
 # Internet Gateway (required for Regional NAT Gateway)
 resource "aws_internet_gateway" "main" {
-  count = var.enable_nat_gateway ? 1 : 0
+  count = local.destroy_enabled == false && var.enable_nat_gateway ? 1 : 0
 
-  vpc_id = aws_vpc.main.id
+  vpc_id = one(aws_vpc.main[*].id)
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-igw"
@@ -60,9 +65,9 @@ resource "aws_internet_gateway" "main" {
 
 # Private Subnets (for Worker Nodes)
 resource "aws_subnet" "private" {
-  count = local.az_count
+  count = local.destroy_enabled == false ? local.az_count : 0
 
-  vpc_id            = aws_vpc.main.id
+  vpc_id            = one(aws_vpc.main[*].id)
   cidr_block        = local.private_subnet_cidrs[count.index]
   availability_zone = local.azs[count.index]
 
@@ -80,7 +85,7 @@ resource "aws_subnet" "private" {
 
 # Elastic IP for Regional NAT Gateway
 resource "aws_eip" "nat" {
-  count = var.enable_nat_gateway ? 1 : 0
+  count = local.destroy_enabled == false && var.enable_nat_gateway ? 1 : 0
 
   domain = "vpc"
 
@@ -95,9 +100,9 @@ resource "aws_eip" "nat" {
 # Note: Regional NAT Gateway automatically expands across AZs based on workload presence
 # Reference: https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateways-regional.html
 resource "aws_nat_gateway" "main" {
-  count = var.enable_nat_gateway ? 1 : 0
+  count = local.destroy_enabled == false && var.enable_nat_gateway ? 1 : 0
 
-  vpc_id            = aws_vpc.main.id
+  vpc_id            = one(aws_vpc.main[*].id)
   allocation_id     = aws_eip.nat[0].id
   connectivity_type = "public"
   availability_mode = "regional" # Regional NAT Gateway - no subnet required
@@ -111,13 +116,13 @@ resource "aws_nat_gateway" "main" {
 
 # Route table for private subnets
 resource "aws_route_table" "private" {
-  count = local.az_count
+  count = local.destroy_enabled == false ? local.az_count : 0
 
-  vpc_id = aws_vpc.main.id
+  vpc_id = one(aws_vpc.main[*].id)
 
   # Route to Regional NAT Gateway if enabled
   dynamic "route" {
-    for_each = var.enable_nat_gateway ? [1] : []
+    for_each = var.enable_nat_gateway && length(aws_nat_gateway.main) > 0 ? [1] : []
     content {
       cidr_block     = "0.0.0.0/0"
       nat_gateway_id = aws_nat_gateway.main[0].id
@@ -131,7 +136,7 @@ resource "aws_route_table" "private" {
 
 # Route table associations for private subnets
 resource "aws_route_table_association" "private" {
-  count = local.az_count
+  count = local.destroy_enabled == false ? local.az_count : 0
 
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private[count.index].id
@@ -140,7 +145,9 @@ resource "aws_route_table_association" "private" {
 # VPC Endpoints for AWS services
 # S3 Gateway Endpoint (no cost)
 resource "aws_vpc_endpoint" "s3" {
-  vpc_id            = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id            = one(aws_vpc.main[*].id)
   service_name      = "com.amazonaws.${data.aws_region.current.id}.s3"
   vpc_endpoint_type = "Gateway"
   route_table_ids   = aws_route_table.private[*].id
@@ -152,11 +159,13 @@ resource "aws_vpc_endpoint" "s3" {
 
 # ECR Docker API Endpoint
 resource "aws_vpc_endpoint" "ecr_dkr" {
-  vpc_id              = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.ecr.dkr"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [one(aws_security_group.vpc_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -166,11 +175,13 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
 
 # ECR API Endpoint
 resource "aws_vpc_endpoint" "ecr_api" {
-  vpc_id              = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.ecr.api"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [one(aws_security_group.vpc_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -180,11 +191,13 @@ resource "aws_vpc_endpoint" "ecr_api" {
 
 # CloudWatch Logs Endpoint
 resource "aws_vpc_endpoint" "cloudwatch_logs" {
-  vpc_id              = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.logs"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [one(aws_security_group.vpc_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -194,11 +207,13 @@ resource "aws_vpc_endpoint" "cloudwatch_logs" {
 
 # CloudWatch Monitoring Endpoint
 resource "aws_vpc_endpoint" "cloudwatch_monitoring" {
-  vpc_id              = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.monitoring"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [one(aws_security_group.vpc_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -208,11 +223,13 @@ resource "aws_vpc_endpoint" "cloudwatch_monitoring" {
 
 # STS Endpoint (required for IAM roles)
 resource "aws_vpc_endpoint" "sts" {
-  vpc_id              = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.sts"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [one(aws_security_group.vpc_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -222,9 +239,11 @@ resource "aws_vpc_endpoint" "sts" {
 
 # Security group for VPC endpoints
 resource "aws_security_group" "vpc_endpoint" {
+  count = local.destroy_enabled == false ? 1 : 0
+
   name        = "${var.name_prefix}-vpc-endpoint-sg"
   description = "Security group for VPC endpoints"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = one(aws_vpc.main[*].id)
 
   ingress {
     description = "HTTPS from VPC"

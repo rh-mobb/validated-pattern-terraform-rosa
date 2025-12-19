@@ -1,4 +1,7 @@
 locals {
+  # Determine if destroy is enabled (use override if provided, else global)
+  destroy_enabled = var.enable_destroy_network != null ? var.enable_destroy_network : var.enable_destroy
+
   # Determine number of AZs based on multi_az
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/modules/terraform-rosa-networking/data.tf
   az_count = var.multi_az ? 3 : 1
@@ -38,6 +41,8 @@ locals {
 
 # VPC
 resource "aws_vpc" "main" {
+  count = local.destroy_enabled == false ? 1 : 0
+
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
@@ -49,9 +54,9 @@ resource "aws_vpc" "main" {
 
 # Private Subnets (for Worker Nodes)
 resource "aws_subnet" "private" {
-  count = local.az_count
+  count = local.destroy_enabled == false ? local.az_count : 0
 
-  vpc_id            = aws_vpc.main.id
+  vpc_id            = one(aws_vpc.main[*].id)
   cidr_block        = local.private_subnet_cidrs[count.index]
   availability_zone = local.azs[count.index]
 
@@ -69,9 +74,9 @@ resource "aws_subnet" "private" {
 
 # Route table for private subnets
 resource "aws_route_table" "private" {
-  count = local.az_count
+  count = local.destroy_enabled == false ? local.az_count : 0
 
-  vpc_id = aws_vpc.main.id
+  vpc_id = one(aws_vpc.main[*].id)
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-private-rt-${local.azs[count.index]}"
@@ -80,7 +85,7 @@ resource "aws_route_table" "private" {
 
 # Route table associations for private subnets
 resource "aws_route_table_association" "private" {
-  count = local.az_count
+  count = local.destroy_enabled == false ? local.az_count : 0
 
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private[count.index].id
@@ -89,7 +94,9 @@ resource "aws_route_table_association" "private" {
 # VPC Endpoints for AWS services (same as private module)
 # S3 Gateway Endpoint
 resource "aws_vpc_endpoint" "s3" {
-  vpc_id            = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id            = one(aws_vpc.main[*].id)
   service_name      = "com.amazonaws.${data.aws_region.current.id}.s3"
   vpc_endpoint_type = "Gateway"
   route_table_ids   = aws_route_table.private[*].id
@@ -101,11 +108,13 @@ resource "aws_vpc_endpoint" "s3" {
 
 # ECR Docker API Endpoint
 resource "aws_vpc_endpoint" "ecr_dkr" {
-  vpc_id              = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.ecr.dkr"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [one(aws_security_group.vpc_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -115,11 +124,13 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
 
 # ECR API Endpoint
 resource "aws_vpc_endpoint" "ecr_api" {
-  vpc_id              = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.ecr.api"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [one(aws_security_group.vpc_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -129,11 +140,13 @@ resource "aws_vpc_endpoint" "ecr_api" {
 
 # CloudWatch Logs Endpoint
 resource "aws_vpc_endpoint" "cloudwatch_logs" {
-  vpc_id              = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.logs"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [one(aws_security_group.vpc_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -143,11 +156,13 @@ resource "aws_vpc_endpoint" "cloudwatch_logs" {
 
 # CloudWatch Monitoring Endpoint
 resource "aws_vpc_endpoint" "cloudwatch_monitoring" {
-  vpc_id              = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.monitoring"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [one(aws_security_group.vpc_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -157,11 +172,13 @@ resource "aws_vpc_endpoint" "cloudwatch_monitoring" {
 
 # STS Endpoint
 resource "aws_vpc_endpoint" "sts" {
-  vpc_id              = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.sts"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [one(aws_security_group.vpc_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -171,9 +188,11 @@ resource "aws_vpc_endpoint" "sts" {
 
 # Security group for VPC endpoints with strict egress control
 resource "aws_security_group" "vpc_endpoint" {
+  count = local.destroy_enabled == false ? 1 : 0
+
   name        = "${var.name_prefix}-vpc-endpoint-sg"
   description = "Security group for VPC endpoints with strict egress control"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = one(aws_vpc.main[*].id)
 
   ingress {
     description = "HTTPS from VPC"
@@ -193,9 +212,11 @@ resource "aws_security_group" "vpc_endpoint" {
 
 # Security group for worker nodes with strict egress control
 resource "aws_security_group" "worker_nodes" {
+  count = local.destroy_enabled == false ? 1 : 0
+
   name        = "${var.name_prefix}-worker-nodes-sg"
   description = "Security group for ROSA HCP worker nodes with strict egress control"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = one(aws_vpc.main[*].id)
 
   ingress {
     description = "All traffic from VPC"
@@ -251,12 +272,12 @@ resource "aws_security_group" "worker_nodes" {
 
 # VPC Flow Logs (if S3 bucket provided)
 resource "aws_flow_log" "vpc" {
-  count = var.flow_log_s3_bucket != null ? 1 : 0
+  count = local.destroy_enabled == false && var.flow_log_s3_bucket != null ? 1 : 0
 
   iam_role_arn    = aws_iam_role.vpc_flow_log[0].arn
   log_destination = "arn:aws:s3:::${var.flow_log_s3_bucket}"
   traffic_type    = "ALL"
-  vpc_id          = aws_vpc.main.id
+  vpc_id          = one(aws_vpc.main[*].id)
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-vpc-flow-log"
@@ -265,7 +286,7 @@ resource "aws_flow_log" "vpc" {
 
 # IAM role for VPC Flow Logs
 resource "aws_iam_role" "vpc_flow_log" {
-  count = var.flow_log_s3_bucket != null ? 1 : 0
+  count = local.destroy_enabled == false && var.flow_log_s3_bucket != null ? 1 : 0
 
   name = "${var.name_prefix}-vpc-flow-log-role"
 
@@ -289,7 +310,7 @@ resource "aws_iam_role" "vpc_flow_log" {
 
 # IAM policy for VPC Flow Logs
 resource "aws_iam_role_policy" "vpc_flow_log" {
-  count = var.flow_log_s3_bucket != null ? 1 : 0
+  count = local.destroy_enabled == false && var.flow_log_s3_bucket != null ? 1 : 0
 
   name = "${var.name_prefix}-vpc-flow-log-policy"
   role = aws_iam_role.vpc_flow_log[0].id
@@ -350,9 +371,9 @@ data "aws_availability_zones" "available" {
 # Note: VPC endpoints get IP addresses in the VPC CIDR, so the existing NACL rules
 # (allowing HTTPS 443 TCP to VPC CIDR) already allow traffic to this endpoint.
 data "aws_vpc_endpoint" "rosa_api" {
-  count = var.cluster_id != null ? 1 : 0
+  count = local.destroy_enabled == false && var.cluster_id != null ? 1 : 0
 
-  vpc_id = aws_vpc.main.id
+  vpc_id = one(aws_vpc.main[*].id)
 
   filter {
     name   = "tag:red-hat-managed"

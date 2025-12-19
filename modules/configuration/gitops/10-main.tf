@@ -33,7 +33,7 @@ locals {
 # - InstallPlan approval (automatic when version is specified)
 # - CSV waiting until Succeeded phase
 resource "openshift_operator" "gitops" {
-  count = var.deploy_gitops ? 1 : 0
+  count = var.deploy_gitops && var.enable_destroy == false ? 1 : 0
 
   name      = "openshift-gitops-operator"
   namespace = var.gitops_namespace

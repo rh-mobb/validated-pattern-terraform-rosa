@@ -61,3 +61,11 @@ variable "tags" {
   default     = {}
   nullable    = false
 }
+
+# Destroy Protection Variable
+variable "enable_destroy" {
+  description = "Set to true to allow resource destruction. Default false prevents accidental destroys. To destroy resources, set this to true and run terraform apply, then terraform destroy."
+  type        = bool
+  default     = false
+  nullable    = false
+}

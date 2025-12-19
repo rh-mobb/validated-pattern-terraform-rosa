@@ -1,4 +1,7 @@
 locals {
+  # Determine if destroy is enabled (use override if provided, else global)
+  destroy_enabled = var.enable_destroy_network != null ? var.enable_destroy_network : var.enable_destroy
+
   # Determine number of AZs based on multi_az
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/modules/terraform-rosa-networking/data.tf
   az_count = var.multi_az ? 3 : 1
@@ -53,6 +56,8 @@ locals {
 
 # VPC
 resource "aws_vpc" "main" {
+  count = local.destroy_enabled == false ? 1 : 0
+
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
@@ -64,7 +69,9 @@ resource "aws_vpc" "main" {
 
 # Internet Gateway (required for public subnets and NAT Gateways)
 resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id = one(aws_vpc.main[*].id)
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-igw"
@@ -73,9 +80,9 @@ resource "aws_internet_gateway" "main" {
 
 # Private Subnets (for Worker Nodes)
 resource "aws_subnet" "private" {
-  count = local.az_count
+  count = local.destroy_enabled == false ? local.az_count : 0
 
-  vpc_id            = aws_vpc.main.id
+  vpc_id            = one(aws_vpc.main[*].id)
   cidr_block        = local.private_subnet_cidrs[count.index]
   availability_zone = local.azs[count.index]
 
@@ -93,9 +100,9 @@ resource "aws_subnet" "private" {
 
 # Public Subnets (for NAT Gateways and load balancers)
 resource "aws_subnet" "public" {
-  count = local.az_count
+  count = local.destroy_enabled == false ? local.az_count : 0
 
-  vpc_id                  = aws_vpc.main.id
+  vpc_id                  = one(aws_vpc.main[*].id)
   cidr_block              = local.public_subnet_cidrs[count.index]
   availability_zone       = local.azs[count.index]
   map_public_ip_on_launch = true
@@ -114,7 +121,7 @@ resource "aws_subnet" "public" {
 
 # Elastic IPs for NAT Gateways
 resource "aws_eip" "nat" {
-  count = var.enable_nat_gateway ? local.az_count : 0
+  count = local.destroy_enabled == false && var.enable_nat_gateway ? local.az_count : 0
 
   domain = "vpc"
 
@@ -127,7 +134,7 @@ resource "aws_eip" "nat" {
 
 # NAT Gateways (one per AZ)
 resource "aws_nat_gateway" "main" {
-  count = var.enable_nat_gateway ? local.az_count : 0
+  count = local.destroy_enabled == false && var.enable_nat_gateway ? local.az_count : 0
 
   allocation_id = aws_eip.nat[count.index].id
   subnet_id     = aws_subnet.public[count.index].id
@@ -141,11 +148,13 @@ resource "aws_nat_gateway" "main" {
 
 # Route table for public subnets
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id = one(aws_vpc.main[*].id)
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.main.id
+    gateway_id = one(aws_internet_gateway.main[*].id)
   }
 
   tags = merge(local.common_tags, {
@@ -155,21 +164,21 @@ resource "aws_route_table" "public" {
 
 # Route table associations for public subnets
 resource "aws_route_table_association" "public" {
-  count = local.az_count
+  count = local.destroy_enabled == false ? local.az_count : 0
 
   subnet_id      = aws_subnet.public[count.index].id
-  route_table_id = aws_route_table.public.id
+  route_table_id = one(aws_route_table.public[*].id)
 }
 
 # Route tables for private subnets
 resource "aws_route_table" "private" {
-  count = local.az_count
+  count = local.destroy_enabled == false ? local.az_count : 0
 
-  vpc_id = aws_vpc.main.id
+  vpc_id = one(aws_vpc.main[*].id)
 
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = var.enable_nat_gateway ? aws_nat_gateway.main[count.index].id : null
+    nat_gateway_id = var.enable_nat_gateway && length(aws_nat_gateway.main) > 0 ? aws_nat_gateway.main[count.index].id : null
   }
 
   tags = merge(local.common_tags, {
@@ -179,7 +188,7 @@ resource "aws_route_table" "private" {
 
 # Route table associations for private subnets
 resource "aws_route_table_association" "private" {
-  count = local.az_count
+  count = local.destroy_enabled == false ? local.az_count : 0
 
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private[count.index].id
@@ -187,10 +196,12 @@ resource "aws_route_table_association" "private" {
 
 # VPC Endpoints for cost optimization (S3, ECR)
 resource "aws_vpc_endpoint" "s3" {
-  vpc_id            = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id            = one(aws_vpc.main[*].id)
   service_name      = "com.amazonaws.${data.aws_region.current.id}.s3"
   vpc_endpoint_type = "Gateway"
-  route_table_ids   = concat([aws_route_table.public.id], aws_route_table.private[*].id)
+  route_table_ids   = length(aws_route_table.public) > 0 && length(aws_route_table.private) > 0 ? concat([one(aws_route_table.public[*].id)], aws_route_table.private[*].id) : []
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-s3-endpoint"
@@ -198,11 +209,13 @@ resource "aws_vpc_endpoint" "s3" {
 }
 
 resource "aws_vpc_endpoint" "ecr_dkr" {
-  vpc_id              = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.ecr.dkr"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [one(aws_security_group.vpc_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -211,11 +224,13 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
 }
 
 resource "aws_vpc_endpoint" "ecr_api" {
-  vpc_id              = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.ecr.api"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [one(aws_security_group.vpc_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -229,11 +244,13 @@ resource "aws_vpc_endpoint" "ecr_api" {
 # - Performance (lower latency, traffic stays within AWS network)
 # - Security (traffic doesn't traverse the internet)
 resource "aws_vpc_endpoint" "sts" {
-  vpc_id              = aws_vpc.main.id
+  count = local.destroy_enabled == false ? 1 : 0
+
+  vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.sts"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [one(aws_security_group.vpc_endpoint[*].id)]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
@@ -243,9 +260,11 @@ resource "aws_vpc_endpoint" "sts" {
 
 # Security group for VPC endpoints
 resource "aws_security_group" "vpc_endpoint" {
+  count = local.destroy_enabled == false ? 1 : 0
+
   name        = "${var.name_prefix}-vpc-endpoint-sg"
   description = "Security group for VPC endpoints"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = one(aws_vpc.main[*].id)
 
   ingress {
     description = "HTTPS from VPC"

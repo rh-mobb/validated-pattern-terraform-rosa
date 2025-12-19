@@ -5,6 +5,7 @@
 BLUE := \033[0;34m
 GREEN := \033[0;32m
 YELLOW := \033[0;33m
+RED := \033[0;31m
 NC := \033[0m # No Color
 
 # Cluster directories mapping
@@ -79,19 +80,22 @@ help: ## Show this help message
 	@echo "  make init.<cluster>       Initialize both infrastructure and configuration"
 	@echo "  make plan.<cluster>       Plan both infrastructure and configuration"
 	@echo "  make apply.<cluster>      Apply both (infrastructure first, then configuration)"
-	@echo "  make destroy.<cluster>    Destroy both (configuration first, then infrastructure)"
+	@echo "  make destroy.<cluster>    Destroy all resources (sets enable_destroy=true, runs apply)"
+	@echo "  make cleanup.<cluster>    Same as destroy (no confirmation)"
 	@echo ""
 	@echo "$(GREEN)Infrastructure Management:$(NC)"
 	@echo "  make init-infrastructure.<cluster>       Initialize infrastructure only"
 	@echo "  make plan-infrastructure.<cluster>       Plan infrastructure changes"
 	@echo "  make apply-infrastructure.<cluster>      Apply infrastructure"
-	@echo "  make destroy-infrastructure.<cluster>     Destroy infrastructure"
+	@echo "  make destroy-infrastructure.<cluster>     Destroy infrastructure resources"
+	@echo "  make cleanup-infrastructure.<cluster>     Same as destroy (no confirmation)"
 	@echo ""
 	@echo "$(GREEN)Configuration Management:$(NC)"
 	@echo "  make init-configuration.<cluster>         Initialize configuration only"
 	@echo "  make plan-configuration.<cluster>         Plan configuration changes"
 	@echo "  make apply-configuration.<cluster>         Apply configuration"
-	@echo "  make destroy-configuration.<cluster>        Destroy configuration"
+	@echo "  make destroy-configuration.<cluster>        Destroy configuration resources"
+	@echo "  make cleanup-configuration.<cluster>        Same as destroy (no confirmation)"
 	@echo ""
 	@echo "$(GREEN)Code Quality:$(NC)"
 	@echo "  make fmt                  Format all Terraform files"
@@ -104,6 +108,12 @@ help: ## Show this help message
 	@echo "  make install-provider     Install OpenShift operator provider from GitHub releases"
 	@echo "  make init-all             Initialize all clusters (infrastructure + configuration)"
 	@echo "  make plan-all             Plan all clusters"
+	@echo ""
+	@echo "$(GREEN)Destroy Protection:$(NC)"
+	@echo "  make destroy.<cluster>    Destroy all resources (sets enable_destroy=true, runs apply)"
+	@echo "  make cleanup.<cluster>    Same as destroy (no confirmation)"
+	@echo "  Note: By default, enable_destroy=false prevents accidental destruction"
+	@echo "        When enable_destroy=true, resources are actually destroyed (not just removed from state)"
 	@echo ""
 	@echo "$(GREEN)Cluster Access:$(NC)"
 	@echo "  Pattern syntax: make <action>.<cluster>"
@@ -224,9 +234,12 @@ apply-public: apply.public ## Apply public cluster configuration
 apply-private: apply.private ## Apply private cluster configuration
 apply-egress-zero: apply.egress-zero ## Apply egress-zero cluster configuration
 
-# Destroy Configuration (must be destroyed first)
+# Destroy Configuration (destroys Kubernetes resources)
+# Sets enable_destroy=true and runs terraform apply
+# When count becomes 0, Terraform destroys the resources (GitOps operator will be deleted from cluster)
 destroy-configuration.%:
 	@echo "$(YELLOW)WARNING: This will destroy the $* cluster configuration!$(NC)"
+	@echo "$(YELLOW)Kubernetes resources (GitOps operator) will be deleted from the cluster.$(NC)"
 	@INFRA_DIR="$(call get_infrastructure_dir,$*)" && \
 		CONFIG_DIR="$(call get_configuration_dir,$*)" && \
 		cd $$INFRA_DIR && \
@@ -246,21 +259,73 @@ destroy-configuration.%:
 		fi && \
 		$(call get_k8s_token_with_retry) && \
 		cd $$CONFIG_DIR && \
-		TF_VAR_k8s_token=$$K8S_TOKEN terraform destroy -auto-approve
+		echo "$(BLUE)Setting enable_destroy=true and applying to remove resources from state...$(NC)" && \
+		TF_VAR_k8s_token=$$K8S_TOKEN TF_VAR_enable_destroy=true terraform apply -auto-approve
 
-# Destroy Infrastructure (must be destroyed after configuration)
+# Destroy Infrastructure (destroys AWS resources)
+# Sets enable_destroy=true and runs terraform apply
+# When count becomes 0, Terraform destroys the resources (cluster, VPC, IAM, etc. will be deleted)
 destroy-infrastructure.%: destroy-configuration.%
 	@echo "$(YELLOW)WARNING: This will destroy the $* cluster infrastructure!$(NC)"
-	@cd $(call get_infrastructure_dir,$*) && terraform destroy -auto-approve
+	@echo "$(YELLOW)AWS resources (cluster, VPC, IAM roles, etc.) will be deleted.$(NC)"
+	@cd $(call get_infrastructure_dir,$*) && \
+		echo "$(BLUE)Setting enable_destroy=true and applying to destroy resources...$(NC)" && \
+		TF_VAR_enable_destroy=true terraform apply -auto-approve
 
-# Destroy both (configuration first, then infrastructure)
+# Destroy both (configuration first, then infrastructure) - destroys all resources
 destroy.%: destroy-configuration.% destroy-infrastructure.%
 	@echo "$(GREEN)Destroyed $* cluster (configuration + infrastructure)$(NC)"
+	@echo "$(GREEN)All resources have been deleted from Kubernetes and AWS.$(NC)"
+
+# Cleanup Configuration (same as destroy - no confirmation)
+cleanup-configuration.%:
+	@echo "$(RED)WARNING: This will DESTROY the $* cluster configuration!$(NC)"
+	@echo "$(YELLOW)Kubernetes resources (GitOps operator) will be deleted from the cluster.$(NC)"
+	@INFRA_DIR="$(call get_infrastructure_dir,$*)" && \
+		CONFIG_DIR="$(call get_configuration_dir,$*)" && \
+		cd $$INFRA_DIR && \
+		API_URL=$$(terraform output -raw api_url 2>/dev/null) && \
+		ADMIN_PASSWORD=$$(terraform output -raw admin_password 2>/dev/null || echo "") && \
+		cd - >/dev/null && \
+		if [ -z "$$API_URL" ]; then \
+			echo "$(YELLOW)Error: Cluster not deployed or api_url output not available$(NC)"; \
+			exit 1; \
+		fi && \
+		if [ -z "$$ADMIN_PASSWORD" ] && [ -z "$$TF_VAR_k8s_token" ]; then \
+			echo "$(YELLOW)Warning: admin_password not found in infrastructure state and TF_VAR_k8s_token not set.$(NC)"; \
+			echo "$(YELLOW)You may need to:$(NC)"; \
+			echo "$(YELLOW)  1. Re-apply infrastructure to add admin_password output: make apply-infrastructure.$*$(NC)"; \
+			echo "$(YELLOW)  2. Or set TF_VAR_k8s_token environment variable$(NC)"; \
+			exit 1; \
+		fi && \
+		$(call get_k8s_token_with_retry) && \
+		cd $$CONFIG_DIR && \
+		echo "$(BLUE)Setting enable_destroy=true and applying to destroy resources...$(NC)" && \
+		TF_VAR_k8s_token=$$K8S_TOKEN TF_VAR_enable_destroy=true terraform apply -auto-approve && \
+		echo "$(GREEN)Configuration resources have been destroyed.$(NC)"
+
+# Cleanup Infrastructure (same as destroy - no confirmation)
+cleanup-infrastructure.%: cleanup-configuration.%
+	@echo "$(RED)WARNING: This will DESTROY the $* cluster infrastructure!$(NC)"
+	@echo "$(YELLOW)AWS resources (cluster, VPC, IAM roles, etc.) will be deleted.$(NC)"
+	@cd $(call get_infrastructure_dir,$*) && \
+		echo "$(BLUE)Setting enable_destroy=true and applying to destroy resources...$(NC)" && \
+		TF_VAR_enable_destroy=true terraform apply -auto-approve && \
+		echo "$(GREEN)Infrastructure resources have been destroyed.$(NC)"
+
+# Cleanup both (configuration first, then infrastructure) - same as destroy
+cleanup.%: cleanup-configuration.% cleanup-infrastructure.%
+	@echo "$(GREEN)Destroyed $* cluster (configuration + infrastructure)$(NC)"
+	@echo "$(GREEN)All resources have been deleted from Kubernetes and AWS.$(NC)"
 
 # Explicit targets for backwards compatibility
 destroy-public: destroy.public ## Destroy public cluster
 destroy-private: destroy.private ## Destroy private cluster
 destroy-egress-zero: destroy.egress-zero ## Destroy egress-zero cluster
+
+cleanup-public: cleanup.public ## Destroy public cluster
+cleanup-private: cleanup.private ## Destroy private cluster
+cleanup-egress-zero: cleanup.egress-zero ## Destroy egress-zero cluster
 
 # Code quality
 fmt: ## Format all Terraform files

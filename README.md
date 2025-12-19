@@ -61,7 +61,11 @@ make show-credentials.public
 
 **4. Destroy the cluster:**
 ```bash
+# Destroy all resources (sets enable_destroy=true and runs terraform apply)
 make destroy.public
+
+# Same as destroy, but with interactive confirmation
+make cleanup.public
 ```
 
 ### Deploy a Private Cluster
@@ -118,7 +122,7 @@ make bastion-connect.private
 # Stop tunnel first if running
 make tunnel-stop.private
 
-# Destroy cluster and bastion
+# Destroy cluster and bastion (sets enable_destroy=true and runs terraform apply)
 make destroy.private
 ```
 
@@ -712,6 +716,86 @@ data "terraform_remote_state" "network" {
 - **State Encryption**: Always enable encryption for S3 backends
 - **State Locking**: Use DynamoDB for state locking in production
 - **Separate State**: Each cluster has its own state file for isolation
+
+## Destroy Protection
+
+This repository implements a **destroy protection pattern** to prevent accidental resource destruction, which is critical for production environments and organizations with strict change control processes.
+
+### How It Works
+
+By default, all resources are protected from destruction. The `enable_destroy` variable (default: `false`) controls whether resources can be destroyed. Resources are gated using the `count` meta-argument:
+
+- **When `enable_destroy = false` (default)**: `count = 1` → Resources exist and are managed by Terraform
+- **When `enable_destroy = true`**: `count = 0` → Terraform destroys the resources (calls provider delete methods)
+
+When you set `enable_destroy = true` and run `terraform apply`, Terraform sees that `count` has changed from `1` to `0`, which triggers resource destruction. This prevents accidental `terraform destroy` operations by requiring an explicit variable change.
+
+### Usage
+
+**Default Behavior (Protected):**
+```hcl
+# In terraform.tfvars
+enable_destroy = false  # Default - resources are protected
+```
+
+**To Allow Destruction:**
+```hcl
+# In terraform.tfvars
+enable_destroy = true  # Allows resource destruction
+```
+
+**Workflow for Intentional Destruction:**
+
+**Option 1: Using Makefile (Recommended)**
+```bash
+# Destroy all resources (sets enable_destroy=true and runs terraform apply)
+make destroy.<cluster>
+
+# Same as destroy, but with interactive confirmation
+make cleanup.<cluster>
+```
+
+**Option 2: Manual Terraform Commands**
+1. Set `enable_destroy = true` in `terraform.tfvars` (or use `TF_VAR_enable_destroy=true`)
+2. Run `terraform apply` - Terraform will destroy resources (because `count` becomes `0`)
+3. Set `enable_destroy = false` again (or remove the variable) for future protection
+
+### Per-Resource Overrides
+
+For fine-grained control, you can override the global `enable_destroy` setting for specific resource types:
+
+```hcl
+# Global setting
+enable_destroy = false
+
+# Per-resource overrides
+enable_destroy_cluster = true   # Allow destroying cluster while preserving other resources
+enable_destroy_iam     = true   # Allow destroying IAM roles while preserving OIDC
+enable_destroy_network = false  # Keep network protected even if global is true
+```
+
+### Resources That Are Never Protected
+
+Some resources are **never gated** and can always be destroyed:
+- **OIDC Configuration and Provider**: Shared across clusters, preserved for reuse
+- **Subnet Tags**: Read-only tags managed by ROSA (in `network-existing` module)
+
+### Benefits
+
+- **Safety**: Prevents accidental destroys by default
+- **Compliance**: Works with permission constraints and change control processes
+- **Flexibility**: Per-resource overrides for common scenarios (e.g., destroy cluster but preserve IAM/OIDC)
+- **Bank-Ready**: Designed for enterprise environments with strict change control
+
+### Example: Destroying a Cluster While Preserving IAM
+
+```hcl
+# terraform.tfvars
+enable_destroy = false
+enable_destroy_cluster = true  # Only cluster resources can be destroyed
+```
+
+This allows destroying the cluster while preserving IAM roles and OIDC configuration for reuse with other clusters.
 
 ## Documentation
 

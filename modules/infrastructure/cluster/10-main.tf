@@ -2,6 +2,9 @@
 data "aws_caller_identity" "current" {}
 
 locals {
+  # Determine if destroy is enabled (use override if provided, else global)
+  destroy_enabled = var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy
+
   # Determine OpenShift version to use
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/04-cluster.tf
   # If openshift_version is provided, use it; otherwise use the latest installable version
@@ -24,9 +27,13 @@ locals {
   # NOTE: ROSA creates "workers" (plural) for single-AZ
   # For multi-AZ, ROSA creates "workers-0", "workers-1", "workers-2" (one per subnet)
   # Use a list (not set) to match reference implementation for count-based iteration
-  hcp_machine_pools = length(var.machine_pools) > 0 ? [for pool in var.machine_pools : pool.name] : (
-    var.multi_az ? [for idx in range(length(var.subnet_ids)) : "workers-${idx}"] : ["workers"]
-  )
+  # Conditionally set machine pools based on destroy flag
+  machine_pools_to_create = local.destroy_enabled == false ? var.machine_pools : []
+  hcp_machine_pools = local.destroy_enabled == false ? (
+    length(var.machine_pools) > 0 ? [for pool in var.machine_pools : pool.name] : (
+      var.multi_az ? [for idx in range(length(var.subnet_ids)) : "workers-${idx}"] : ["workers"]
+    )
+  ) : []
 
   # Common tags
   common_tags = merge(var.tags, {
@@ -62,6 +69,7 @@ data "rhcs_machine_types" "available" {}
 # Reference: https://registry.terraform.io/providers/terraform-redhat/rhcs/latest/docs/resources/cluster_rosa_hcp
 # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/04-cluster.tf
 resource "rhcs_cluster_rosa_hcp" "main" {
+  count = local.destroy_enabled == false ? 1 : 0
   name           = var.cluster_name
   cloud_region   = var.region
   aws_account_id = data.aws_caller_identity.current.account_id
@@ -176,9 +184,9 @@ resource "rhcs_cluster_rosa_hcp" "main" {
 # For HCP, we read the default machine pools created by the cluster, then manage them
 # Using count (not for_each) to match reference implementation for magic import pattern
 data "rhcs_hcp_machine_pool" "default" {
-  count = length(local.hcp_machine_pools)
+  count = local.destroy_enabled == false ? length(local.hcp_machine_pools) : 0
 
-  cluster = rhcs_cluster_rosa_hcp.main.id
+  cluster = one(rhcs_cluster_rosa_hcp.main[*].id)
   name    = local.hcp_machine_pools[count.index]
 }
 
@@ -186,13 +194,14 @@ resource "rhcs_hcp_machine_pool" "default" {
   # Only create resources for pools that exist (magic import pattern)
   # The data source count matches local.hcp_machine_pools, so use that for resource count
   # This ensures we create resources for all expected pools, and the data source will populate values if pools exist
-  count = length(local.hcp_machine_pools)
+  # Gate with destroy_enabled flag
+  count = local.destroy_enabled == false ? length(local.hcp_machine_pools) : 0
 
   # Use expected pool name from local.hcp_machine_pools (not from data source, which may be null)
   # For multi-AZ: "workers-0", "workers-1", "workers-2"
   # For single-AZ: "workers"
   name    = local.hcp_machine_pools[count.index]
-  cluster = rhcs_cluster_rosa_hcp.main.id
+  cluster = one(rhcs_cluster_rosa_hcp.main[*].id)
 
   # Handle null subnet_id - derive from count.index if data source returns null
   # Since hcp_machine_pools list matches subnet order, use count.index to map to subnet_ids

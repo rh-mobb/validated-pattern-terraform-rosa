@@ -1,36 +1,36 @@
 output "gitops_deployed" {
-  description = "Whether GitOps operator was deployed"
-  value       = var.deploy_gitops
+  description = "Whether GitOps operator was deployed (null if enable_destroy is true)"
+  value       = var.deploy_gitops && var.enable_destroy == false ? true : null
   sensitive   = false
 }
 
 output "gitops_namespace" {
-  description = "Namespace where GitOps operator is installed"
-  value       = var.deploy_gitops ? openshift_operator.gitops[0].namespace : null
+  description = "Namespace where GitOps operator is installed (null if enable_destroy is true)"
+  value       = var.deploy_gitops && var.enable_destroy == false && length(openshift_operator.gitops) > 0 ? openshift_operator.gitops[0].namespace : null
   sensitive   = false
 }
 
 output "operator_channel" {
-  description = "Channel used for GitOps operator subscription"
-  value       = var.deploy_gitops ? openshift_operator.gitops[0].channel : null
+  description = "Channel used for GitOps operator subscription (null if enable_destroy is true)"
+  value       = var.deploy_gitops && var.enable_destroy == false && length(openshift_operator.gitops) > 0 ? openshift_operator.gitops[0].channel : null
   sensitive   = false
 }
 
 output "installed_csv" {
-  description = "Name of the installed ClusterServiceVersion (CSV)"
-  value       = var.deploy_gitops ? openshift_operator.gitops[0].installed_csv : null
+  description = "Name of the installed ClusterServiceVersion (CSV) (null if enable_destroy is true)"
+  value       = var.deploy_gitops && var.enable_destroy == false && length(openshift_operator.gitops) > 0 ? openshift_operator.gitops[0].installed_csv : null
   sensitive   = false
 }
 
 output "csv_phase" {
-  description = "Current phase of the CSV (e.g., 'Succeeded', 'Installing', 'Failed')"
-  value       = var.deploy_gitops ? openshift_operator.gitops[0].csv_phase : null
+  description = "Current phase of the CSV (e.g., 'Succeeded', 'Installing', 'Failed') (null if enable_destroy is true)"
+  value       = var.deploy_gitops && var.enable_destroy == false && length(openshift_operator.gitops) > 0 ? openshift_operator.gitops[0].csv_phase : null
   sensitive   = false
 }
 
 output "operator_deployment_ready" {
-  description = "Whether the GitOps operator deployment is ready (true when CSV is Succeeded)"
-  value       = var.deploy_gitops && length(openshift_operator.gitops) > 0 ? openshift_operator.gitops[0].csv_phase == "Succeeded" : false
+  description = "Whether the GitOps operator deployment is ready (true when CSV is Succeeded) (false if enable_destroy is true)"
+  value       = var.deploy_gitops && var.enable_destroy == false && length(openshift_operator.gitops) > 0 ? openshift_operator.gitops[0].csv_phase == "Succeeded" : false
   sensitive   = false
 }
 
