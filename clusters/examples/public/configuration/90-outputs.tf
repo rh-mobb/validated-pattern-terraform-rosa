@@ -72,3 +72,21 @@ output "console_url" {
   value       = data.terraform_remote_state.infrastructure.outputs.console_url
   sensitive   = false
 }
+
+output "gitops_route_url" {
+  description = "Full URL of the GitOps (ArgoCD) server route (null if gitops not enabled, route not found, or operator not ready)"
+  value = var.gitops_enabled && var.enable_destroy == false && length(openshift_operator.gitops) > 0 && length(data.kubernetes_resource.gitops_route) > 0 ? try(
+    "https://${data.kubernetes_resource.gitops_route[0].object.spec.host}",
+    null
+  ) : null
+  sensitive = false
+}
+
+output "gitops_route_host" {
+  description = "Hostname of the GitOps (ArgoCD) server route (null if gitops not enabled, route not found, or operator not ready)"
+  value = var.gitops_enabled && var.enable_destroy == false && length(openshift_operator.gitops) > 0 && length(data.kubernetes_resource.gitops_route) > 0 ? try(
+    data.kubernetes_resource.gitops_route[0].object.spec.host,
+    null
+  ) : null
+  sensitive = false
+}

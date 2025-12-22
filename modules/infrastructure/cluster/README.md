@@ -51,9 +51,9 @@ module "cluster" {
 }
 
 # Admin user creation is handled by a separate identity-admin module
-# See modules/identity-admin/ for details
+# See modules/infrastructure/identity-admin/ for details
 module "identity_admin" {
-  source = "../../modules/identity-admin"
+  source = "../identity-admin"
 
   cluster_id     = module.cluster.cluster_id
   admin_password = "YourSecurePassword123!"
@@ -113,7 +113,7 @@ module "identity_admin" {
 
 ### Identity Provider
 
-**Note**: Admin user creation has been moved to a separate `identity-admin` module for independent lifecycle management. See `modules/identity-admin/README.md` for details.
+**Note**: Admin user creation has been moved to a separate `identity-admin` module for independent lifecycle management. See `modules/infrastructure/identity-admin/README.md` for details.
 
 ## Outputs
 

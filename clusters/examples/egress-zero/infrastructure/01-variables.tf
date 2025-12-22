@@ -80,10 +80,24 @@ variable "flow_log_s3_bucket" {
 }
 
 variable "tags" {
-  description = "Tags to apply to all resources"
+  description = "Tags to apply to all resources (from terraform.tfvars)"
   type        = map(string)
   default     = {}
   nullable    = false
+}
+
+variable "tags_override" {
+  description = <<EOF
+  Optional override for tags. If set, this value will be used instead of the tags variable.
+  Useful for setting tags via environment variables (TF_VAR_tags_override).
+
+  Can be provided via:
+  - Environment variable: TF_VAR_tags_override (JSON format: '{"key":"value"}')
+  - terraform.tfvars file
+  EOF
+  type        = map(string)
+  default     = null
+  nullable    = true
 }
 
 variable "token" {
@@ -108,14 +122,17 @@ variable "admin_username" {
   nullable    = false
 }
 
-variable "admin_password" {
+variable "admin_password_override" {
   description = <<EOF
-  Password for the 'admin' user. Identity provider is not created if unspecified.
+  Optional override for admin password. If not set, a random password will be generated and stored in AWS Secrets Manager.
   Password must be 14 characters or more, contain one uppercase letter and a symbol or number.
 
   Can be provided via:
   - terraform.tfvars file (not recommended for production)
-  - Environment variable: TF_VAR_admin_password
+  - Environment variable: TF_VAR_admin_password_override
+
+  Note: The password is never output by Terraform. Use AWS CLI to retrieve it:
+    aws secretsmanager get-secret-value --secret-id <secret_arn> --query SecretString --output text
   EOF
   type        = string
   sensitive   = true

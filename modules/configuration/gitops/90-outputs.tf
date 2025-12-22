@@ -51,3 +51,21 @@ output "api_url" {
   value       = var.api_url
   sensitive   = false
 }
+
+output "gitops_route_url" {
+  description = "Full URL of the GitOps (ArgoCD) server route (null if enable_destroy is true, route not found, or operator not ready)"
+  value = var.deploy_gitops && var.enable_destroy == false && length(openshift_operator.gitops) > 0 && length(data.kubernetes_resource.gitops_route) > 0 ? try(
+    "https://${data.kubernetes_resource.gitops_route[0].object.spec.host}",
+    null
+  ) : null
+  sensitive = false
+}
+
+output "gitops_route_host" {
+  description = "Hostname of the GitOps (ArgoCD) server route (null if enable_destroy is true, route not found, or operator not ready)"
+  value = var.deploy_gitops && var.enable_destroy == false && length(openshift_operator.gitops) > 0 && length(data.kubernetes_resource.gitops_route) > 0 ? try(
+    data.kubernetes_resource.gitops_route[0].object.spec.host,
+    null
+  ) : null
+  sensitive = false
+}

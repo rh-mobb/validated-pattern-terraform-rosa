@@ -59,9 +59,3 @@ provider "openshift" {
   token    = var.k8s_token
   insecure = var.skip_tls_verify
 }
-
-# # RHCS provider for identity-admin module
-# provider "rhcs" {
-#   token = var.token
-#   url   = "https://api.openshift.com"
-# }

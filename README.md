@@ -25,7 +25,7 @@ Each cluster example has separate `infrastructure/` and `configuration/` directo
 - AWS CLI configured with appropriate credentials
 - Red Hat Cloud Services (RHCS) token (set via `TF_VAR_token` environment variable)
 - `oc` CLI installed (for cluster access)
-- `sshuttle` installed (for private cluster access via bastion) - `brew install sshuttle` on macOS
+- `sshuttle` installed (for egress-zero cluster access via bastion) - `brew install sshuttle` on macOS
 
 ### Deploy a Public Cluster
 
@@ -68,64 +68,6 @@ make destroy.public
 make cleanup.public
 ```
 
-### Deploy a Private Cluster
-
-Private clusters require a bastion host and SSH tunnel for access. The Makefile automates this process.
-
-**1. Set required environment variables:**
-```bash
-export TF_VAR_token="your-rhcs-token"
-export TF_VAR_admin_password="your-secure-password"  # Optional, for admin user
-```
-
-**2. Initialize, plan, and apply:**
-```bash
-# Initialize Terraform
-make init.private
-
-# Review the plan
-make plan.private
-
-# Apply the configuration (creates cluster + bastion)
-make apply.private
-```
-
-**3. Access the cluster via bastion tunnel:**
-```bash
-# Start sshuttle VPN tunnel (routes all VPC traffic through bastion)
-# Note: Requires sudo privileges - you'll be prompted for your local sudo password
-make tunnel-start.private
-
-# In another terminal, show cluster endpoints
-make show-endpoints.private
-
-# Login to the cluster (sshuttle routes traffic transparently)
-make login.private
-
-# Show admin credentials
-make show-credentials.private
-```
-
-**4. Stop the tunnel when done:**
-```bash
-make tunnel-stop.private
-```
-
-**5. Connect to bastion directly (optional):**
-```bash
-# Connect via SSM Session Manager
-make bastion-connect.private
-```
-
-**6. Destroy the cluster:**
-```bash
-# Stop tunnel first if running
-make tunnel-stop.private
-
-# Destroy cluster and bastion (sets enable_destroy=true and runs terraform apply)
-make destroy.private
-```
-
 ## Repository Structure
 
 The repository is organized to separate **infrastructure** (foundational AWS/ROSA resources) from **configuration** (cluster configuration, GitOps, identity providers) with independent state files:
@@ -139,18 +81,15 @@ rosa-hcp-infrastructure/
 │   │   ├── network-egress-zero/# Egress Zero VPC (⚠️ WIP)
 │   │   ├── iam/                # IAM roles and OIDC configuration
 │   │   ├── cluster/            # ROSA HCP Cluster module
-│   │   └── bastion/            # Bastion host for private cluster access
+│   │   ├── bastion/            # Bastion host for egress-zero cluster access
+│   │   └── identity-admin/     # Admin user creation (temporary bootstrap, uses OCM provider)
 │   └── configuration/          # Configuration modules
-│       ├── gitops/             # OpenShift GitOps operator
-│       └── identity-admin/     # Admin user creation (temporary bootstrap)
+│       └── gitops/             # OpenShift GitOps operator
 └── clusters/                   # Cluster configurations
     └── examples/               # Example cluster configurations
         ├── public/             # Development example (public API)
-        │   ├── infrastructure/ # Infrastructure state (network, iam, cluster)
-        │   └── configuration/  # Configuration state (gitops, identity-admin)
-        ├── private/            # Development example (private API)
-        │   ├── infrastructure/
-        │   └── configuration/
+        │   ├── infrastructure/ # Infrastructure state (network, iam, cluster, identity-admin)
+        │   └── configuration/  # Configuration state (gitops)
         └── egress-zero/        # Production-ready example (⚠️ WIP)
             ├── infrastructure/
             └── configuration/
@@ -254,7 +193,7 @@ module "gitops" {
 
 # Create admin user
 module "identity_admin" {
-  source = "../../../../modules/configuration/identity-admin"
+  source = "../../../../modules/infrastructure/identity-admin"
 
   cluster_id     = data.terraform_remote_state.infrastructure.outputs.cluster_id
   admin_password = var.admin_password
@@ -559,7 +498,7 @@ make apply.my-cluster
   - HTPasswd identity provider
   - Can be removed when external IDP is configured
 
-- **bastion**: Bastion host for private cluster access
+- **bastion**: Bastion host for egress-zero cluster access
   - SSM Session Manager support
   - Pre-installed tools (`oc`, `kubectl`)
   - **Development/demo use only** - not for production
@@ -573,11 +512,11 @@ The Makefile provides convenient targets for managing clusters. Use **pattern sy
 ```bash
 # Pattern: make <action>.<cluster>
 make init.public
-make plan.private
+make plan.egress-zero
 make apply.egress-zero
 make destroy.public
-make login.private
-make tunnel-start.private
+make login.egress-zero
+make tunnel-start.egress-zero
 ```
 
 ### Available Actions
@@ -605,7 +544,7 @@ make tunnel-start.private
 - `show-endpoints.<cluster>` - Show API and console URLs
 - `show-credentials.<cluster>` - Show admin credentials and endpoints
 
-**Bastion & Tunnel (Private/Egress-Zero clusters):**
+**Bastion & Tunnel (Egress-Zero clusters):**
 - `tunnel-start.<cluster>` - Start sshuttle VPN tunnel
 - `tunnel-stop.<cluster>` - Stop sshuttle tunnel
 - `tunnel-status.<cluster>` - Check tunnel status
@@ -624,11 +563,11 @@ make tunnel-start.private
 
 See `make help` for complete list of targets.
 
-## Bastion Host for Private Clusters
+## Bastion Host for Egress-Zero Clusters
 
 > **⚠️ Development/Demo Use Only**: The bastion host is provided for development and demonstration purposes. For production deployments, use AWS Transit Gateway, Direct Connect, or VPN connections instead.
 
-Private and egress-zero clusters include an optional bastion host for secure access:
+Egress-zero clusters include an optional bastion host for secure access:
 
 - **SSM Session Manager**: No public IP, access via AWS Systems Manager (recommended)
 - **Pre-installed Tools**: OpenShift CLI (`oc`), Kubernetes CLI (`kubectl`)
@@ -640,14 +579,14 @@ The `tunnel-start.<cluster>` target creates a VPN-like tunnel using `sshuttle`:
 
 ```bash
 # Start tunnel (requires sudo - you'll be prompted for password)
-make tunnel-start.private
+make tunnel-start.egress-zero
 
 # Tunnel is now active - all traffic to VPC CIDR routes through bastion
 # You can now use oc login with the direct API URL
-make login.private
+make login.egress-zero
 
 # Stop tunnel when done
-make tunnel-stop.private
+make tunnel-stop.egress-zero
 ```
 
 **Why sshuttle?** Unlike SSH port forwarding, sshuttle routes **all VPC traffic** through the bastion, enabling OAuth flows required for `oc login` to work correctly.

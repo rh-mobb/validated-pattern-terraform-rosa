@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **BREAKING**: Removed `clusters/examples/private/` cluster example
+  - Private cluster example removed (only public and egress-zero examples remain)
+  - Private network module (`modules/infrastructure/network-private/`) retained for use with egress-zero clusters
+  - Updated Makefile to remove all private cluster targets
+  - Updated README.md to remove private cluster deployment instructions
+
+### Changed
+- **BREAKING**: Admin password management moved to AWS Secrets Manager:
+  - **BREAKING**: Variable renamed: `admin_password` → `admin_password_override` (nullable, optional)
+  - **BREAKING**: Removed `admin_password` output (password never output by Terraform)
+  - Added `admin_password_secret_arn` output (ARN of AWS Secrets Manager secret)
+  - If `admin_password_override` is not set, a random password is generated and stored in AWS Secrets Manager
+  - Password stored in secret: `rosa-hcp-{cluster_name}-admin-password`
+  - Makefile updated to retrieve password from AWS Secrets Manager using AWS CLI
+  - **Migration required**: Update any references to `admin_password` variable or output
+  - **Security improvement**: Password no longer stored in Terraform state or outputs
+
 ### Added
 - **Destroy Protection Pattern**: Implemented `enable_destroy` pattern to prevent accidental resource destruction:
   - Global `enable_destroy` variable (default: `false`) controls all resources by default
@@ -24,7 +42,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **BREAKING**: Reorganized repository structure to separate infrastructure and configuration:
-  - Modules reorganized: `modules/infrastructure/` (network, iam, cluster, bastion) and `modules/configuration/` (gitops, identity-admin)
+  - Modules reorganized: `modules/infrastructure/` (network, iam, cluster, bastion, identity-admin) and `modules/configuration/` (gitops)
+  - Module organization is based on provider type: infrastructure modules use OCM/AWS providers, configuration modules use Kubernetes/Terraform providers
+  - **BREAKING**: Moved `identity-admin` module from `modules/configuration/` to `modules/infrastructure/`:
+    - Uses `rhcs` (OCM) provider, not Kubernetes/Terraform providers
+    - Belongs in infrastructure based on provider type
+    - Updated all example cluster references to new path
+    - Updated documentation (README.md, PLAN.md, module READMEs)
   - Cluster examples reorganized: Each cluster now has `infrastructure/` and `configuration/` subdirectories with separate state files
   - Configuration uses `terraform_remote_state` data source to read infrastructure outputs
   - Updated Makefile with infrastructure/configuration specific targets

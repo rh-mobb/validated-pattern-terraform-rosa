@@ -26,6 +26,56 @@ Reference: https://github.com/rh-mobb/mobb-rules/blob/main/content/languages/ter
 
 **Best Practice**: `PLAN.md` is the source of truth. Code should reflect the plan, and the plan should reflect reality.
 
+## Problem Solving and Debugging
+
+### Discussion Before Implementation
+
+**MANDATORY**: When encountering errors, bugs, or situations with multiple solution approaches, **ALWAYS discuss the issue and potential fixes before implementing**.
+
+**When to Discuss First**:
+1. **Any error messages** - Analyze the error, understand root cause, discuss solutions
+2. **Bugs or unexpected behavior** - Understand why it's happening, explore fix options
+3. **Multiple solution approaches** - Present options with pros/cons, get direction
+4. **Architectural decisions** - Changes that affect module structure or patterns
+5. **Breaking changes** - Any change that affects existing functionality
+6. **Complex fixes** - Solutions that require changes across multiple files/modules
+
+**Discussion Process**:
+1. **Analyze the problem**: Understand what's happening and why
+2. **Identify root cause**: Don't just fix symptoms, understand the underlying issue
+3. **Present options**: List 2-3 potential solutions with:
+   - Pros and cons of each approach
+   - Impact on existing code
+   - Trade-offs and considerations
+4. **Get direction**: Wait for user input on preferred approach
+5. **Implement**: Once direction is given, implement the chosen solution
+
+**Example Discussion Format**:
+```
+## Problem Analysis
+[Describe the error/issue]
+
+## Root Cause
+[Explain why this is happening]
+
+## Potential Solutions
+
+### Option 1: [Approach Name]
+- Pros: ...
+- Cons: ...
+- Impact: ...
+
+### Option 2: [Approach Name]
+- Pros: ...
+- Cons: ...
+- Impact: ...
+
+## Recommendation
+[Which option do you prefer and why?]
+```
+
+**Exception**: Simple, obvious fixes (typos, syntax errors, missing imports) can be fixed immediately without discussion.
+
 ## Documentation Requirements
 
 ### Code Documentation
@@ -593,16 +643,17 @@ When writing new Terraform code, ensure:
 ## Workflow Checklist
 
 Before committing code, ensure:
-1. [ ] Code follows PLAN.md specifications
-2. [ ] PLAN.md updated if architecture changed
-3. [ ] CHANGELOG.md updated with changes
-4. [ ] All documentation updated (README.md, module docs)
-5. [ ] Code passes linting/validation
-6. [ ] Security scanning completed (checkov)
-7. [ ] Variables and outputs documented
-8. [ ] Sensitive data properly handled
-9. [ ] Version numbers updated if needed
-10. [ ] Git commit message references PLAN.md if deviating
+1. [ ] **Issues discussed** - Errors, bugs, or multiple solution approaches discussed before implementing
+2. [ ] Code follows PLAN.md specifications
+3. [ ] PLAN.md updated if architecture changed
+4. [ ] CHANGELOG.md updated with changes
+5. [ ] All documentation updated (README.md, module docs)
+6. [ ] Code passes linting/validation
+7. [ ] Security scanning completed (checkov)
+8. [ ] Variables and outputs documented
+9. [ ] Sensitive data properly handled
+10. [ ] Version numbers updated if needed
+11. [ ] Git commit message references PLAN.md if deviating
 
 ## References
 

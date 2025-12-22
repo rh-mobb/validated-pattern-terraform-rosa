@@ -1,13 +1,17 @@
 # Identity Admin Module
 
-This module creates an HTPasswd identity provider and admin user for ROSA HCP clusters. This is typically used as a temporary bootstrap identity provider that can be removed once an external identity provider (e.g., LDAP, OIDC) is configured.
+This module creates an HTPasswd identity provider and admin user for ROSA HCP clusters using the RHCS (OCM) provider. This is typically used as a temporary bootstrap identity provider that can be removed once an external identity provider (e.g., LDAP, OIDC) is configured.
+
+**Note**: This module belongs in `infrastructure` because it uses the `rhcs` (OCM) provider, not Kubernetes/Terraform providers. Modules are organized by provider type:
+- **Infrastructure modules** (`modules/infrastructure/`): Use OCM providers (`rhcs`) or AWS providers
+- **Configuration modules** (`modules/configuration/`): Use Kubernetes/Terraform providers (`kubernetes`, `openshift`)
 
 ## Features
 
-- **HTPasswd Identity Provider**: Creates a simple username/password identity provider
+- **HTPasswd Identity Provider**: Creates a simple username/password identity provider via OCM API
 - **Admin User**: Creates an admin user with cluster-admin privileges
 - **Temporary by Design**: Intended to be removed after external IDP is configured
-- **Lifecycle Management**: Can be easily added or removed from cluster configuration
+- **Lifecycle Management**: Can be easily added or removed from cluster infrastructure
 
 ## Usage
 

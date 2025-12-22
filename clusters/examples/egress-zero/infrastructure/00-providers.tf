@@ -21,14 +21,23 @@ terraform {
       source  = "terraform-redhat/rhcs"
       version = "~> 1.7"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
+}
+
+# Local value for tags (use override if set, otherwise use tags variable)
+locals {
+  tags = var.tags_override != null ? var.tags_override : var.tags
 }
 
 provider "aws" {
   region = var.region
 
   default_tags {
-    tags = var.tags
+    tags = local.tags
   }
 }
 

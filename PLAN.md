@@ -22,10 +22,10 @@ rosa-hcp-infrastructure/
 │   │   ├── network-egress-zero/# Egress Zero VPC (no internet egress)
 │   │   ├── iam/                # IAM & OIDC module
 │   │   ├── cluster/            # ROSA HCP Cluster module
-│   │   └── bastion/            # Bastion host for private cluster access
+│   │   ├── bastion/            # Bastion host for private cluster access
+│   │   └── identity-admin/     # Admin user creation (temporary bootstrap, uses OCM provider)
 │   └── configuration/          # Configuration modules
-│       ├── gitops/             # OpenShift GitOps operator
-│       └── identity-admin/     # Admin user creation (temporary bootstrap)
+│       └── gitops/             # OpenShift GitOps operator
 └── clusters/
     └── examples/
         └── public/
@@ -35,7 +35,7 @@ rosa-hcp-infrastructure/
             │   ├── 10-main.tf
             │   ├── 90-outputs.tf
             │   └── terraform.tfvars
-            └── configuration/   # Configuration state (gitops, identity-admin)
+            └── configuration/   # Configuration state (gitops)
             ├── 00-providers.tf
             ├── 01-variables.tf
                 ├── 10-main.tf   # Uses terraform_remote_state to read infrastructure

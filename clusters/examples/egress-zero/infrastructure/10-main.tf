@@ -9,7 +9,7 @@ module "network" {
   # cluster_id is optional - can be added after cluster creation to enable ROSA VPC endpoint lookup
   # Note: Cannot pass module.cluster.cluster_id here due to circular dependency (cluster depends on network)
   # After initial cluster creation, you can add: cluster_id = module.cluster.cluster_id
-  tags                 = var.tags
+  tags                 = local.tags
   enable_destroy       = var.enable_destroy
   enable_destroy_network = var.enable_destroy_network
 }
@@ -21,7 +21,7 @@ module "iam" {
   account_role_prefix  = var.cluster_name # No trailing dash - account-iam-resources module adds it
   operator_role_prefix = var.cluster_name # No trailing dash - operator-roles module adds it
   zero_egress          = true              # Enable zero egress mode (attaches ECR read-only policy to worker role)
-  tags                 = var.tags
+  tags                 = local.tags
   enable_destroy       = var.enable_destroy
   enable_destroy_iam   = var.enable_destroy_iam
 }
@@ -31,12 +31,12 @@ module "cluster" {
 
   cluster_name       = var.cluster_name
   region             = var.region
-  vpc_id             = try(module.network.vpc_id, null)
+  vpc_id             = module.network.vpc_id
   vpc_cidr           = var.vpc_cidr
-  subnet_ids         = try(module.network.private_subnet_ids, [])
-  installer_role_arn = try(module.iam.installer_role_arn, null)
-  support_role_arn   = try(module.iam.support_role_arn, null)
-  worker_role_arn    = try(module.iam.worker_role_arn, null)
+  subnet_ids         = module.network.private_subnet_ids
+  installer_role_arn = module.iam.installer_role_arn
+  support_role_arn   = module.iam.support_role_arn
+  worker_role_arn    = module.iam.worker_role_arn
   oidc_config_id     = module.iam.oidc_config_id # OIDC is never gated
   oidc_endpoint_url  = module.iam.oidc_endpoint_url # OIDC is never gated
   enable_destroy     = var.enable_destroy
@@ -49,7 +49,7 @@ module "cluster" {
   # disable_workload_monitoring = true            # Disable workload monitoring (may require internet egress)
   zero_egress                 = true            # Enable zero egress mode (egress-zero cluster)
   multi_az                   = true            # Always multi-AZ for production
-  availability_zones         = try(module.network.private_subnet_azs, [])
+  availability_zones         = module.network.private_subnet_azs
 
   # Egress-zero clusters may take longer for nodes to start due to network connectivity
   # Set to false to allow cluster creation to complete even if nodes are still starting
@@ -86,18 +86,66 @@ module "cluster" {
   depends_on = [module.network, module.iam]
 }
 
+# Admin Password Management
+# Generate random password if override is not provided
+# Store password in AWS Secrets Manager for secure access
+resource "random_password" "admin_password" {
+  count = var.admin_password_override == null ? 1 : 0
+
+  length  = 20
+  special = true
+  upper   = true
+  lower   = true
+  numeric = true
+
+  # Ensure password meets ROSA requirements:
+  # - 14+ characters (we use 20)
+  # - Contains uppercase letter (upper = true)
+  # - Contains symbol or number (special = true, numeric = true)
+}
+
+# AWS Secrets Manager secret for admin password
+# Stores either the override password or the generated random password
+resource "aws_secretsmanager_secret" "admin_password" {
+  count = var.enable_destroy == false ? 1 : 0
+
+  name        = "rosa-hcp-${var.cluster_name}-admin-password"
+  description = "Admin password for ROSA HCP cluster ${var.cluster_name}"
+
+  tags = merge(local.tags, {
+    Name        = "rosa-hcp-${var.cluster_name}-admin-password"
+    Cluster     = var.cluster_name
+    ManagedBy   = "Terraform"
+    Purpose     = "ClusterAdminPassword"
+  })
+}
+
+# Store the password in the secret
+resource "aws_secretsmanager_secret_version" "admin_password" {
+  count = var.enable_destroy == false ? 1 : 0
+
+  secret_id = aws_secretsmanager_secret.admin_password[0].id
+  secret_string = var.admin_password_override != null ? var.admin_password_override : random_password.admin_password[0].result
+}
+
 # Admin User (optional, for initial cluster access)
 # This must be created in infrastructure as it's needed for configuration operations
 # This can be removed once an external identity provider is configured
+# Only create if enable_destroy is false (resources should be created)
 module "identity_admin" {
-  count  = var.admin_password != null ? 1 : 0
-  source = "../../../../modules/configuration/identity-admin"
+  count  = var.enable_destroy == false ? 1 : 0
+  source = "../../../../modules/infrastructure/identity-admin"
 
-  cluster_id     = try(module.cluster.cluster_id, null)
-  admin_password = var.admin_password
+  cluster_id     = module.cluster.cluster_id
+  # Use override if provided, otherwise use the random password result
+  admin_password = var.admin_password_override != null ? var.admin_password_override : random_password.admin_password[0].result
   enable_destroy = var.enable_destroy
 
-  depends_on = [module.cluster]
+  depends_on = [
+    module.cluster,
+    random_password.admin_password,
+    aws_secretsmanager_secret_version.admin_password
+  ]
 }
 
 # Bastion Host (optional, for development/demo use only)
@@ -110,9 +158,9 @@ module "bastion" {
   source = "../../../../modules/infrastructure/bastion"
 
   name_prefix            = var.cluster_name
-  vpc_id                 = try(module.network.vpc_id, null)
-  subnet_id              = try(module.network.private_subnet_ids[0], null) # Use first private subnet
-  private_subnet_ids     = try(module.network.private_subnet_ids, [])    # All private subnets for VPC endpoints
+  vpc_id                 = module.network.vpc_id
+  subnet_id              = length(module.network.private_subnet_ids) > 0 ? module.network.private_subnet_ids[0] : null # Use first private subnet
+  private_subnet_ids     = module.network.private_subnet_ids    # All private subnets for VPC endpoints
   region                 = var.region
   vpc_cidr               = var.vpc_cidr
   bastion_public_ip      = var.bastion_public_ip # Should be false for egress-zero

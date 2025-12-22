@@ -12,9 +12,8 @@ NC := \033[0m # No Color
 # Maps cluster name (e.g., "public") to base directory path
 define cluster_dir
 $(if $(filter public,$1),clusters/examples/public,\
-$(if $(filter private,$1),clusters/examples/private,\
 $(if $(filter egress-zero,$1),clusters/examples/egress-zero,\
-$(error Unknown cluster: $1))))
+$(error Unknown cluster: $1)))
 endef
 
 # Helper function to get cluster directory from target suffix
@@ -26,6 +25,43 @@ get_infrastructure_dir = $(call cluster_dir,$1)/infrastructure
 
 # Helper function to get configuration directory
 get_configuration_dir = $(call cluster_dir,$1)/configuration
+
+# Shell function to get admin password from AWS Secrets Manager
+# Usage: Call this function within a shell command block
+# Sets ADMIN_PASSWORD variable in the shell context
+# Requires: INFRA_DIR variable to be set to infrastructure directory
+define get_admin_password_from_secret
+	SECRET_ARN=$$(terraform output -raw admin_password_secret_arn 2>&1 | grep -E "^arn:aws:secretsmanager:" | head -1 || echo ""); \
+	if [ -z "$$SECRET_ARN" ] || [ "$$SECRET_ARN" = "null" ]; then \
+		if [ -n "$$TF_VAR_admin_password_override" ]; then \
+			ADMIN_PASSWORD=$$TF_VAR_admin_password_override; \
+		else \
+			echo "$(YELLOW)Warning: admin_password_secret_arn not found in infrastructure state.$(NC)"; \
+			echo "$(YELLOW)Infrastructure may already be destroyed or never created.$(NC)"; \
+			echo "$(YELLOW)You can:$(NC)"; \
+			echo "$(YELLOW)  1. Set TF_VAR_admin_password_override to provide password manually$(NC)"; \
+			echo "$(YELLOW)  2. Set TF_VAR_k8s_token to provide token directly$(NC)"; \
+			ADMIN_PASSWORD=""; \
+		fi; \
+	else \
+		if ! command -v aws >/dev/null 2>&1; then \
+			echo "$(YELLOW)Error: AWS CLI not found. Required to retrieve admin password from Secrets Manager.$(NC)"; \
+			echo "$(YELLOW)Install AWS CLI: https://aws.amazon.com/cli/$(NC)"; \
+			exit 1; \
+		fi; \
+		ADMIN_PASSWORD=$$(aws secretsmanager get-secret-value --secret-id $$SECRET_ARN --query SecretString --output text 2>/dev/null || echo "") && \
+		if [ -z "$$ADMIN_PASSWORD" ]; then \
+			echo "$(YELLOW)Error: Failed to retrieve admin password from Secrets Manager.$(NC)"; \
+			echo "$(YELLOW)Secret ARN: $$SECRET_ARN$(NC)"; \
+			echo "$(YELLOW)You may need to:$(NC)"; \
+			echo "$(YELLOW)  1. Ensure AWS credentials are configured$(NC)"; \
+			echo "$(YELLOW)  2. Ensure you have permission to read the secret$(NC)"; \
+			echo "$(YELLOW)  3. Or set TF_VAR_admin_password_override environment variable$(NC)"; \
+			exit 1; \
+		fi; \
+	fi; \
+	:
+endef
 
 # Shell function to get Kubernetes token with retry logic (5 minute timeout)
 # Usage: Call this function within a shell command block
@@ -67,7 +103,6 @@ endef
 
 # Backwards compatibility - explicit cluster directories
 CLUSTER_PUBLIC := clusters/examples/public
-CLUSTER_PRIVATE := clusters/examples/private
 CLUSTER_EGRESS_ZERO := clusters/examples/egress-zero
 
 help: ## Show this help message
@@ -75,7 +110,7 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(GREEN)Cluster Management (Infrastructure + Configuration):$(NC)"
 	@echo "  Pattern syntax: make <action>.<cluster>"
-	@echo "  Examples: make init.public, make plan.private, make apply.egress-zero"
+	@echo "  Examples: make init.public, make plan.egress-zero, make apply.public"
 	@echo ""
 	@echo "  make init.<cluster>       Initialize both infrastructure and configuration"
 	@echo "  make plan.<cluster>       Plan both infrastructure and configuration"
@@ -117,7 +152,7 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(GREEN)Cluster Access:$(NC)"
 	@echo "  Pattern syntax: make <action>.<cluster>"
-	@echo "  Examples: make login.public, make show-endpoints.private, make show-credentials.egress-zero"
+	@echo "  Examples: make login.public, make show-endpoints.egress-zero, make show-credentials.public"
 	@echo ""
 	@echo "  make login.<cluster>            Login to cluster using oc CLI"
 	@echo "  make show-endpoints.<cluster>    Show API and console URLs"
@@ -125,7 +160,7 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(GREEN)Bastion & Tunnel Management:$(NC)"
 	@echo "  Pattern syntax: make <action>.<cluster>"
-	@echo "  Examples: make tunnel-start.private, make tunnel-stop.egress-zero"
+	@echo "  Examples: make tunnel-start.egress-zero, make tunnel-stop.egress-zero"
 	@echo ""
 	@echo "  make tunnel-start.<cluster>     Start sshuttle VPN tunnel via bastion (routes all VPC traffic)"
 	@echo "                                   Requires: sshuttle (brew install sshuttle on macOS)"
@@ -150,10 +185,9 @@ init.%: init-infrastructure.% init-configuration.%
 
 # Explicit targets for backwards compatibility
 init-public: init.public ## Initialize Terraform for public cluster
-init-private: init.private ## Initialize Terraform for private cluster
 init-egress-zero: init.egress-zero ## Initialize Terraform for egress-zero cluster
 
-init-all: init.public init.private init.egress-zero ## Initialize all clusters
+init-all: init.public init.egress-zero ## Initialize all clusters
 
 # Plan Infrastructure
 plan-infrastructure.%: init-infrastructure.%
@@ -167,16 +201,16 @@ plan-configuration.%: init-configuration.%
 		CONFIG_DIR="$(call get_configuration_dir,$*)" && \
 		cd $$INFRA_DIR && \
 		API_URL=$$(terraform output -raw api_url 2>/dev/null) && \
-		ADMIN_PASSWORD=$$(terraform output -raw admin_password 2>/dev/null || echo "") && \
 		cd - >/dev/null && \
 		if [ -z "$$API_URL" ]; then \
 			echo "$(YELLOW)Error: Cluster not deployed or api_url output not available$(NC)"; \
 			exit 1; \
 		fi && \
+		$(call get_admin_password_from_secret) && \
 		if [ -z "$$ADMIN_PASSWORD" ] && [ -z "$$TF_VAR_k8s_token" ]; then \
-			echo "$(YELLOW)Warning: admin_password not found in infrastructure state and TF_VAR_k8s_token not set.$(NC)"; \
+			echo "$(YELLOW)Warning: admin_password not found and TF_VAR_k8s_token not set.$(NC)"; \
 			echo "$(YELLOW)You may need to:$(NC)"; \
-			echo "$(YELLOW)  1. Re-apply infrastructure to add admin_password output: make apply-infrastructure.$*$(NC)"; \
+			echo "$(YELLOW)  1. Re-apply infrastructure: make apply-infrastructure.$*$(NC)"; \
 			echo "$(YELLOW)  2. Or set TF_VAR_k8s_token environment variable$(NC)"; \
 			exit 1; \
 		fi && \
@@ -190,10 +224,9 @@ plan.%: plan-infrastructure.% plan-configuration.%
 
 # Explicit targets for backwards compatibility
 plan-public: plan.public ## Plan public cluster deployment
-plan-private: plan.private ## Plan private cluster deployment
 plan-egress-zero: plan.egress-zero ## Plan egress-zero cluster deployment
 
-plan-all: plan.public plan.private plan.egress-zero ## Plan all clusters
+plan-all: plan.public plan.egress-zero ## Plan all clusters
 
 # Apply Infrastructure
 apply-infrastructure.%: plan-infrastructure.%
@@ -208,16 +241,16 @@ apply-configuration.%: plan-configuration.%
 		CONFIG_DIR="$(call get_configuration_dir,$*)" && \
 		cd $$INFRA_DIR && \
 		API_URL=$$(terraform output -raw api_url 2>/dev/null) && \
-		ADMIN_PASSWORD=$$(terraform output -raw admin_password 2>/dev/null || echo "") && \
 		cd - >/dev/null && \
 		if [ -z "$$API_URL" ]; then \
 			echo "$(YELLOW)Error: Cluster not deployed or api_url output not available$(NC)"; \
 			exit 1; \
 		fi && \
+		$(call get_admin_password_from_secret) && \
 		if [ -z "$$ADMIN_PASSWORD" ] && [ -z "$$TF_VAR_k8s_token" ]; then \
-			echo "$(YELLOW)Warning: admin_password not found in infrastructure state and TF_VAR_k8s_token not set.$(NC)"; \
+			echo "$(YELLOW)Warning: admin_password not found and TF_VAR_k8s_token not set.$(NC)"; \
 			echo "$(YELLOW)You may need to:$(NC)"; \
-			echo "$(YELLOW)  1. Re-apply infrastructure to add admin_password output: make apply-infrastructure.$*$(NC)"; \
+			echo "$(YELLOW)  1. Re-apply infrastructure: make apply-infrastructure.$*$(NC)"; \
 			echo "$(YELLOW)  2. Or set TF_VAR_k8s_token environment variable$(NC)"; \
 			exit 1; \
 		fi && \
@@ -231,7 +264,6 @@ apply.%: apply-infrastructure.% apply-configuration.%
 
 # Explicit targets for backwards compatibility
 apply-public: apply.public ## Apply public cluster configuration
-apply-private: apply.private ## Apply private cluster configuration
 apply-egress-zero: apply.egress-zero ## Apply egress-zero cluster configuration
 
 # Destroy Configuration (destroys Kubernetes resources)
@@ -243,24 +275,37 @@ destroy-configuration.%:
 	@INFRA_DIR="$(call get_infrastructure_dir,$*)" && \
 		CONFIG_DIR="$(call get_configuration_dir,$*)" && \
 		cd $$INFRA_DIR && \
-		API_URL=$$(terraform output -raw api_url 2>/dev/null) && \
-		ADMIN_PASSWORD=$$(terraform output -raw admin_password 2>/dev/null || echo "") && \
+		API_URL=$$(terraform output -raw api_url 2>&1 | grep -E "^https?://" | head -1 || echo "") && \
 		cd - >/dev/null && \
 		if [ -z "$$API_URL" ]; then \
-			echo "$(YELLOW)Error: Cluster not deployed or api_url output not available$(NC)"; \
-			exit 1; \
+			echo "$(YELLOW)Warning: Cluster not deployed or api_url output not available.$(NC)"; \
+			echo "$(YELLOW)Infrastructure may already be destroyed. Attempting to destroy configuration anyway...$(NC)"; \
 		fi && \
+		cd $$INFRA_DIR && \
+		$(call get_admin_password_from_secret) && \
+		cd - >/dev/null && \
 		if [ -z "$$ADMIN_PASSWORD" ] && [ -z "$$TF_VAR_k8s_token" ]; then \
-			echo "$(YELLOW)Warning: admin_password not found in infrastructure state and TF_VAR_k8s_token not set.$(NC)"; \
-			echo "$(YELLOW)You may need to:$(NC)"; \
-			echo "$(YELLOW)  1. Re-apply infrastructure to add admin_password output: make apply-infrastructure.$*$(NC)"; \
-			echo "$(YELLOW)  2. Or set TF_VAR_k8s_token environment variable$(NC)"; \
-			exit 1; \
-		fi && \
-		$(call get_k8s_token_with_retry) && \
-		cd $$CONFIG_DIR && \
-		echo "$(BLUE)Setting enable_destroy=true and applying to remove resources from state...$(NC)" && \
-		TF_VAR_k8s_token=$$K8S_TOKEN TF_VAR_enable_destroy=true terraform apply -auto-approve
+			echo "$(YELLOW)Warning: Cannot retrieve admin password and TF_VAR_k8s_token not set.$(NC)"; \
+			echo "$(YELLOW)Configuration may already be destroyed or infrastructure is missing.$(NC)"; \
+			echo "$(YELLOW)Attempting to destroy configuration anyway (may fail if cluster is still running)...$(NC)"; \
+			cd $$CONFIG_DIR && \
+			echo "$(BLUE)Setting enable_destroy=true and applying to remove resources from state...$(NC)" && \
+			TF_VAR_enable_destroy=true terraform apply -auto-approve || \
+			(echo "$(YELLOW)Configuration destroy completed (may have failed if cluster is not accessible)$(NC)" && exit 0) \
+		else \
+			if [ -n "$$API_URL" ]; then \
+				$(call get_k8s_token_with_retry) && \
+				cd $$CONFIG_DIR && \
+				echo "$(BLUE)Setting enable_destroy=true and applying to remove resources from state...$(NC)" && \
+				TF_VAR_k8s_token=$$K8S_TOKEN TF_VAR_enable_destroy=true terraform apply -auto-approve; \
+			else \
+				echo "$(YELLOW)Skipping Kubernetes authentication (cluster not available).$(NC)"; \
+				cd $$CONFIG_DIR && \
+				echo "$(BLUE)Setting enable_destroy=true and applying to remove resources from state...$(NC)" && \
+				TF_VAR_enable_destroy=true terraform apply -auto-approve || \
+				(echo "$(YELLOW)Configuration destroy completed$(NC)" && exit 0); \
+			fi \
+		fi
 
 # Destroy Infrastructure (destroys AWS resources)
 # Sets enable_destroy=true and runs terraform apply
@@ -278,31 +323,41 @@ destroy.%: destroy-configuration.% destroy-infrastructure.%
 	@echo "$(GREEN)All resources have been deleted from Kubernetes and AWS.$(NC)"
 
 # Cleanup Configuration (same as destroy - no confirmation)
+# If credentials aren't available, skips configuration cleanup (assumes already deleted)
 cleanup-configuration.%:
 	@echo "$(RED)WARNING: This will DESTROY the $* cluster configuration!$(NC)"
 	@echo "$(YELLOW)Kubernetes resources (GitOps operator) will be deleted from the cluster.$(NC)"
 	@INFRA_DIR="$(call get_infrastructure_dir,$*)" && \
 		CONFIG_DIR="$(call get_configuration_dir,$*)" && \
 		cd $$INFRA_DIR && \
-		API_URL=$$(terraform output -raw api_url 2>/dev/null) && \
-		ADMIN_PASSWORD=$$(terraform output -raw admin_password 2>/dev/null || echo "") && \
+		API_URL=$$(terraform output -raw api_url 2>&1 | grep -E "^https?://" | head -1 || echo "") && \
 		cd - >/dev/null && \
 		if [ -z "$$API_URL" ]; then \
-			echo "$(YELLOW)Error: Cluster not deployed or api_url output not available$(NC)"; \
-			exit 1; \
+			echo "$(YELLOW)Warning: Cluster not deployed or api_url output not available.$(NC)"; \
+			echo "$(YELLOW)Skipping configuration cleanup (infrastructure may already be destroyed).$(NC)"; \
+			exit 0; \
 		fi && \
+		cd $$INFRA_DIR && \
+		$(call get_admin_password_from_secret) && \
+		cd - >/dev/null && \
 		if [ -z "$$ADMIN_PASSWORD" ] && [ -z "$$TF_VAR_k8s_token" ]; then \
-			echo "$(YELLOW)Warning: admin_password not found in infrastructure state and TF_VAR_k8s_token not set.$(NC)"; \
-			echo "$(YELLOW)You may need to:$(NC)"; \
-			echo "$(YELLOW)  1. Re-apply infrastructure to add admin_password output: make apply-infrastructure.$*$(NC)"; \
-			echo "$(YELLOW)  2. Or set TF_VAR_k8s_token environment variable$(NC)"; \
-			exit 1; \
+			echo "$(YELLOW)Warning: Cannot retrieve admin password and TF_VAR_k8s_token not set.$(NC)"; \
+			echo "$(YELLOW)Configuration may already be destroyed. Skipping configuration cleanup.$(NC)"; \
+			exit 0; \
 		fi && \
-		$(call get_k8s_token_with_retry) && \
-		cd $$CONFIG_DIR && \
-		echo "$(BLUE)Setting enable_destroy=true and applying to destroy resources...$(NC)" && \
-		TF_VAR_k8s_token=$$K8S_TOKEN TF_VAR_enable_destroy=true terraform apply -auto-approve && \
-		echo "$(GREEN)Configuration resources have been destroyed.$(NC)"
+		if [ -n "$$API_URL" ]; then \
+			$(call get_k8s_token_with_retry) && \
+			cd $$CONFIG_DIR && \
+			echo "$(BLUE)Setting enable_destroy=true and applying to destroy resources...$(NC)" && \
+			TF_VAR_k8s_token=$$K8S_TOKEN TF_VAR_enable_destroy=true terraform apply -auto-approve && \
+			echo "$(GREEN)Configuration resources have been destroyed.$(NC)"; \
+		else \
+			echo "$(YELLOW)Skipping Kubernetes authentication (cluster not available).$(NC)"; \
+			cd $$CONFIG_DIR && \
+			echo "$(BLUE)Setting enable_destroy=true and applying to remove resources from state...$(NC)" && \
+			TF_VAR_enable_destroy=true terraform apply -auto-approve || \
+			(echo "$(YELLOW)Configuration cleanup skipped (cluster not accessible)$(NC)" && exit 0); \
+		fi
 
 # Cleanup Infrastructure (same as destroy - no confirmation)
 cleanup-infrastructure.%: cleanup-configuration.%
@@ -314,17 +369,16 @@ cleanup-infrastructure.%: cleanup-configuration.%
 		echo "$(GREEN)Infrastructure resources have been destroyed.$(NC)"
 
 # Cleanup both (configuration first, then infrastructure) - same as destroy
+# If configuration cleanup is skipped (no credentials), still proceeds to infrastructure cleanup
 cleanup.%: cleanup-configuration.% cleanup-infrastructure.%
-	@echo "$(GREEN)Destroyed $* cluster (configuration + infrastructure)$(NC)"
+	@echo "$(GREEN)Cleanup completed for $* cluster$(NC)"
 	@echo "$(GREEN)All resources have been deleted from Kubernetes and AWS.$(NC)"
 
 # Explicit targets for backwards compatibility
 destroy-public: destroy.public ## Destroy public cluster
-destroy-private: destroy.private ## Destroy private cluster
 destroy-egress-zero: destroy.egress-zero ## Destroy egress-zero cluster
 
 cleanup-public: cleanup.public ## Destroy public cluster
-cleanup-private: cleanup.private ## Destroy private cluster
 cleanup-egress-zero: cleanup.egress-zero ## Destroy egress-zero cluster
 
 # Code quality
@@ -345,7 +399,7 @@ validate-modules: ## Validate all modules
 
 validate-examples: ## Validate all example clusters
 	@echo "$(BLUE)Validating example clusters...$(NC)"
-	@for cluster in public private egress-zero; do \
+	@for cluster in public egress-zero; do \
 		echo "Validating $$cluster infrastructure..."; \
 		cd $(call get_infrastructure_dir,$$cluster) && terraform init -backend=false >/dev/null 2>&1 && terraform validate && cd - >/dev/null || echo "  ✗ Failed: $$cluster infrastructure"; \
 		echo "Validating $$cluster configuration..."; \
@@ -371,7 +425,6 @@ show-endpoints.%:
 
 # Explicit targets for backwards compatibility
 show-endpoints-public: show-endpoints.public ## Show API and console URLs for public cluster
-show-endpoints-private: show-endpoints.private ## Show API and console URLs for private cluster
 show-endpoints-egress-zero: show-endpoints.egress-zero ## Show API and console URLs for egress-zero cluster
 
 # Cluster Access - Show Credentials (includes endpoints)
@@ -399,7 +452,6 @@ show-credentials.%: show-endpoints.%
 
 # Explicit targets for backwards compatibility
 show-credentials-public: show-credentials.public ## Show admin credentials and endpoints for public cluster
-show-credentials-private: show-credentials.private ## Show admin credentials and endpoints for private cluster
 show-credentials-egress-zero: show-credentials.egress-zero ## Show admin credentials and endpoints for egress-zero cluster
 
 # Cluster Access - Login
@@ -410,7 +462,8 @@ login.%:
 		echo "$(YELLOW)Error: oc CLI not found. Please install OpenShift CLI.$(NC)"; \
 		exit 1; \
 	fi
-	@cd $(call get_infrastructure_dir,$*) && \
+	@INFRA_DIR="$(call get_infrastructure_dir,$*)" && \
+		cd $$INFRA_DIR && \
 		API_URL=$$(terraform output -raw api_url 2>/dev/null) && \
 		if [ -z "$$API_URL" ]; then \
 			echo "$(YELLOW)Error: Cluster not deployed or api_url output not available$(NC)"; \
@@ -420,21 +473,20 @@ login.%:
 		if [ -n "$$VPC_CIDR" ] && pgrep -f "sshuttle.*$$VPC_CIDR" >/dev/null 2>&1; then \
 			echo "$(GREEN)sshuttle tunnel active - using direct API URL (traffic routed through bastion)$(NC)"; \
 		fi && \
-		ADMIN_PASSWORD=$$(terraform output -raw admin_password 2>/dev/null || echo "") && \
-		if [ -z "$$ADMIN_PASSWORD" ] && [ -z "$$TF_VAR_admin_password" ]; then \
-			echo "$(YELLOW)Error: Admin password not found in infrastructure state and TF_VAR_admin_password not set.$(NC)"; \
+		$(call get_admin_password_from_secret) && \
+		if [ -z "$$ADMIN_PASSWORD" ] && [ -z "$$TF_VAR_admin_password_override" ]; then \
+			echo "$(YELLOW)Error: Admin password not found and TF_VAR_admin_password_override not set.$(NC)"; \
 			echo "$(YELLOW)You may need to:$(NC)"; \
-			echo "$(YELLOW)  1. Re-apply infrastructure to add admin_password output: make apply-infrastructure.$*$(NC)"; \
-			echo "$(YELLOW)  2. Or set TF_VAR_admin_password environment variable$(NC)"; \
+			echo "$(YELLOW)  1. Re-apply infrastructure: make apply-infrastructure.$*$(NC)"; \
+			echo "$(YELLOW)  2. Or set TF_VAR_admin_password_override environment variable$(NC)"; \
 			exit 1; \
 		fi && \
-		PASSWORD=$${ADMIN_PASSWORD:-$$TF_VAR_admin_password} && \
+		PASSWORD=$${ADMIN_PASSWORD:-$$TF_VAR_admin_password_override} && \
 		oc login $$API_URL --username admin --password $$PASSWORD --insecure-skip-tls-verify=false || \
 		(echo "$(YELLOW)Login failed. Check credentials and cluster status.$(NC)" && exit 1)
 
 # Explicit targets for backwards compatibility
 login-public: login.public ## Login to public cluster using oc CLI
-login-private: login.private ## Login to private cluster using oc CLI
 login-egress-zero: login.egress-zero ## Login to egress-zero cluster using oc CLI
 
 # Bastion & Tunnel Management
@@ -512,7 +564,7 @@ tunnel-stop.%:
 				echo "$(GREEN)Tunnel stopped$(NC)"; \
 			else \
 				echo "$(YELLOW)No tunnel found running$(NC)"; \
-			fi; \
+			fi \
 		fi
 
 tunnel-status.%:
@@ -570,13 +622,9 @@ bastion-connect.%:
 		(echo "$(YELLOW)Failed to connect. Check AWS credentials and bastion status.$(NC)" && exit 1)
 
 # Explicit targets for backwards compatibility
-tunnel-start-private: tunnel-start.private ## Start SSH tunnel for private cluster
 tunnel-start-egress-zero: tunnel-start.egress-zero ## Start SSH tunnel for egress-zero cluster
-tunnel-stop-private: tunnel-stop.private ## Stop SSH tunnel for private cluster
 tunnel-stop-egress-zero: tunnel-stop.egress-zero ## Stop SSH tunnel for egress-zero cluster
-tunnel-status-private: tunnel-status.private ## Check tunnel status for private cluster
 tunnel-status-egress-zero: tunnel-status.egress-zero ## Check tunnel status for egress-zero cluster
-bastion-connect-private: bastion-connect.private ## Connect to private cluster bastion
 bastion-connect-egress-zero: bastion-connect.egress-zero ## Connect to egress-zero cluster bastion
 
 # Install OpenShift Provider

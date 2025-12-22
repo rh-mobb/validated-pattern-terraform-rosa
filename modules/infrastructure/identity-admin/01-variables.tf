@@ -1,7 +1,14 @@
 variable "cluster_id" {
-  description = "ID of the ROSA HCP cluster"
+  description = "ID of the ROSA HCP cluster (null when enable_destroy is true, must be set when enable_destroy is false)"
   type        = string
-  nullable    = false
+  nullable    = true
+
+  validation {
+    # When enable_destroy is false, resource will be created (count = 1), so cluster_id must not be null
+    # When enable_destroy is true, resource won't be created (count = 0), so cluster_id can be null
+    condition = var.enable_destroy == false ? var.cluster_id != null : true
+    error_message = "cluster_id must not be null when enable_destroy is false (resource will be created)."
+  }
 }
 
 variable "admin_password" {

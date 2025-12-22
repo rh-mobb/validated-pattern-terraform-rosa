@@ -66,3 +66,25 @@ resource "openshift_operator" "gitops" {
   # Timeout for CSV waiting (default is 10m, provider default is 20m for create)
   wait_timeout = "20m"
 }
+
+# Data source to fetch the GitOps server route
+# The route is created by the GitOps operator in the openshift-gitops namespace
+# Note: This is the ArgoCD instance route, not the operator namespace (openshift-gitops-operator)
+# The route is created automatically when the GitOps operator installs ArgoCD
+# Using kubernetes_resource data source to read OpenShift Route resource
+# Reference: https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/data-sources/resource
+data "kubernetes_resource" "gitops_route" {
+  count = var.deploy_gitops && var.enable_destroy == false && length(openshift_operator.gitops) > 0 ? 1 : 0
+
+  api_version = "route.openshift.io/v1"
+  kind        = "Route"
+
+  metadata {
+    name      = "openshift-gitops-server"
+    namespace = "openshift-gitops"
+  }
+
+  # Wait for the operator to be ready and CSV to be Succeeded before trying to fetch the route
+  # The route is created by the ArgoCD instance, which is deployed after the operator CSV succeeds
+  depends_on = [openshift_operator.gitops]
+}

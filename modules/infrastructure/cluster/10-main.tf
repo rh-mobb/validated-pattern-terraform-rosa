@@ -19,7 +19,7 @@ locals {
   # NOTE: hcp_replicas is the TOTAL number of replicas across all subnets, not per subnet
   autoscaling_enabled = length(var.machine_pools) > 0 ? var.machine_pools[0].autoscaling_enabled : true
   hcp_replicas = length(var.machine_pools) > 0 ? var.machine_pools[0].min_replicas : (
-    var.multi_az ? (1 * length(var.subnet_ids)) : 2
+    var.multi_az && length(var.subnet_ids) > 0 ? (1 * length(var.subnet_ids)) : 2
   )
 
   # Determine machine pool names - HCP creates one pool per subnet if multi-AZ
@@ -31,7 +31,7 @@ locals {
   machine_pools_to_create = local.destroy_enabled == false ? var.machine_pools : []
   hcp_machine_pools = local.destroy_enabled == false ? (
     length(var.machine_pools) > 0 ? [for pool in var.machine_pools : pool.name] : (
-      var.multi_az ? [for idx in range(length(var.subnet_ids)) : "workers-${idx}"] : ["workers"]
+      var.multi_az && length(var.subnet_ids) > 0 ? [for idx in range(length(var.subnet_ids)) : "workers-${idx}"] : ["workers"]
     )
   ) : []
 
@@ -160,8 +160,9 @@ resource "rhcs_cluster_rosa_hcp" "main" {
     }
 
     # Validate replicas is a multiple of number of subnets for multi-AZ clusters
+    # Only validate when destroy is enabled (resource will be created) and subnet_ids is provided
     precondition {
-      condition = var.multi_az ? (local.hcp_replicas % length(var.subnet_ids) == 0) : true
+      condition = local.destroy_enabled == false && var.multi_az && length(var.subnet_ids) > 0 ? (local.hcp_replicas % length(var.subnet_ids) == 0) : true
       error_message = "For multi-AZ clusters, replicas (${local.hcp_replicas}) must be a multiple of the number of subnets (${length(var.subnet_ids)}). For ${length(var.subnet_ids)} subnets, use replicas like ${length(var.subnet_ids)}, ${length(var.subnet_ids) * 2}, ${length(var.subnet_ids) * 3}, etc."
     }
   }
@@ -286,4 +287,4 @@ resource "rhcs_hcp_machine_pool" "default" {
 
 # Note: Admin user creation has been moved to a separate identity-admin module
 # This allows for independent lifecycle management (create initially, remove when external IDP is configured)
-# See modules/identity-admin/ for the admin user creation module
+# See modules/infrastructure/identity-admin/ for the admin user creation module

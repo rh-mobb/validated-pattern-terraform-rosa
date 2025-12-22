@@ -58,10 +58,14 @@ output "admin_user_created" {
   sensitive   = false
 }
 
-output "admin_password" {
-  description = "Admin password (sensitive - only output if admin user was created)"
-  value       = var.admin_password
-  sensitive   = true
+output "admin_password_secret_arn" {
+  description = <<EOF
+  ARN of the AWS Secrets Manager secret containing the admin password.
+  Use AWS CLI to retrieve the password:
+    aws secretsmanager get-secret-value --secret-id <arn> --query SecretString --output text
+  EOF
+  value       = length(aws_secretsmanager_secret.admin_password) > 0 ? aws_secretsmanager_secret.admin_password[0].arn : null
+  sensitive   = false
 }
 
 output "bastion_deployed" {

@@ -12,9 +12,16 @@ variable "region" {
 }
 
 variable "vpc_id" {
-  description = "VPC ID from network module"
+  description = "VPC ID from network module (null when enable_destroy is true, must be set when enable_destroy is false)"
   type        = string
-  nullable    = false
+  nullable    = true
+
+  validation {
+    # When enable_destroy is false, resource will be created (count = 1), so vpc_id must not be null
+    # When enable_destroy is true, resource won't be created (count = 0), so vpc_id can be null
+    condition = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? var.vpc_id != null : true
+    error_message = "vpc_id must not be null when enable_destroy is false (resource will be created)."
+  }
 }
 
 variable "vpc_cidr" {
@@ -24,47 +31,76 @@ variable "vpc_cidr" {
 }
 
 variable "subnet_ids" {
-  description = "List of private subnet IDs from network module (aws_subnet_ids)"
+  description = "List of private subnet IDs from network module (null or empty when enable_destroy is false)"
   type        = list(string)
-  nullable    = false
+  nullable    = true
+  default     = []
+
+  validation {
+    condition = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? length(var.subnet_ids) > 0 : true
+    error_message = "subnet_ids must not be empty when enable_destroy is false (resource will be created)."
+  }
 }
 
 variable "installer_role_arn" {
-  description = "ARN of the Installer role from IAM module"
+  description = "ARN of the Installer role from IAM module (null when enable_destroy is false)"
   type        = string
-  nullable    = false
+  nullable    = true
+
+  validation {
+    condition = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? var.installer_role_arn != null : true
+    error_message = "installer_role_arn must not be null when enable_destroy is false (resource will be created)."
+  }
 }
 
 variable "support_role_arn" {
-  description = "ARN of the Support role from IAM module"
+  description = "ARN of the Support role from IAM module (null when enable_destroy is false)"
   type        = string
-  nullable    = false
+  nullable    = true
+
+  validation {
+    condition = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? var.support_role_arn != null : true
+    error_message = "support_role_arn must not be null when enable_destroy is false (resource will be created)."
+  }
 }
 
 variable "worker_role_arn" {
-  description = "ARN of the Worker role from IAM module"
+  description = "ARN of the Worker role from IAM module (null when enable_destroy is false)"
   type        = string
-  nullable    = false
+  nullable    = true
+
+  validation {
+    condition = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? var.worker_role_arn != null : true
+    error_message = "worker_role_arn must not be null when enable_destroy is false (resource will be created)."
+  }
 }
 
 variable "oidc_config_id" {
-  description = "OIDC configuration ID from IAM module"
+  description = "OIDC configuration ID from IAM module (null when enable_destroy is false, but OIDC is never gated)"
   type        = string
-  nullable    = false
+  nullable    = true
+  # Note: OIDC is never gated by enable_destroy, but may be null if IAM module has enable_destroy_iam = true
 }
 
 variable "oidc_endpoint_url" {
-  description = "OIDC endpoint URL from IAM module"
+  description = "OIDC endpoint URL from IAM module (null when enable_destroy is false, but OIDC is never gated)"
   type        = string
-  nullable    = false
+  nullable    = true
+  # Note: OIDC is never gated by enable_destroy, but may be null if IAM module has enable_destroy_iam = true
 }
 
 # Cluster Configuration Variables (with organizational defaults)
 # Note: availability_zones should come from network module output (private_subnet_azs)
 variable "availability_zones" {
-  description = "List of availability zones from network module. Automatically determined based on multi_az setting."
+  description = "List of availability zones from network module. Automatically determined based on multi_az setting. (null or empty when enable_destroy is false)"
   type        = list(string)
-  nullable    = false
+  nullable    = true
+  default     = []
+
+  validation {
+    condition = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? length(var.availability_zones) > 0 : true
+    error_message = "availability_zones must not be empty when enable_destroy is false (resource will be created)."
+  }
 }
 
 variable "multi_az" {
@@ -159,7 +195,7 @@ variable "tags" {
 }
 
 # Note: Admin user creation has been moved to a separate identity-admin module
-# Use modules/identity-admin/ for admin user creation to enable independent lifecycle management
+# Use modules/infrastructure/identity-admin/ for admin user creation to enable independent lifecycle management
 
 # Machine Pool Configuration
 variable "machine_pools" {

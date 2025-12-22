@@ -6,5 +6,9 @@ terraform {
       source  = "registry.terraform.io/rh-mobb/openshift"
       version = "~> 0.1"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 3.0"
+    }
   }
 }
