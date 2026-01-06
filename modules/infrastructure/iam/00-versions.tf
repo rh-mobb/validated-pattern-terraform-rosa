@@ -7,6 +7,7 @@ terraform {
       version = ">= 6.0"
     }
     rhcs = {
+      # Registry provider for IAM resources
       source  = "terraform-redhat/rhcs"
       version = "~> 1.7"
     }

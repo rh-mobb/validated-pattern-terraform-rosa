@@ -655,6 +655,94 @@ Before committing code, ensure:
 10. [ ] Version numbers updated if needed
 11. [ ] Git commit message references PLAN.md if deviating
 
+## Reference Repositories
+
+**IMPORTANT**: The `./reference/` directory contains three reference repositories that provide valuable source code examples and patterns. These repositories significantly improve Cursor's accuracy and understanding of ROSA HCP Terraform patterns.
+
+### Checking for Reference Repositories
+
+**MANDATORY**: Before implementing new features or patterns, check if reference implementations exist in `./reference/`:
+
+1. **rosa-hcp-dedicated-vpc** (`./reference/rosa-hcp-dedicated-vpc/`):
+   - **Purpose**: Comprehensive ROSA HCP deployment example with advanced production features
+   - **Useful References**:
+     - API endpoint security group configuration (`terraform/2.expose-api.tf`) - **Used for api_endpoint_allowed_cidrs implementation**
+     - Secrets management (`terraform/3.secrets.tf`) - AWS Secrets Manager integration patterns
+     - Logging and SIEM (`terraform/4.logging.tf`, `terraform/5.siem-logging.tf`) - CloudWatch and SIEM integration
+     - Cert Manager (`terraform/6.cert-manager.tf`) - Certificate management patterns
+     - Storage (`terraform/7.storage.tf`) - EFS storage configuration
+     - IPSec VPN (`terraform/8.ipsec.tf`) - VPN connectivity patterns
+     - Bootstrap scripts (`terraform/9.bootstrap.tf`, `scripts/*.tftpl`) - Cluster initialization patterns
+     - Alerting (`terraform/10.alerting.tf`) - Monitoring and alerting setup
+     - Ingress (`terraform/11.ingress.tf`) - Ingress controller configuration
+     - Machine pool management (`terraform/12-restart-default-machinepool.tf`) - Machine pool lifecycle patterns
+     - Termination protection (`terraform/13.termination-protection.tf`) - Resource protection patterns
+   - **When to Reference**: Production-grade features, advanced configurations, Day 2 operations
+
+2. **terraform-rosa** (`./reference/terraform-rosa/`):
+   - **Purpose**: Red Hat MOBB's all-in-one ROSA module (supports both Classic and HCP)
+   - **Source**: https://github.com/rh-mobb/terraform-rosa
+   - **Useful References**:
+     - Network module (`modules/terraform-rosa-networking/`) - Network topology patterns
+     - Cluster creation (`04-cluster.tf`) - Cluster resource patterns and version handling
+     - IAM roles (`03-roles.tf`) - IAM role creation patterns
+     - Identity providers (`05-identity.tf`) - HTPasswd and other IDP patterns
+     - Bastion host (`06-bastion.tf`) - Bastion host configuration
+     - GitOps deployment (`21-gitops.tf`) - GitOps operator installation
+     - File organization - Numbered file prefix system (00-99) for execution order
+   - **When to Reference**: Module structure patterns, file organization, simpler deployment patterns
+
+3. **terraform-provider-rhcs** (`./reference/terraform-provider-rhcs/`):
+   - **Purpose**: Source code for the RHCS Terraform provider
+   - **Source**: https://github.com/terraform-redhat/terraform-provider-rhcs
+   - **Useful References**:
+     - Provider documentation (`docs/`) - Complete provider resource and data source documentation
+     - Examples (`examples/`) - Official provider usage examples
+     - Resource implementations (`provider/*/`) - Understanding how provider resources work internally
+     - Data sources (`docs/data-sources/`) - Available data sources and their usage
+     - Guides (`docs/guides/`) - Provider-specific guides (upgrading clusters, machine pools, etc.)
+   - **When to Reference**: Understanding provider capabilities, finding available resources/data sources, debugging provider issues
+
+4. **OCM API Specification** (`./reference/OCM.json`):
+   - **Purpose**: Complete OpenAPI specification for the OpenShift Cluster Manager (OCM) API
+   - **Source**: Exported from OCM API endpoint
+   - **Useful References**:
+     - API schema definitions (`components/schemas/`) - Complete data structures and types
+     - Endpoint definitions (`paths/`) - Available API endpoints and operations
+     - Request/response schemas - Understanding API payload structures
+     - Field names and types - Verifying exact API field names (e.g., `role_arn` vs `roleArn`)
+   - **When to Reference**:
+     - Verifying API field names and structures when implementing provider features
+     - Understanding nested object structures (e.g., `aws.audit_log.role_arn`)
+     - Checking available API endpoints and operations
+     - Confirming data types and validation rules
+   - **Example**: Used to verify CloudWatch audit log structure (`AWS.audit_log.role_arn`)
+
+5. **OCM SDK** (`./reference/ocm-sdk-go/`):
+   - **Purpose**: Go SDK for the OpenShift Cluster Manager (OCM) API
+   - **Source**: https://github.com/openshift-online/ocm-sdk-go
+   - **Useful References**:
+     - Builder patterns (`*_builder_alias.go`) - How to construct API objects (e.g., `NewAuditLog()`, `RoleArn()`)
+     - Type definitions (`*_type_alias.go`) - Go types for API objects
+     - Method names - Verifying exact SDK method names (e.g., `RoleArn` vs `RoleARN`, `GetRoleArn` vs `GetRoleARN`)
+     - OpenAPI spec (`openapi/clusters_mgmt/v1/openapi.json`) - Generated OpenAPI spec used by SDK
+   - **When to Reference**:
+     - Implementing provider features that use OCM SDK
+     - Verifying SDK method names and signatures
+     - Understanding how to build API objects (builders)
+     - Checking available methods on types (getters, setters)
+   - **Example**: Used to verify `AuditLogBuilder.RoleArn()` and `AuditLog.GetRoleArn()` method names
+
+### Using Reference Repositories
+
+**Best Practice**: When implementing new features:
+1. **Check reference repositories first** - Look for similar patterns in `./reference/`
+2. **Reference the implementation** - Add comments referencing the source file (e.g., `# Reference: ./reference/rosa-hcp-dedicated-vpc/terraform/2.expose-api.tf`)
+3. **Adapt patterns** - Adapt patterns to match this repository's architecture and conventions
+4. **Document deviations** - If deviating from reference patterns, document why in code comments
+
+**Note**: These repositories and files are cloned/downloaded locally for development. They are not part of the main repository but provide invaluable reference material. See README.md for instructions on cloning/downloading them.
+
 ## References
 
 - **Project Plan**: See `PLAN.md` in repository root
@@ -663,3 +751,5 @@ Before committing code, ensure:
 - ROSA HCP Documentation: https://docs.redhat.com/en/documentation/red_hat_openshift_service_on_aws/
 - Keep a Changelog: https://keepachangelog.com/
 - Semantic Versioning: https://semver.org/
+- **OCM API Specification**: `./reference/OCM.json` - OpenAPI spec for OCM API (see Reference Repositories section)
+- **OCM SDK**: `./reference/ocm-sdk-go/` - Go SDK for OCM API (see Reference Repositories section)

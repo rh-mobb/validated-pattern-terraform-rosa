@@ -323,13 +323,13 @@ rosa-hcp-infrastructure/
 
 This step creates **three example clusters** demonstrating different network topologies and security postures:
 
-1. **Public Cluster** (`clusters/examples/public/`) - Development example
-2. **Private Cluster** (`clusters/examples/private/`) - Development example
-3. **Egress-Zero Cluster** (`clusters/examples/egress-zero/`) - Production-ready example with extra hardening
+1. **Public Cluster** (`examples/public/`) - Development example
+2. **Private Cluster** (`examples/private/`) - Development example
+3. **Egress-Zero Cluster** (`examples/egress-zero/`) - Production-ready example with extra hardening
 
 ### 5.1 Example 1: Public Cluster (Development)
 
-**Path**: `clusters/examples/public/infrastructure/` and `clusters/examples/public/configuration/`
+**Path**: `examples/public/infrastructure/` and `examples/public/configuration/`
 
 **Purpose**: Development/Testing cluster with internet access via NAT Gateway
 
@@ -431,7 +431,7 @@ data "terraform_remote_state" "infrastructure" {
 }
 ```
 
-**Infrastructure Variables** (`infrastructure/terraform.tfvars`):
+**Infrastructure Variables** (`clusters/default.tfvars`):
 
 ```hcl
 cluster_name      = "dev-public-01"
@@ -446,7 +446,7 @@ instance_type     = "m5.large"  # Smaller instance for dev
 
 ### 5.2 Example 2: Private Cluster (Development)
 
-**Path**: `clusters/examples/private/infrastructure/` and `clusters/examples/private/configuration/`
+**Path**: `examples/private/infrastructure/` and `examples/private/configuration/`
 
 **Purpose**: Development cluster with PrivateLink API but VPC endpoints for AWS services
 
@@ -535,7 +535,7 @@ instance_type     = "m5.large"
 
 ### 5.3 Example 3: Egress-Zero Cluster (Production-Ready)
 
-**Path**: `clusters/examples/egress-zero/infrastructure/` and `clusters/examples/egress-zero/configuration/`
+**Path**: `examples/egress-zero/infrastructure/` and `examples/egress-zero/configuration/`
 
 **Purpose**: Production-ready cluster with maximum security hardening and zero internet egress
 
@@ -819,7 +819,7 @@ locals {
 | 4 | Repo 1 | Build `network-egress-zero` module. Ensure strict egress controls | Terraform |
 | 5 | Repo 1 | Build `iam` module. Use rhcs provider for account & operator roles | Terraform |
 | 6 | Repo 1 | Build `cluster` module. Reference hardened specs (Private, Encrypted) | Terraform |
-| 7 | Repo 1 | Create three example clusters in `clusters/examples/`: public (dev), private (dev), egress-zero (prod-ready) | Terraform |
+| 7 | Repo 1 | Create three example clusters in `examples/`: public (dev), private (dev), egress-zero (prod-ready) | Terraform |
 | 8 | Verify | Run end-to-end `terraform apply` for each example. Verify configurations and connectivity | CLI |
 | 9 | Future | Build Repository 2 for Bootstrap, GitOps, IDP, Logging, Monitoring | Terraform/GitOps |
 

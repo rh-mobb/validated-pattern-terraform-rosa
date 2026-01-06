@@ -65,11 +65,20 @@ data "rhcs_versions" "available" {
 # Note: This data source returns machine types for the current region context
 data "rhcs_machine_types" "available" {}
 
+# DNS Domain Registration
+# Reference: ./reference/rosa-hcp-dedicated-vpc/terraform/1.main.tf:17-19
+# DNS domain persists between cluster creations (not gated by enable_destroy)
+resource "rhcs_dns_domain" "dns_domain" {
+  count        = var.enable_persistent_dns_domain ? 1 : 0
+  cluster_arch = "hcp"
+}
+
 # ROSA HCP Cluster
 # Reference: https://registry.terraform.io/providers/terraform-redhat/rhcs/latest/docs/resources/cluster_rosa_hcp
 # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/04-cluster.tf
 resource "rhcs_cluster_rosa_hcp" "main" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count          = local.destroy_enabled == false ? 1 : 0
+  provider       = rhcs-local  # Use local provider with audit_log_arn support
   name           = var.cluster_name
   cloud_region   = var.region
   aws_account_id = data.aws_caller_identity.current.account_id
@@ -103,10 +112,21 @@ resource "rhcs_cluster_rosa_hcp" "main" {
   # Optional encryption
   kms_key_arn = var.kms_key_arn
 
+  # CloudWatch audit log forwarding
+  # Using provider-native support (requires custom-built provider with audit_log_arn support)
+  # Script-based fallback is commented out in 20-audit-logging.tf
+  audit_log_arn = local.destroy_enabled == false && var.enable_audit_logging ? (
+    length(aws_iam_role.cloudwatch_audit_logging) > 0 ? aws_iam_role.cloudwatch_audit_logging[0].arn : null
+  ) : null
+
   # Network CIDR configuration
   service_cidr = var.service_cidr
   pod_cidr     = var.pod_cidr
   host_prefix  = var.host_prefix
+
+  # DNS domain configuration
+  # Reference: ./reference/rosa-hcp-dedicated-vpc/terraform/1.main.tf:103
+  base_dns_domain = var.enable_persistent_dns_domain ? rhcs_dns_domain.dns_domain[0].id : null
 
   # Version configuration
   # Use determined version (provided or latest installable)
@@ -162,7 +182,7 @@ resource "rhcs_cluster_rosa_hcp" "main" {
     # Validate replicas is a multiple of number of subnets for multi-AZ clusters
     # Only validate when destroy is enabled (resource will be created) and subnet_ids is provided
     precondition {
-      condition = local.destroy_enabled == false && var.multi_az && length(var.subnet_ids) > 0 ? (local.hcp_replicas % length(var.subnet_ids) == 0) : true
+      condition     = local.destroy_enabled == false && var.multi_az && length(var.subnet_ids) > 0 ? (local.hcp_replicas % length(var.subnet_ids) == 0) : true
       error_message = "For multi-AZ clusters, replicas (${local.hcp_replicas}) must be a multiple of the number of subnets (${length(var.subnet_ids)}). For ${length(var.subnet_ids)} subnets, use replicas like ${length(var.subnet_ids)}, ${length(var.subnet_ids) * 2}, ${length(var.subnet_ids) * 3}, etc."
     }
   }
@@ -263,7 +283,7 @@ resource "rhcs_hcp_machine_pool" "default" {
     }
 
     precondition {
-      condition     = local.autoscaling_enabled ? (
+      condition = local.autoscaling_enabled ? (
         (length(var.machine_pools) > 0 ? var.machine_pools[0].max_replicas : var.default_max_replicas) >= local.hcp_replicas
       ) : true
       error_message = "'max_replicas' must be greater than or equal to 'min_replicas'."
@@ -288,3 +308,49 @@ resource "rhcs_hcp_machine_pool" "default" {
 # Note: Admin user creation has been moved to a separate identity-admin module
 # This allows for independent lifecycle management (create initially, remove when external IDP is configured)
 # See modules/infrastructure/identity-admin/ for the admin user creation module
+
+# API Endpoint Security Group Access Configuration
+# By default, ROSA HCP creates a VPC endpoint security group that only allows access from within the VPC.
+# This configuration allows adding additional IPv4 CIDR blocks to access the API endpoint.
+# Reference: https://github.com/redhat-rosa/rosa-hcp-dedicated-vpc/blob/main/terraform/2.expose-api.tf
+
+# Data source to find the VPC endpoint security group created by ROSA
+# ROSA tags the security group with: Name = "${cluster_id}-vpce-private-router"
+data "aws_security_groups" "vpc_endpoint_default" {
+  count = local.destroy_enabled == false && length(var.api_endpoint_allowed_cidrs) > 0 ? 1 : 0
+
+  filter {
+    name   = "tag:Name"
+    values = ["${one(rhcs_cluster_rosa_hcp.main[*].id)}-vpce-private-router"]
+  }
+
+  depends_on = [
+    rhcs_cluster_rosa_hcp.main
+  ]
+}
+
+# Create ingress rules for each allowed CIDR block
+# Use for_each instead of count for better resource stability
+resource "aws_vpc_security_group_ingress_rule" "api_endpoint_access" {
+  for_each = local.destroy_enabled == false && length(var.api_endpoint_allowed_cidrs) > 0 ? toset(var.api_endpoint_allowed_cidrs) : toset([])
+
+  security_group_id = data.aws_security_groups.vpc_endpoint_default[0].ids[0]
+  cidr_ipv4         = each.value
+  from_port         = 443
+  ip_protocol       = "tcp"
+  to_port           = 443
+
+  description = "Allow HTTPS access to ROSA HCP API endpoint from ${each.value}"
+
+  lifecycle {
+    # Ignore changes to security_group_id as it's managed by ROSA
+    ignore_changes = [
+      security_group_id
+    ]
+  }
+
+  depends_on = [
+    rhcs_cluster_rosa_hcp.main,
+    data.aws_security_groups.vpc_endpoint_default
+  ]
+}

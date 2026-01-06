@@ -4,7 +4,7 @@ terraform {
   required_providers {
     openshift = {
       source  = "registry.terraform.io/rh-mobb/openshift"
-      version = "~> 0.1"
+      version = "~> 0.1.2"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"

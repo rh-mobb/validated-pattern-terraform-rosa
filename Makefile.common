@@ -1,0 +1,80 @@
+# Common Makefile functions and variables
+# Included by root Makefile and example Makefiles
+
+# Colors for output
+BLUE := \033[0;34m
+GREEN := \033[0;32m
+YELLOW := \033[0;33m
+RED := \033[0;31m
+NC := \033[0m # No Color
+
+# Get repository root (works from any subdirectory)
+REPO_ROOT := $(shell git rev-parse --show-toplevel 2>/dev/null || pwd)
+
+# Shell function to get admin password from AWS Secrets Manager
+# Uses external script for better maintainability and debugging
+# Usage: Call this function within a shell command block
+# Sets ADMIN_PASSWORD variable in the shell context
+# Requires: INFRA_DIR variable to be set to infrastructure directory
+define get_admin_password_from_secret
+	INFRA_DIR_ARG=$$1; \
+	if [ -z "$$INFRA_DIR_ARG" ]; then \
+		echo "$(YELLOW)Error: Infrastructure directory argument is empty$(NC)"; \
+		exit 1; \
+	fi && \
+	REPO_ROOT=$$(git rev-parse --show-toplevel 2>/dev/null || pwd) && \
+	SCRIPT_PATH="$$REPO_ROOT/scripts/get-admin-password.sh" && \
+	if [ ! -f "$$SCRIPT_PATH" ]; then \
+		SCRIPT_PATH="$$(pwd)/scripts/get-admin-password.sh"; \
+	fi && \
+	if [ ! -f "$$SCRIPT_PATH" ]; then \
+		echo "$(YELLOW)Error: get-admin-password.sh script not found$(NC)"; \
+		echo "$(YELLOW)Expected at: $$SCRIPT_PATH$(NC)"; \
+		exit 1; \
+	fi && \
+	ADMIN_PASSWORD=$$($$SCRIPT_PATH "$$INFRA_DIR_ARG") && \
+	if [ -z "$$ADMIN_PASSWORD" ]; then \
+		echo "$(YELLOW)Warning: Script returned empty password$(NC)"; \
+	else \
+		echo "$(BLUE)Successfully retrieved admin password$(NC)"; \
+	fi && \
+	export ADMIN_PASSWORD
+endef
+
+# Shell function to get Kubernetes token with retry logic (5 minute timeout)
+# Usage: Call this function within a shell command block
+# Sets K8S_TOKEN variable in the shell context
+define get_k8s_token_with_retry
+	if [ -z "$$TF_VAR_k8s_token" ]; then \
+		echo "$(BLUE)Obtaining Kubernetes token via oc login...$(NC)"; \
+		if ! command -v oc >/dev/null 2>&1; then \
+			echo "$(YELLOW)Error: oc CLI not found. Required for authentication.$(NC)"; \
+			echo "$(YELLOW)Install OpenShift CLI: https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/$(NC)"; \
+			exit 1; \
+		fi; \
+		TIMEOUT=300; \
+		ELAPSED=0; \
+		INTERVAL=10; \
+		K8S_TOKEN=""; \
+		while [ $$ELAPSED -lt $$TIMEOUT ]; do \
+			if oc login $$API_URL --username=admin --password=$$ADMIN_PASSWORD --insecure-skip-tls-verify=true >/dev/null 2>&1 || \
+			   oc login $$API_URL --username=admin --password=$$ADMIN_PASSWORD --insecure-skip-tls-verify=false >/dev/null 2>&1; then \
+				K8S_TOKEN=$$(oc whoami --show-token 2>/dev/null); \
+				if [ -n "$$K8S_TOKEN" ]; then \
+					echo "$(GREEN)Successfully obtained Kubernetes token$(NC)"; \
+					break; \
+				fi; \
+			fi; \
+			printf "$(YELLOW)Waiting for cluster to be ready... (%ds/%ds)$(NC)\n" $$ELAPSED $$TIMEOUT; \
+			sleep $$INTERVAL; \
+			ELAPSED=$$((ELAPSED + INTERVAL)); \
+		done; \
+		if [ -z "$$K8S_TOKEN" ]; then \
+			echo "$(YELLOW)Error: Failed to login to cluster after $$TIMEOUT seconds$(NC)"; \
+			exit 1; \
+		fi; \
+	else \
+		echo "$(YELLOW)Note: Using TF_VAR_k8s_token from environment.$(NC)"; \
+		K8S_TOKEN=$$TF_VAR_k8s_token; \
+	fi
+endef

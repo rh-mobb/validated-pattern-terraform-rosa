@@ -7,8 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **DNS Domain Registration**: Added DNS domain registration using `rhcs_dns_domain` resource with feature toggle:
+  - New `enable_persistent_dns_domain` variable in cluster module (default: `false`) controls DNS domain registration
+  - When enabled, creates `rhcs_dns_domain` resource in cluster module that persists between cluster creations (not gated by `enable_destroy`)
+  - DNS domain resource is created and managed within the cluster module for better encapsulation
+  - When disabled, ROSA uses default DNS domain
+  - Infrastructure files pass the toggle to the cluster module
+  - Reference implementation: `./reference/rosa-hcp-dedicated-vpc/terraform/1.main.tf:17-19`
+- **CloudWatch Audit Log Forwarding**: Added CloudWatch audit log forwarding as a toggleable feature (enabled by default):
+  - New `enable_audit_logging` variable (default: `true`) in cluster module
+  - Creates IAM role and policy for CloudWatch audit log forwarding
+  - IAM role uses OIDC federation for OpenShift logging service account (`system:serviceaccount:openshift-logging:cluster-logging`)
+  - New output `cloudwatch_audit_logging_role_arn` provides the role ARN for cluster configuration
+  - Configuration file: `modules/infrastructure/cluster/20-audit-logging.tf`
+  - Reference implementation: `./reference/rosa-hcp-dedicated-vpc/terraform/4.logging.tf`
+  - Note: Cluster configuration via OCM API or rosa CLI may be required depending on provider version
+- **API Endpoint Security Group Access**: Added optional `api_endpoint_allowed_cidrs` variable to cluster module:
+  - Allows specifying additional IPv4 CIDR blocks to access the ROSA HCP API endpoint
+  - By default, the VPC endpoint security group only allows access from within the VPC
+  - Useful for allowing access from VPN ranges, bastion hosts, or other VPCs
+  - Automatically finds the ROSA-managed VPC endpoint security group by tag name
+  - Creates ingress rules for each specified CIDR block (port 443/TCP)
+  - Only creates resources when CIDRs are provided and `enable_destroy` is false
+  - Reference implementation: `reference/rosa-hcp-dedicated-vpc/terraform/2.expose-api.tf`
+
 ### Removed
-- **BREAKING**: Removed `clusters/examples/private/` cluster example
+- **BREAKING**: Removed `examples/private/` cluster example
   - Private cluster example removed (only public and egress-zero examples remain)
   - Private network module (`modules/infrastructure/network-private/`) retained for use with egress-zero clusters
   - Updated Makefile to remove all private cluster targets

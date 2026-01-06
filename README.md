@@ -15,7 +15,7 @@ The repository is organized into two main categories:
 
 Each cluster example has separate `infrastructure/` and `configuration/` directories with independent Terraform state files. Configuration reads infrastructure outputs via `terraform_remote_state` data sources.
 
-> **⚠️ Known Issue**: The egress-zero cluster example (`clusters/examples/egress-zero/`) is currently non-functional. Worker nodes are not starting successfully. Investigation is ongoing. See [CHANGELOG.md](CHANGELOG.md) for details.
+> **⚠️ Known Issue**: The egress-zero cluster example (`examples/egress-zero/`) is currently non-functional. Worker nodes are not starting successfully. Investigation is ongoing. See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ## Quick Start
 
@@ -134,7 +134,7 @@ The modules are designed to be **composable** and **reusable**. You can mix and 
 Here's how the example clusters compose modules:
 
 ```hcl
-# clusters/examples/public/infrastructure/10-main.tf
+# examples/public/infrastructure/10-main.tf
 module "network" {
   source = "../../../../modules/infrastructure/network-public"
 
@@ -170,7 +170,7 @@ module "cluster" {
 ```
 
 ```hcl
-# clusters/examples/public/configuration/10-main.tf
+# examples/public/configuration/10-main.tf
 # Read infrastructure outputs via remote state
 data "terraform_remote_state" "infrastructure" {
   backend = "local"
@@ -753,18 +753,77 @@ This allows destroying the cluster while preserving IAM roles and OIDC configura
 - ✅ **identity-admin**: Production-ready
 - ✅ **bastion**: Production-ready (dev/demo use only)
 
+## Development Setup
+
+### Reference Repositories
+
+To improve Cursor's accuracy and provide better code suggestions, clone the following reference repositories into the `./reference/` directory:
+
+```bash
+# Create reference directory if it doesn't exist
+mkdir -p reference
+
+# Clone reference repositories
+cd reference
+
+# 1. ROSA HCP Dedicated VPC - Comprehensive production example
+git clone https://github.com/redhat-rosa/rosa-hcp-dedicated-vpc.git rosa-hcp-dedicated-vpc
+
+# 2. Terraform ROSA - Red Hat MOBB's all-in-one ROSA module
+git clone https://github.com/rh-mobb/terraform-rosa.git terraform-rosa
+
+# 3. Terraform Provider RHCS - Source code for the RHCS provider
+git clone https://github.com/terraform-redhat/terraform-provider-rhcs.git terraform-provider-rhcs
+
+# 4. OCM SDK - Go SDK for OCM API
+git clone https://github.com/openshift-online/ocm-sdk-go.git ocm-sdk-go
+
+cd ..
+```
+
+**Additional Reference Files:**
+
+The following files should be downloaded/exported to the `./reference/` directory:
+
+- **OCM API Specification** (`./reference/OCM.json`):
+  - **Purpose**: Complete OpenAPI specification for the OpenShift Cluster Manager (OCM) API
+  - **How to obtain**: Export from OCM API endpoint or download from OCM documentation
+  - **Useful for**: Verifying API field names, structures, and available endpoints when implementing provider features
+  - **Example**: Used to verify CloudWatch audit log structure (`AWS.audit_log.role_arn`)
+
+**Why clone/download these repositories and files?**
+
+- **Improved Cursor Accuracy**: Having these repositories locally allows Cursor to reference actual ROSA HCP Terraform patterns, improving code suggestions and understanding
+- **Reference Implementations**: These repositories contain production-grade examples and patterns that can be referenced when implementing new features
+- **Provider Documentation**: The provider source code includes comprehensive documentation and examples
+- **Pattern Matching**: Cursor can better understand ROSA HCP patterns by analyzing these reference implementations
+
+**What each repository/file provides:**
+
+1. **rosa-hcp-dedicated-vpc**: Advanced production features (API endpoint security, secrets management, logging, SIEM, storage, VPN, bootstrap scripts, alerting, ingress)
+2. **terraform-rosa**: Module structure patterns, file organization, simpler deployment patterns
+3. **terraform-provider-rhcs**: Complete provider documentation, examples, and resource implementations
+4. **ocm-sdk-go**: Go SDK for the OCM API - useful for verifying SDK method names and patterns when implementing provider features
+5. **OCM.json**: OpenAPI specification for the OCM API - authoritative source for API field names, structures, and endpoints
+
+**Note**: These repositories are for reference only and are not part of the main repository. They are excluded from version control (see `.gitignore`).
+
 ## Contributing
 
 1. Review [PLAN.md](PLAN.md) before making changes
 2. Follow [.cursorrules](.cursorrules) guidelines
-3. Update [CHANGELOG.md](CHANGELOG.md) with changes
-4. Ensure all code passes `terraform fmt` and `terraform validate`
-5. Run security scanning with `checkov`
+3. Check `./reference/` repositories for similar patterns before implementing new features
+4. Update [CHANGELOG.md](CHANGELOG.md) with changes
+5. Ensure all code passes `terraform fmt` and `terraform validate`
+6. Run security scanning with `checkov`
 
 ## References
 
 - [ROSA HCP Documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_service_on_aws/)
 - [Terraform RHCS Provider](https://registry.terraform.io/providers/terraform-redhat/rhcs/latest)
+- **OCM API Specification**: `./reference/OCM.json` - OpenAPI spec for OCM API (see Reference Repositories section above)
+- **OCM SDK**: `./reference/ocm-sdk-go/` - Go SDK for OCM API (see Reference Repositories section above)
+- [OCM SDK Source](https://github.com/openshift-online/ocm-sdk-go) - GitHub repository for OCM SDK
 - [Red Hat MOBB Rules](https://github.com/rh-mobb/mobb-rules)
 
 ## License

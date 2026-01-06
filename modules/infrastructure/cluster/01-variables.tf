@@ -19,7 +19,7 @@ variable "vpc_id" {
   validation {
     # When enable_destroy is false, resource will be created (count = 1), so vpc_id must not be null
     # When enable_destroy is true, resource won't be created (count = 0), so vpc_id can be null
-    condition = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? var.vpc_id != null : true
+    condition     = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? var.vpc_id != null : true
     error_message = "vpc_id must not be null when enable_destroy is false (resource will be created)."
   }
 }
@@ -37,7 +37,7 @@ variable "subnet_ids" {
   default     = []
 
   validation {
-    condition = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? length(var.subnet_ids) > 0 : true
+    condition     = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? length(var.subnet_ids) > 0 : true
     error_message = "subnet_ids must not be empty when enable_destroy is false (resource will be created)."
   }
 }
@@ -48,7 +48,7 @@ variable "installer_role_arn" {
   nullable    = true
 
   validation {
-    condition = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? var.installer_role_arn != null : true
+    condition     = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? var.installer_role_arn != null : true
     error_message = "installer_role_arn must not be null when enable_destroy is false (resource will be created)."
   }
 }
@@ -59,7 +59,7 @@ variable "support_role_arn" {
   nullable    = true
 
   validation {
-    condition = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? var.support_role_arn != null : true
+    condition     = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? var.support_role_arn != null : true
     error_message = "support_role_arn must not be null when enable_destroy is false (resource will be created)."
   }
 }
@@ -70,7 +70,7 @@ variable "worker_role_arn" {
   nullable    = true
 
   validation {
-    condition = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? var.worker_role_arn != null : true
+    condition     = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? var.worker_role_arn != null : true
     error_message = "worker_role_arn must not be null when enable_destroy is false (resource will be created)."
   }
 }
@@ -98,7 +98,7 @@ variable "availability_zones" {
   default     = []
 
   validation {
-    condition = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? length(var.availability_zones) > 0 : true
+    condition     = (var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy) == false ? length(var.availability_zones) > 0 : true
     error_message = "availability_zones must not be empty when enable_destroy is false (resource will be created)."
   }
 }
@@ -266,4 +266,32 @@ variable "enable_destroy_cluster" {
   type        = bool
   default     = null
   nullable    = true
+}
+
+variable "api_endpoint_allowed_cidrs" {
+  description = "Optional list of IPv4 CIDR blocks allowed to access the ROSA HCP API endpoint. By default, the VPC endpoint security group only allows access from within the VPC. This variable allows you to add additional CIDR blocks (e.g., VPN ranges, bastion host IPs, or other VPCs)."
+  type        = list(string)
+  default     = []
+  nullable    = false
+
+  validation {
+    condition = alltrue([
+      for cidr in var.api_endpoint_allowed_cidrs : can(cidrhost(cidr, 0))
+    ])
+    error_message = "All CIDR blocks in api_endpoint_allowed_cidrs must be valid IPv4 CIDR notation (e.g., '10.0.0.0/32' or '192.168.1.0/24')."
+  }
+}
+
+variable "enable_audit_logging" {
+  description = "Enable CloudWatch audit log forwarding for the ROSA HCP cluster. When enabled, creates an IAM role for CloudWatch logging and configures the cluster to forward audit logs to CloudWatch."
+  type        = bool
+  default     = true
+  nullable    = false
+}
+
+variable "enable_persistent_dns_domain" {
+  description = "Enable persistent DNS domain registration. When true, creates rhcs_dns_domain resource that persists between cluster creations. When false, ROSA uses default DNS domain."
+  type        = bool
+  default     = false
+  nullable    = false
 }

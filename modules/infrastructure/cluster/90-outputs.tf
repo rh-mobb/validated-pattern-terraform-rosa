@@ -30,3 +30,9 @@ output "state" {
   value       = length(rhcs_cluster_rosa_hcp.main) > 0 ? one(rhcs_cluster_rosa_hcp.main[*].state) : null
   sensitive   = false
 }
+
+output "cloudwatch_audit_logging_role_arn" {
+  description = "ARN of the IAM role for CloudWatch audit log forwarding (null if enable_destroy is true or enable_audit_logging is false)"
+  value       = local.destroy_enabled == false && var.enable_audit_logging && length(aws_iam_role.cloudwatch_audit_logging) > 0 ? aws_iam_role.cloudwatch_audit_logging[0].arn : null
+  sensitive   = false
+}

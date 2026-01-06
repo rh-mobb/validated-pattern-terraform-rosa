@@ -45,6 +45,18 @@ module "cluster" {
     }
   ]
 
+  # Optional: Allow API endpoint access from additional CIDR blocks
+  # By default, only VPC CIDR can access the API endpoint
+  api_endpoint_allowed_cidrs = [
+    "10.0.0.0/32",      # Example: Specific IP
+    "192.168.1.0/24"   # Example: VPN range
+  ]
+
+  # Optional: DNS domain registration
+  # When enabled, creates rhcs_dns_domain resource that persists between cluster creations (not gated by enable_destroy)
+  # When disabled, ROSA uses default DNS domain
+  enable_persistent_dns_domain = false  # Default: false
+
   tags = {
     Environment = "production"
   }
@@ -99,6 +111,9 @@ module "identity_admin" {
 | channel_group | Channel group for OpenShift version | `string` | `"stable"` |
 | openshift_version | OpenShift version to pin. If not provided, automatically uses latest installable version | `string` | `null` |
 | wait_for_std_compute_nodes_complete | Wait for standard compute nodes to complete before considering cluster creation successful. Set to false if nodes may take longer (e.g., egress-zero clusters) | `bool` | `true` |
+| enable_audit_logging | Enable CloudWatch audit log forwarding. When enabled, creates IAM role and policy for CloudWatch logging | `bool` | `true` |
+| api_endpoint_allowed_cidrs | Optional list of IPv4 CIDR blocks allowed to access the ROSA HCP API endpoint. By default, the VPC endpoint security group only allows access from within the VPC. Useful for VPN ranges, bastion hosts, or other VPCs | `list(string)` | `[]` |
+| enable_persistent_dns_domain | Enable persistent DNS domain registration. When true, creates rhcs_dns_domain resource that persists between cluster creations (not gated by enable_destroy). When false, ROSA uses default DNS domain | `bool` | `false` |
 | tags | Tags to apply to the cluster | `map(string)` | `{}` |
 | machine_pools | List of machine pool configurations | `list(object)` | `[]` |
 
@@ -126,6 +141,7 @@ module "identity_admin" {
 | kubeconfig | Kubernetes configuration file (sensitive) |
 | cluster_admin_password | Cluster admin password (sensitive) |
 | state | State of the cluster |
+| cloudwatch_audit_logging_role_arn | ARN of the IAM role for CloudWatch audit log forwarding (null if disabled or enable_destroy is true) |
 
 ## Organizational Defaults
 
