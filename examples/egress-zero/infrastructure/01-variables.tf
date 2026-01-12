@@ -201,3 +201,60 @@ variable "enable_persistent_dns_domain" {
   default     = false
   nullable    = false
 }
+
+variable "additional_machine_pools" {
+  description = <<EOF
+  Map of additional machine pools to create beyond the default pools.
+  Key is the pool name, value is the pool configuration.
+
+  subnet_index: Index of the private subnet to use (0, 1, 2, etc.). Automatically maps to the actual subnet ID.
+
+  Example:
+  additional_machine_pools = {
+    "compute-0" = {
+      subnet_index        = 0
+      instance_type       = "m5.2xlarge"
+      autoscaling_enabled = true
+      min_replicas        = 1
+      max_replicas        = 3
+    }
+  }
+  EOF
+  type = map(object({
+    subnet_index        = number # Index of private subnet (0, 1, 2, etc.)
+    instance_type       = string
+    autoscaling_enabled = optional(bool, true)
+    min_replicas        = optional(number)
+    max_replicas        = optional(number)
+    replicas            = optional(number) # Only if autoscaling_enabled = false
+    auto_repair         = optional(bool, true)
+    labels              = optional(map(string), {})
+    taints = optional(list(object({
+      key          = string
+      value        = string
+      schedule_type = string # "NoSchedule", "PreferNoSchedule", "NoExecute"
+    })), [])
+    additional_security_group_ids = optional(list(string), [])
+    capacity_reservation_id       = optional(string)
+    disk_size                     = optional(number)
+    ec2_metadata_http_tokens      = optional(string, "required")
+    tags                          = optional(map(string), {})
+    version                       = optional(string)
+    upgrade_acknowledgements_for  = optional(string)
+    kubelet_configs              = optional(string)
+    tuning_configs               = optional(list(string), [])
+    ignore_deletion_error         = optional(bool, false)
+  }))
+  default  = {}
+  nullable = false
+
+  validation {
+    condition = alltrue([
+      for k, v in var.additional_machine_pools : (
+        (v.autoscaling_enabled && v.min_replicas != null && v.max_replicas != null && v.replicas == null) ||
+        (!v.autoscaling_enabled && v.replicas != null && v.min_replicas == null && v.max_replicas == null)
+      )
+    ])
+    error_message = "For each additional machine pool: if autoscaling_enabled is true, min_replicas and max_replicas must be set and replicas must be null. If autoscaling_enabled is false, replicas must be set and min_replicas/max_replicas must be null."
+  }
+}

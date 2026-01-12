@@ -65,12 +65,25 @@ else
         exit 1
     fi
 
+    # Extract region from ARN (format: arn:aws:secretsmanager:<region>:<account-id>:secret:<name>)
+    SECRET_REGION=$(echo "$SECRET_ARN" | cut -d':' -f4)
+
+    if [ -z "$SECRET_REGION" ]; then
+        echo -e "${YELLOW}Error: Could not extract region from secret ARN: $SECRET_ARN${NC}" >&2
+        exit 1
+    fi
+
     # Retrieve password from AWS Secrets Manager
-    ADMIN_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query SecretString --output text 2>/dev/null || echo "")
+    ADMIN_PASSWORD=$(aws secretsmanager get-secret-value \
+        --secret-id "$SECRET_ARN" \
+        --region "$SECRET_REGION" \
+        --query SecretString \
+        --output text 2>&1 || echo "")
 
     if [ -z "$ADMIN_PASSWORD" ]; then
         echo -e "${YELLOW}Error: Failed to retrieve admin password from Secrets Manager.${NC}" >&2
         echo -e "${YELLOW}Secret ARN: $SECRET_ARN${NC}" >&2
+        echo -e "${YELLOW}Region: $SECRET_REGION${NC}" >&2
         echo -e "${YELLOW}You may need to:${NC}" >&2
         echo -e "${YELLOW}  1. Ensure AWS credentials are configured${NC}" >&2
         echo -e "${YELLOW}  2. Ensure you have permission to read the secret${NC}" >&2

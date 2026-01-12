@@ -26,6 +26,7 @@ terraform {
       version = ">= 6.0"
     }
     rhcs = {
+      # Official registry provider
       source  = "terraform-redhat/rhcs"
       version = "~> 1.7"
     }

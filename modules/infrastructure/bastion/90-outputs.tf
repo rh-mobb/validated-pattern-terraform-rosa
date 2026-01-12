@@ -59,7 +59,7 @@ output "ssh_tunnel_command" {
 }
 
 output "ssm_endpoint_ids" {
-  description = "Map of SSM VPC endpoint IDs created by the bastion module (empty if enable_destroy is true)"
+  description = "Map of SSM VPC endpoint IDs created by the bastion module (empty if enable_destroy is true). Note: S3 endpoint is created by the network module."
   value = length(aws_vpc_endpoint.ssm) > 0 ? {
     ssm         = one(aws_vpc_endpoint.ssm[*].id)
     ec2messages = one(aws_vpc_endpoint.ec2messages[*].id)

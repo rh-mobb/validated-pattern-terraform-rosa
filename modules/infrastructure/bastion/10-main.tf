@@ -5,15 +5,16 @@ data "aws_partition" "current" {}
 
 data "aws_caller_identity" "current" {}
 
-# Find latest RHEL 9 AMI
-# Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/06-bastion.tf
-data "aws_ami" "rhel9" {
-  owners      = ["309956199498", "219670896067"] # Red Hat and AWS
+# Find latest Amazon Linux 2 AMI
+# Amazon Linux 2 has SSM agent pre-installed, which is essential for egress-zero clusters
+# Reference: https://docs.aws.amazon.com/systems-manager/latest/userguide/ami-preinstalled-agent.html
+data "aws_ami" "amazon_linux2" {
+  owners      = ["amazon"]
   most_recent = true
 
   filter {
     name   = "name"
-    values = ["RHEL-9*"]
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
   }
 
   filter {
@@ -198,11 +199,14 @@ resource "aws_vpc_endpoint" "ssmmessages" {
   })
 }
 
+# Note: S3 Gateway endpoint is created by the network module (network-egress-zero)
+# No need to create it here - the bastion instance can use the existing endpoint
+
 # Bastion EC2 Instance
 resource "aws_instance" "bastion" {
   count = var.enable_destroy == false ? 1 : 0
 
-  ami                         = data.aws_ami.rhel9.id
+  ami                         = data.aws_ami.amazon_linux2.id
   instance_type               = var.instance_type
   subnet_id                   = var.subnet_id
   vpc_security_group_ids      = [one(aws_security_group.bastion[*].id)]
@@ -216,33 +220,45 @@ resource "aws_instance" "bastion" {
 #!/bin/bash
 set -e -x
 
-# Install SSM Agent (required for Session Manager)
-# Use curl + rpm directly to avoid dnf metadata issues in private subnets
-# curl is available by default on RHEL, wget is not
-curl -s https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm -o /tmp/amazon-ssm-agent.rpm
-sudo rpm -Uvh /tmp/amazon-ssm-agent.rpm
-sudo systemctl enable amazon-ssm-agent
-sudo systemctl start amazon-ssm-agent
-rm -f /tmp/amazon-ssm-agent.rpm
+# Amazon Linux 2 has SSM agent pre-installed
+# For egress-zero clusters, we cannot install additional packages (no internet access)
+# Just ensure SSM agent is enabled and running
 
-# Install useful system packages
-sudo dnf install -y wget curl python3 python3-devel net-tools gcc libffi-devel openssl-devel jq bind-utils podman
+echo "Checking SSM agent status..."
 
-# Install OpenShift/Kubernetes clients
-wget -q https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
-mkdir -p openshift
-tar -zxvf openshift-client-linux.tar.gz -C openshift
-sudo install openshift/oc /usr/local/bin/oc
-sudo install openshift/kubectl /usr/local/bin/kubectl
-rm -rf openshift openshift-client-linux.tar.gz
+# Verify SSM agent is installed (should always be true on Amazon Linux 2)
+if rpm -q amazon-ssm-agent >/dev/null 2>&1; then
+    echo "SSM agent package is installed"
+elif command -v amazon-ssm-agent >/dev/null 2>&1; then
+    echo "SSM agent binary found: $(command -v amazon-ssm-agent)"
+else
+    echo "ERROR: SSM agent not found. This is unexpected on Amazon Linux 2."
+    echo "SSM agent should be pre-installed on Amazon Linux 2 AMIs."
+    exit 1
+fi
 
-# Install Terraform (optional, for running Terraform from bastion)
-# Uncomment if you want to run Terraform from the bastion:
-# TERRAFORM_VERSION=1.6.0
-# wget -q https://releases.hashicorp.com/terraform/$${TERRAFORM_VERSION}/terraform_$${TERRAFORM_VERSION}_linux_amd64.zip
-# unzip terraform_$${TERRAFORM_VERSION}_linux_amd64.zip
-# sudo mv terraform /usr/local/bin/
-# rm terraform_$${TERRAFORM_VERSION}_linux_amd64.zip
+# Enable and start SSM Agent
+echo "Enabling SSM agent..."
+sudo systemctl enable amazon-ssm-agent || {
+    echo "WARNING: Failed to enable SSM agent"
+}
+
+echo "Starting SSM agent..."
+sudo systemctl start amazon-ssm-agent || {
+    echo "ERROR: Failed to start SSM agent"
+    exit 1
+}
+
+# Wait a moment for SSM agent to start and register
+echo "Waiting for SSM agent to initialize..."
+sleep 10
+
+# Check SSM agent status
+echo "SSM agent status:"
+sudo systemctl status amazon-ssm-agent --no-pager -l || echo "SSM agent status check failed"
+
+echo "Bastion initialization complete. SSM agent should be running and registering with AWS Systems Manager."
+echo "Note: For egress-zero clusters, no additional packages are installed (no internet access)."
 EOF
 
   # Ensure SSM Agent is running before considering instance ready

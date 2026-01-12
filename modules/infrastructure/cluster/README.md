@@ -115,7 +115,8 @@ module "identity_admin" {
 | api_endpoint_allowed_cidrs | Optional list of IPv4 CIDR blocks allowed to access the ROSA HCP API endpoint. By default, the VPC endpoint security group only allows access from within the VPC. Useful for VPN ranges, bastion hosts, or other VPCs | `list(string)` | `[]` |
 | enable_persistent_dns_domain | Enable persistent DNS domain registration. When true, creates rhcs_dns_domain resource that persists between cluster creations (not gated by enable_destroy). When false, ROSA uses default DNS domain | `bool` | `false` |
 | tags | Tags to apply to the cluster | `map(string)` | `{}` |
-| machine_pools | List of machine pool configurations | `list(object)` | `[]` |
+| machine_pools | List of machine pool configurations for default pools | `list(object)` | `[]` |
+| additional_machine_pools | Map of additional custom machine pools beyond default pools. Supports advanced features: taints, labels, kubelet configs, tuning configs, version pinning, capacity reservations | `map(object)` | `{}` |
 
 ### Machine Pool Defaults (if machine_pools not provided)
 
@@ -142,6 +143,9 @@ module "identity_admin" {
 | cluster_admin_password | Cluster admin password (sensitive) |
 | state | State of the cluster |
 | cloudwatch_audit_logging_role_arn | ARN of the IAM role for CloudWatch audit log forwarding (null if disabled or enable_destroy is true) |
+| default_machine_pools | Map of default machine pool IDs keyed by pool name |
+| additional_machine_pools | Map of additional machine pool IDs keyed by pool name |
+| all_machine_pools | Map of all machine pool IDs (default + additional) keyed by pool name |
 
 ## Organizational Defaults
 
@@ -193,6 +197,80 @@ machine_pools = [
   }
 ]
 ```
+
+### Additional Machine Pools
+
+Create additional custom machine pools beyond the default ones. These pools support advanced features like taints, labels, kubelet configs, tuning configs, version pinning, and capacity reservations:
+
+```hcl
+additional_machine_pools = {
+  "compute" = {
+    subnet_id           = module.network.private_subnet_ids[0]
+    instance_type       = "m5.2xlarge"
+    autoscaling_enabled = true
+    min_replicas        = 2
+    max_replicas        = 10
+    labels = {
+      "node-role.kubernetes.io/compute" = ""
+    }
+    taints = [
+      {
+        key          = "workload"
+        value        = "compute"
+        schedule_type = "NoSchedule"
+      }
+    ]
+  }
+  "gpu" = {
+    subnet_id           = module.network.private_subnet_ids[1]
+    instance_type       = "g4dn.xlarge"
+    autoscaling_enabled = true
+    min_replicas        = 0
+    max_replicas        = 5
+    labels = {
+      "node-role.kubernetes.io/gpu" = ""
+    }
+    taints = [
+      {
+        key          = "nvidia.com/gpu"
+        value        = "true"
+        schedule_type = "NoSchedule"
+      }
+    ]
+  }
+  "spot" = {
+    subnet_id           = module.network.private_subnet_ids[0]
+    instance_type       = "m5.large"
+    autoscaling_enabled = true
+    min_replicas        = 0
+    max_replicas        = 10
+    labels = {
+      "node-role.kubernetes.io/spot" = ""
+    }
+    taints = [
+      {
+        key          = "spot"
+        value        = "true"
+        schedule_type = "PreferNoSchedule"
+      }
+    ]
+  }
+}
+```
+
+**Advanced Features**:
+
+- **Taints**: Control pod scheduling with taints. Valid `schedule_type` values: `"NoSchedule"`, `"PreferNoSchedule"`, `"NoExecute"`
+- **Labels**: Apply Kubernetes node labels for node selection and scheduling
+- **Kubelet Configs**: Apply custom kubelet configurations (specify by name, config must already exist)
+- **Tuning Configs**: Apply performance tuning configurations (list of tuning config names)
+- **Version Pinning**: Pin OpenShift version per pool (e.g., `"4.15.0"`)
+- **Capacity Reservations**: Use AWS Capacity Reservations (specify `capacity_reservation_id`)
+- **Additional Security Groups**: Attach additional security groups to nodes (`additional_security_group_ids`)
+- **Disk Size**: Customize root disk size in GiB (`disk_size`)
+- **EC2 Metadata HTTP Tokens**: Control IMDS access (`"optional"` or `"required"`, default: `"required"`)
+
+**Note**: Additional machine pool names cannot conflict with default pool names (e.g., `"workers"`, `"workers-0"`, `"workers-1"`, etc.). The module validates this automatically.
 
 ## Architecture Decision
 

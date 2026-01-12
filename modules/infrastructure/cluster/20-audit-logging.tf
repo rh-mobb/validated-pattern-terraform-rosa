@@ -95,73 +95,72 @@ resource "aws_iam_role_policy_attachment" "cloudwatch_audit_logging" {
 }
 
 # Configure audit log forwarding on the cluster using ROSA CLI
-# FALLBACK VERSION: Commented out - using provider-native audit_log_arn attribute instead
-# Uncomment this if you need to fall back to the script-based approach
+# Using script-based approach until audit_log_arn is available in official provider release
+# Once PR is accepted, we can switch to provider-native implementation in 10-main.tf
 # Reference: ./reference/rosa-hcp-dedicated-vpc/terraform/5.siem-logging.tf
-# resource "null_resource" "configure_audit_logging" {
-#   count = local.destroy_enabled == false && var.enable_audit_logging && length(rhcs_cluster_rosa_hcp.main) > 0 ? 1 : 0
-#
-#   triggers = {
-#     cluster_id   = one(rhcs_cluster_rosa_hcp.main[*].id)
-#     cluster_name = var.cluster_name
-#     role_arn     = aws_iam_role.cloudwatch_audit_logging[0].arn
-#     # Re-run if the role ARN changes
-#     role_arn_hash = sha256(aws_iam_role.cloudwatch_audit_logging[0].arn)
-#   }
-#
-#   # Configure audit logging
-#   provisioner "local-exec" {
-#     command = <<-EOT
-#       set -e
-#       echo "Configuring CloudWatch audit log forwarding for cluster ${var.cluster_name}..."
-#
-#       # Check if rosa CLI is installed
-#       if ! command -v rosa &> /dev/null; then
-#         echo "ERROR: rosa CLI is not installed. Please install it from: https://console.redhat.com/openshift/downloads"
-#         exit 1
-#       fi
-#
-#       # Check if already logged in, only login if not authenticated
-#       if ! rosa whoami &> /dev/null; then
-#         echo "Not logged in to ROSA. Attempting to login..."
-#         # Login to ROSA if token is available via environment variable
-#         if [ -n "$${OCM_TOKEN}" ]; then
-#           rosa login --token="$${OCM_TOKEN}" || {
-#             echo "ERROR: Failed to login with OCM_TOKEN"
-#             exit 1
-#           }
-#         elif [ -n "$${ROSA_TOKEN}" ]; then
-#           rosa login --token="$${ROSA_TOKEN}" || {
-#             echo "ERROR: Failed to login with ROSA_TOKEN"
-#             exit 1
-#           }
-#         else
-#           echo "ERROR: Not logged in and no token provided. Set OCM_TOKEN or ROSA_TOKEN environment variable."
-#           exit 1
-#         fi
-#       else
-#         echo "Already logged in to ROSA"
-#       fi
-#
-#       # Configure audit log ARN
-#       rosa edit cluster -c "${var.cluster_name}" --audit-log-arn "${aws_iam_role.cloudwatch_audit_logging[0].arn}" --yes || {
-#         echo "WARNING: Failed to configure audit logging. Cluster may not be ready yet."
-#         exit 1
-#       }
-#
-#       echo "Successfully configured CloudWatch audit log forwarding"
-#     EOT
-#   }
-#
-#   # Note: No destroy provisioner needed - destroying the cluster automatically removes audit logging configuration
-#
-#   depends_on = [
-#     rhcs_cluster_rosa_hcp.main,
-#     aws_iam_role.cloudwatch_audit_logging,
-#     aws_iam_role_policy_attachment.cloudwatch_audit_logging
-#   ]
-# }
+resource "null_resource" "configure_audit_logging" {
+  count = local.destroy_enabled == false && var.enable_audit_logging && length(rhcs_cluster_rosa_hcp.main) > 0 ? 1 : 0
 
-# Note: The Terraform provider now supports audit_log_arn directly in rhcs_cluster_rosa_hcp.
-# The provider-native implementation is used in 10-main.tf via the audit_log_arn attribute.
-# The script-based fallback (commented above) is available if needed.
+  triggers = {
+    cluster_id   = one(rhcs_cluster_rosa_hcp.main[*].id)
+    cluster_name = var.cluster_name
+    role_arn     = aws_iam_role.cloudwatch_audit_logging[0].arn
+    # Re-run if the role ARN changes
+    role_arn_hash = sha256(aws_iam_role.cloudwatch_audit_logging[0].arn)
+  }
+
+  # Configure audit logging
+  provisioner "local-exec" {
+    command = <<-EOT
+      set -e
+      echo "Configuring CloudWatch audit log forwarding for cluster ${var.cluster_name}..."
+
+      # Check if rosa CLI is installed
+      if ! command -v rosa &> /dev/null; then
+        echo "ERROR: rosa CLI is not installed. Please install it from: https://console.redhat.com/openshift/downloads"
+        exit 1
+      fi
+
+      # Check if already logged in, only login if not authenticated
+      if ! rosa whoami &> /dev/null; then
+        echo "Not logged in to ROSA. Attempting to login..."
+        # Login to ROSA if token is available via environment variable
+        if [ -n "$${OCM_TOKEN}" ]; then
+          rosa login --token="$${OCM_TOKEN}" || {
+            echo "ERROR: Failed to login with OCM_TOKEN"
+            exit 1
+          }
+        elif [ -n "$${ROSA_TOKEN}" ]; then
+          rosa login --token="$${ROSA_TOKEN}" || {
+            echo "ERROR: Failed to login with ROSA_TOKEN"
+            exit 1
+          }
+        else
+          echo "ERROR: Not logged in and no token provided. Set OCM_TOKEN or ROSA_TOKEN environment variable."
+          exit 1
+        fi
+      else
+        echo "Already logged in to ROSA"
+      fi
+
+      # Configure audit log ARN
+      rosa edit cluster -c "${var.cluster_name}" --audit-log-arn "${aws_iam_role.cloudwatch_audit_logging[0].arn}" --yes || {
+        echo "WARNING: Failed to configure audit logging. Cluster may not be ready yet."
+        exit 1
+      }
+
+      echo "Successfully configured CloudWatch audit log forwarding"
+    EOT
+  }
+
+  # Note: No destroy provisioner needed - destroying the cluster automatically removes audit logging configuration
+
+  depends_on = [
+    rhcs_cluster_rosa_hcp.main,
+    aws_iam_role.cloudwatch_audit_logging,
+    aws_iam_role_policy_attachment.cloudwatch_audit_logging
+  ]
+}
+
+# Note: Using script-based approach until audit_log_arn is available in official provider release.
+# Once PR is accepted, we can switch to provider-native implementation using audit_log_arn attribute in 10-main.tf.

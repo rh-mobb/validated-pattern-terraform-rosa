@@ -26,14 +26,9 @@ terraform {
       version = ">= 6.0"
     }
     rhcs = {
-      # Registry provider for most resources (IAM, OIDC, etc.)
+      # Official registry provider
       source  = "terraform-redhat/rhcs"
       version = "~> 1.7"
-    }
-    rhcs-local = {
-      # Local custom provider with audit_log_arn support - only for cluster resource
-      source  = "terraform.local/local/rhcs"
-      version = "1.7.2"  # Matches installed local provider version
     }
     random = {
       source  = "hashicorp/random"
@@ -68,10 +63,4 @@ provider "rhcs" {
   # token_url     = "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
   # client_id     = "cloud-services"
   # client_secret = "" # Empty string uses default client secret
-}
-
-# Local custom provider with audit_log_arn support - only for cluster resource
-provider "rhcs-local" {
-  token = var.token
-  url   = "https://api.openshift.com"
 }

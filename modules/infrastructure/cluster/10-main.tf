@@ -50,6 +50,11 @@ locals {
     },
     var.zero_egress ? { "zero_egress" = "true" } : {}
   )
+
+  # Additional machine pools validation
+  # Ensure no name conflicts with default pools
+  default_pool_names   = toset(local.hcp_machine_pools)
+  additional_pool_names = keys(var.additional_machine_pools)
 }
 
 # Query available OpenShift versions
@@ -78,7 +83,6 @@ resource "rhcs_dns_domain" "dns_domain" {
 # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/04-cluster.tf
 resource "rhcs_cluster_rosa_hcp" "main" {
   count          = local.destroy_enabled == false ? 1 : 0
-  provider       = rhcs-local  # Use local provider with audit_log_arn support
   name           = var.cluster_name
   cloud_region   = var.region
   aws_account_id = data.aws_caller_identity.current.account_id
@@ -113,11 +117,12 @@ resource "rhcs_cluster_rosa_hcp" "main" {
   kms_key_arn = var.kms_key_arn
 
   # CloudWatch audit log forwarding
-  # Using provider-native support (requires custom-built provider with audit_log_arn support)
-  # Script-based fallback is commented out in 20-audit-logging.tf
-  audit_log_arn = local.destroy_enabled == false && var.enable_audit_logging ? (
-    length(aws_iam_role.cloudwatch_audit_logging) > 0 ? aws_iam_role.cloudwatch_audit_logging[0].arn : null
-  ) : null
+  # Note: audit_log_arn is not yet available in the official provider release
+  # Audit logging is configured via script-based approach in 20-audit-logging.tf
+  # Once PR is accepted, we can switch to provider-native implementation:
+  # audit_log_arn = local.destroy_enabled == false && var.enable_audit_logging ? (
+  #   length(aws_iam_role.cloudwatch_audit_logging) > 0 ? aws_iam_role.cloudwatch_audit_logging[0].arn : null
+  # ) : null
 
   # Network CIDR configuration
   service_cidr = var.service_cidr
@@ -184,6 +189,12 @@ resource "rhcs_cluster_rosa_hcp" "main" {
     precondition {
       condition     = local.destroy_enabled == false && var.multi_az && length(var.subnet_ids) > 0 ? (local.hcp_replicas % length(var.subnet_ids) == 0) : true
       error_message = "For multi-AZ clusters, replicas (${local.hcp_replicas}) must be a multiple of the number of subnets (${length(var.subnet_ids)}). For ${length(var.subnet_ids)} subnets, use replicas like ${length(var.subnet_ids)}, ${length(var.subnet_ids) * 2}, ${length(var.subnet_ids) * 3}, etc."
+    }
+
+    # Validate no name conflicts between default and additional pools
+    precondition {
+      condition     = length(setintersection(local.default_pool_names, local.additional_pool_names)) == 0
+      error_message = "Additional machine pool names cannot conflict with default pool names. Default pools: ${join(", ", local.default_pool_names)}. Conflicting names: ${join(", ", setintersection(local.default_pool_names, local.additional_pool_names))}"
     }
   }
 
@@ -303,6 +314,82 @@ resource "rhcs_hcp_machine_pool" "default" {
       error_message = "Instance type '${length(var.machine_pools) > 0 ? var.machine_pools[0].instance_type : (try(data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.instance_type, null) != null ? data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.instance_type : var.default_instance_type)}' is not available for ROSA in region '${var.region}'. Use 'terraform console' and run 'data.rhcs_machine_types.available.items' to see available machine types."
     }
   }
+}
+
+# Additional Custom Machine Pools
+# Reference: ./reference/rosa-hcp-dedicated-vpc/terraform/1.main.tf:212-233
+# Use for_each for stable resource addressing (better than count for dynamic resources)
+resource "rhcs_hcp_machine_pool" "additional" {
+  for_each = local.destroy_enabled == false ? var.additional_machine_pools : {}
+
+  cluster   = one(rhcs_cluster_rosa_hcp.main[*].id)
+  name      = each.key # Pool name from map key
+  subnet_id = each.value.subnet_id
+
+  # Autoscaling configuration
+  autoscaling = {
+    enabled      = each.value.autoscaling_enabled
+    min_replicas = each.value.autoscaling_enabled ? each.value.min_replicas : null
+    max_replicas = each.value.autoscaling_enabled ? each.value.max_replicas : null
+  }
+
+  # Replicas (only if autoscaling is disabled)
+  replicas = each.value.autoscaling_enabled ? null : each.value.replicas
+
+  # Auto repair
+  auto_repair = each.value.auto_repair
+
+  # AWS Node Pool configuration
+  aws_node_pool = {
+    instance_type                = each.value.instance_type
+    additional_security_group_ids = length(each.value.additional_security_group_ids) > 0 ? each.value.additional_security_group_ids : null
+    capacity_reservation_id       = each.value.capacity_reservation_id
+    disk_size                     = each.value.disk_size
+    ec2_metadata_http_tokens      = each.value.ec2_metadata_http_tokens
+    tags                          = merge(local.common_tags, each.value.tags)
+  }
+
+  # Kubernetes configuration
+  # Only set labels/taints/tuning_configs if they have values (provider requires at least 1 element if provided)
+  labels                       = length(each.value.labels) > 0 ? each.value.labels : null
+  taints                       = length(each.value.taints) > 0 ? each.value.taints : null
+  kubelet_configs             = each.value.kubelet_configs
+  tuning_configs              = length(each.value.tuning_configs) > 0 ? each.value.tuning_configs : null
+  version                     = each.value.version
+  upgrade_acknowledgements_for = each.value.upgrade_acknowledgements_for
+
+  # Lifecycle
+  ignore_deletion_error = each.value.ignore_deletion_error
+
+  lifecycle {
+    # Validate instance type is available for ROSA
+    precondition {
+      condition = contains(
+        [for mt in data.rhcs_machine_types.available.items : mt.id],
+        each.value.instance_type
+      )
+      error_message = "Instance type '${each.value.instance_type}' for machine pool '${each.key}' is not available for ROSA in region '${var.region}'. Use 'terraform console' and run 'data.rhcs_machine_types.available.items' to see available machine types."
+    }
+
+    # Validate subnet_id is in the provided subnet_ids list
+    precondition {
+      condition     = contains(var.subnet_ids, each.value.subnet_id)
+      error_message = "Subnet ID '${each.value.subnet_id}' for machine pool '${each.key}' must be one of the cluster's subnet IDs: ${join(", ", var.subnet_ids)}"
+    }
+
+    # Validate autoscaling configuration
+    precondition {
+      condition = each.value.autoscaling_enabled ? (
+        each.value.max_replicas >= each.value.min_replicas
+      ) : true
+      error_message = "For machine pool '${each.key}': max_replicas (${each.value.max_replicas}) must be greater than or equal to min_replicas (${each.value.min_replicas})"
+    }
+  }
+
+  depends_on = [
+    rhcs_cluster_rosa_hcp.main,
+    rhcs_hcp_machine_pool.default # Ensure default pools are created first
+  ]
 }
 
 # Note: Admin user creation has been moved to a separate identity-admin module

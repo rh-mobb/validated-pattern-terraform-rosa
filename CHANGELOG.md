@@ -31,6 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Creates ingress rules for each specified CIDR block (port 443/TCP)
   - Only creates resources when CIDRs are provided and `enable_destroy` is false
   - Reference implementation: `reference/rosa-hcp-dedicated-vpc/terraform/2.expose-api.tf`
+- **Machine Pool Management**: Added support for additional custom machine pools beyond default pools:
+  - New `additional_machine_pools` variable in cluster module for creating custom pools
+  - Support for advanced features: taints, labels, kubelet configs, tuning configs, version pinning
+  - Support for AWS features: capacity reservations, additional security groups, custom disk size
+  - New outputs: `default_machine_pools`, `additional_machine_pools`, `all_machine_pools`
+  - Validation to prevent name conflicts between default and additional pools
+  - Validation for subnet IDs, instance types, and autoscaling configuration
+  - Uses `for_each` pattern for stable resource addressing
+  - Reference implementation: `./reference/rosa-hcp-dedicated-vpc/terraform/1.main.tf:212-233`
 
 ### Removed
 - **BREAKING**: Removed `examples/private/` cluster example

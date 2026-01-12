@@ -10,6 +10,23 @@ module "network" {
   enable_destroy_network = var.enable_destroy_network
 }
 
+# Additional machine pools - resolve subnet_index to actual subnet IDs
+locals {
+  # Resolve subnet_index to actual subnet IDs from network module
+  # Only resolve when destroy is disabled (resources will be created)
+  # Remove subnet_index and add subnet_id for the cluster module
+  additional_machine_pools_resolved = var.enable_destroy == false && length(module.network.private_subnet_ids) > 0 ? {
+    for pool_name, pool_config in var.additional_machine_pools : pool_name => merge(
+      {
+        for k, v in pool_config : k => v if k != "subnet_index"
+      },
+      {
+        subnet_id = module.network.private_subnet_ids[pool_config.subnet_index]
+      }
+    )
+  } : {}
+}
+
 module "iam" {
   source = "../../../modules/infrastructure/iam"
 
@@ -23,11 +40,6 @@ module "iam" {
 
 module "cluster" {
   source = "../../../modules/infrastructure/cluster"
-
-  # Pass the local provider to the cluster module
-  providers = {
-    rhcs-local = rhcs-local
-  }
 
   # Required: Pass outputs from Network and IAM modules
   cluster_name       = var.cluster_name
@@ -63,6 +75,31 @@ module "cluster" {
       autoscaling_enabled = true
     }
   ]
+
+  # Additional machine pools - resolved with actual subnet IDs
+  additional_machine_pools = {
+    for pool_name, pool_config in local.additional_machine_pools_resolved : pool_name => {
+      subnet_id                    = pool_config.subnet_id
+      instance_type                = pool_config.instance_type
+      autoscaling_enabled          = pool_config.autoscaling_enabled
+      min_replicas                 = pool_config.min_replicas
+      max_replicas                 = pool_config.max_replicas
+      replicas                     = pool_config.replicas
+      auto_repair                  = pool_config.auto_repair
+      labels                       = pool_config.labels
+      taints                       = pool_config.taints
+      additional_security_group_ids = pool_config.additional_security_group_ids
+      capacity_reservation_id       = pool_config.capacity_reservation_id
+      disk_size                     = pool_config.disk_size
+      ec2_metadata_http_tokens      = pool_config.ec2_metadata_http_tokens
+      tags                          = pool_config.tags
+      version                       = pool_config.version
+      upgrade_acknowledgements_for  = pool_config.upgrade_acknowledgements_for
+      kubelet_configs              = pool_config.kubelet_configs
+      tuning_configs               = pool_config.tuning_configs
+      ignore_deletion_error         = pool_config.ignore_deletion_error
+    }
+  }
 
   # Optional: Allow API endpoint access from additional IPv4 CIDR blocks
   # By default, the VPC endpoint security group only allows access from within the VPC
@@ -155,12 +192,13 @@ module "identity_admin" {
 # WARNING: This bastion is provided for development and demonstration purposes only.
 # For production deployments, use AWS Transit Gateway, Direct Connect, or VPN connections.
 module "bastion" {
-  count  = var.enable_bastion ? 1 : 0
+  # Only create bastion when enable_destroy is false and network resources exist (prevents errors during cleanup)
+  count  = var.enable_bastion && var.enable_destroy == false && length(module.network.private_subnet_ids) > 0 ? 1 : 0
   source = "../../../modules/infrastructure/bastion"
 
   name_prefix            = var.cluster_name
   vpc_id                 = module.network.vpc_id
-  subnet_id              = length(module.network.private_subnet_ids) > 0 ? module.network.private_subnet_ids[0] : null # Use first private subnet
+  subnet_id              = module.network.private_subnet_ids[0] # Use first private subnet
   private_subnet_ids     = module.network.private_subnet_ids    # All private subnets for VPC endpoints
   region                 = var.region
   vpc_cidr               = var.vpc_cidr

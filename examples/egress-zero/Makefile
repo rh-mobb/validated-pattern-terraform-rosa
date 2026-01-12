@@ -107,7 +107,7 @@ plan-infrastructure: init-infrastructure
 		-out=terraform.tfplan
 
 # Plan Configuration
-plan-configuration: init-configuration
+plan-configuration: init-configuration tunnel-start
 	@echo "$(BLUE)Planning configuration...$(NC)"
 	@INFRA_DIR="$(INFRA_DIR)" && \
 	CONFIG_DIR="$(CONFIG_DIR)" && \
@@ -146,7 +146,7 @@ plan-configuration: init-configuration
 	fi && \
 	echo "$(BLUE)Running Terraform plan in $$CONFIG_DIR...$(NC)" && \
 	cd $$CONFIG_DIR && \
-	TF_VAR_k8s_token=$$K8S_TOKEN terraform plan -out=terraform.tfplan
+	TF_VAR_cluster_name=$(CLUSTER_NAME) TF_VAR_k8s_token=$$K8S_TOKEN terraform plan -out=terraform.tfplan
 
 # Plan both (infrastructure first, then configuration)
 plan: plan-infrastructure plan-configuration
@@ -161,7 +161,7 @@ apply-infrastructure: plan-infrastructure
 		terraform.tfplan
 
 # Apply Configuration
-apply-configuration: plan-configuration
+apply-configuration: plan-configuration tunnel-start
 	@echo "$(YELLOW)Applying configuration...$(NC)"
 	@INFRA_DIR="$(INFRA_DIR)" && \
 	CONFIG_DIR="$(CONFIG_DIR)" && \
@@ -207,10 +207,11 @@ apply: apply-infrastructure apply-configuration
 	@echo "$(GREEN)Applied $(CLUSTER_NAME) (infrastructure + configuration)$(NC)"
 
 # Destroy Configuration
-destroy-configuration: check-cluster
+destroy-configuration: check-cluster tunnel-start
 	@echo "$(YELLOW)WARNING: This will destroy the configuration!$(NC)"
 	@echo "$(YELLOW)Kubernetes resources (GitOps operator) will be deleted from the cluster.$(NC)"
 	@INFRA_DIR="$(INFRA_DIR)" && \
+	INFRA_DIR_ABS=$$(cd "$$INFRA_DIR" && pwd) && \
 	CONFIG_DIR="$(CONFIG_DIR)" && \
 	cd $$INFRA_DIR && \
 	API_URL=$$(terraform output -raw api_url 2>&1 | grep -E "^https?://" | head -1 || echo "") && \
@@ -219,9 +220,17 @@ destroy-configuration: check-cluster
 		echo "$(YELLOW)Warning: Cluster not deployed or api_url output not available.$(NC)"; \
 		echo "$(YELLOW)Infrastructure may already be destroyed. Attempting to destroy configuration anyway...$(NC)"; \
 	fi && \
-	cd $$INFRA_DIR && \
-	$(get_admin_password_from_secret,$$INFRA_DIR) && \
-	cd - >/dev/null && \
+	REPO_ROOT=$$(git rev-parse --show-toplevel 2>/dev/null || pwd) && \
+	SCRIPT_PATH="$$REPO_ROOT/scripts/get-admin-password.sh" && \
+	if [ ! -f "$$SCRIPT_PATH" ]; then \
+		SCRIPT_PATH="$$(pwd)/../../scripts/get-admin-password.sh"; \
+	fi && \
+	if [ ! -f "$$SCRIPT_PATH" ]; then \
+		echo "$(YELLOW)Error: get-admin-password.sh script not found$(NC)"; \
+		exit 1; \
+	fi && \
+	ADMIN_PASSWORD=$$($$SCRIPT_PATH "$$INFRA_DIR_ABS") && \
+	export ADMIN_PASSWORD && \
 	if [ -z "$$ADMIN_PASSWORD" ] && [ -z "$$TF_VAR_k8s_token" ]; then \
 		echo "$(YELLOW)Warning: Cannot retrieve admin password and TF_VAR_k8s_token not set.$(NC)"; \
 		echo "$(YELLOW)Configuration may already be destroyed or infrastructure is missing.$(NC)"; \
@@ -235,7 +244,7 @@ destroy-configuration: check-cluster
 			$(get_k8s_token_with_retry) && \
 			cd $$CONFIG_DIR && \
 			echo "$(BLUE)Setting enable_destroy=true and applying to remove resources from state...$(NC)" && \
-			TF_VAR_k8s_token=$$K8S_TOKEN TF_VAR_enable_destroy=true terraform apply -auto-approve; \
+			TF_VAR_cluster_name=$(CLUSTER_NAME) TF_VAR_k8s_token=$$K8S_TOKEN TF_VAR_enable_destroy=true terraform apply -auto-approve; \
 		else \
 			echo "$(YELLOW)Skipping Kubernetes authentication (cluster not available).$(NC)"; \
 			cd $$CONFIG_DIR && \
@@ -261,7 +270,7 @@ destroy: destroy-configuration destroy-infrastructure
 	@echo "$(GREEN)All resources have been deleted from Kubernetes and AWS.$(NC)"
 
 # Cleanup Configuration
-cleanup-configuration: check-cluster
+cleanup-configuration: check-cluster tunnel-start
 	@echo "$(RED)WARNING: This will DESTROY the configuration!$(NC)"
 	@echo "$(YELLOW)Kubernetes resources (GitOps operator) will be deleted from the cluster.$(NC)"
 	@INFRA_DIR="$(INFRA_DIR)" && \
@@ -295,7 +304,7 @@ cleanup-configuration: check-cluster
 		$(get_k8s_token_with_retry) && \
 		cd $$CONFIG_DIR && \
 		echo "$(BLUE)Setting enable_destroy=true and applying to destroy resources...$(NC)" && \
-		TF_VAR_k8s_token=$$K8S_TOKEN TF_VAR_enable_destroy=true terraform apply -auto-approve && \
+		TF_VAR_cluster_name=$(CLUSTER_NAME) TF_VAR_k8s_token=$$K8S_TOKEN TF_VAR_enable_destroy=true terraform apply -auto-approve && \
 		echo "$(GREEN)Configuration resources have been destroyed.$(NC)"; \
 	else \
 		echo "$(YELLOW)Skipping Kubernetes authentication (cluster not available).$(NC)"; \
@@ -341,13 +350,14 @@ show-endpoints: check-cluster
 show-credentials: show-endpoints
 	@echo "$(BLUE)EGRESS-ZERO Cluster Credentials:$(NC)"
 	@INFRA_DIR="$(INFRA_DIR)" && \
+	INFRA_DIR_ABS=$$(cd $$INFRA_DIR && pwd) && \
 	REPO_ROOT=$$(git rev-parse --show-toplevel 2>/dev/null || pwd) && \
 	SCRIPT_PATH="$$REPO_ROOT/scripts/get-admin-password.sh" && \
 	if [ ! -f "$$SCRIPT_PATH" ]; then \
 		SCRIPT_PATH="$$(pwd)/../../scripts/get-admin-password.sh"; \
 	fi && \
 	if [ -f "$$SCRIPT_PATH" ]; then \
-		ADMIN_PASSWORD=$$($$SCRIPT_PATH "$$INFRA_DIR" 2>/dev/null) && \
+		ADMIN_PASSWORD=$$($$SCRIPT_PATH "$$INFRA_DIR_ABS" 2>/dev/null) && \
 		if [ -n "$$ADMIN_PASSWORD" ]; then \
 			echo "Admin Username: admin"; \
 			echo "Admin Password: $$ADMIN_PASSWORD"; \
@@ -379,6 +389,7 @@ login: check-cluster
 		exit 1; \
 	fi
 	@INFRA_DIR="$(INFRA_DIR)" && \
+		INFRA_DIR_ABS=$$(cd $$INFRA_DIR && pwd) && \
 		cd $$INFRA_DIR && \
 		API_URL=$$(terraform output -raw api_url 2>/dev/null) && \
 		if [ -z "$$API_URL" ]; then \
@@ -389,7 +400,17 @@ login: check-cluster
 		if [ -n "$$VPC_CIDR" ] && pgrep -f "sshuttle.*$$VPC_CIDR" >/dev/null 2>&1; then \
 			echo "$(GREEN)sshuttle tunnel active - using direct API URL (traffic routed through bastion)$(NC)"; \
 		fi && \
-		$(get_admin_password_from_secret,$$INFRA_DIR) && \
+		REPO_ROOT=$$(git rev-parse --show-toplevel 2>/dev/null || pwd) && \
+		SCRIPT_PATH="$$REPO_ROOT/scripts/get-admin-password.sh" && \
+		if [ ! -f "$$SCRIPT_PATH" ]; then \
+			SCRIPT_PATH="$$(pwd)/../../scripts/get-admin-password.sh"; \
+		fi && \
+		if [ ! -f "$$SCRIPT_PATH" ]; then \
+			echo "$(YELLOW)Error: get-admin-password.sh script not found$(NC)"; \
+			exit 1; \
+		fi && \
+		ADMIN_PASSWORD=$$($$SCRIPT_PATH "$$INFRA_DIR_ABS") && \
+		export ADMIN_PASSWORD && \
 		if [ -z "$$ADMIN_PASSWORD" ] && [ -z "$$TF_VAR_admin_password_override" ]; then \
 			echo "$(YELLOW)Error: Admin password not found and TF_VAR_admin_password_override not set.$(NC)"; \
 			echo "$(YELLOW)You may need to:$(NC)"; \
@@ -403,91 +424,38 @@ login: check-cluster
 
 # Tunnel Management
 tunnel-start: check-cluster
-	@echo "$(BLUE)Starting sshuttle VPN tunnel via bastion...$(NC)"
-	@if ! command -v sshuttle >/dev/null 2>&1; then \
-		echo "$(YELLOW)Error: sshuttle not found.$(NC)"; \
-		echo "$(YELLOW)Installation instructions:$(NC)"; \
-		echo "  macOS:  brew install sshuttle"; \
-		echo "  Linux:  pip install sshuttle  (or use your package manager)"; \
-		echo "  See:    https://github.com/sshuttle/sshuttle"; \
+	@REPO_ROOT=$$(git rev-parse --show-toplevel 2>/dev/null || pwd) && \
+	SCRIPT_PATH="$$REPO_ROOT/scripts/tunnel-start.sh" && \
+	if [ ! -f "$$SCRIPT_PATH" ]; then \
+		SCRIPT_PATH="$$(pwd)/../../scripts/tunnel-start.sh"; \
+	fi && \
+	if [ ! -f "$$SCRIPT_PATH" ]; then \
+		echo "$(YELLOW)Error: tunnel-start.sh script not found$(NC)"; \
 		exit 1; \
-	fi
-	@if ! command -v aws >/dev/null 2>&1; then \
-		echo "$(YELLOW)Error: aws CLI not found. Please install AWS CLI.$(NC)"; \
-		exit 1; \
-	fi
-	@cd $(CONFIG_DIR) && \
-		BASTION_ID=$$(terraform output -raw bastion_instance_id 2>/dev/null) && \
-		if [ -z "$$BASTION_ID" ] || [ "$$BASTION_ID" = "null" ]; then \
-			echo "$(YELLOW)Error: Bastion not deployed. Enable bastion with enable_bastion=true$(NC)"; \
-			exit 1; \
-		fi && \
-		cd ../$(INFRA_DIR) && \
-		VPC_CIDR=$$(terraform output -raw vpc_cidr_block 2>/dev/null || terraform output -json 2>/dev/null | jq -r '.vpc_cidr_block.value // empty') && \
-		if [ -z "$$VPC_CIDR" ]; then \
-			echo "$(YELLOW)Error: VPC CIDR not found in terraform outputs$(NC)"; \
-			exit 1; \
-		fi && \
-		REGION=$$(terraform output -raw region 2>/dev/null || terraform output -json 2>/dev/null | jq -r '.region.value // empty' || echo "us-east-1") && \
-		if [ -z "$$REGION" ]; then \
-			REGION=$$(grep -E "^region\s*=" ../$(CLUSTER_DIR)/terraform.tfvars 2>/dev/null | cut -d'"' -f2 | cut -d"'" -f2 | head -1 || echo "us-east-1"); \
-		fi && \
-		if pgrep -f "sshuttle.*$$VPC_CIDR" >/dev/null 2>&1; then \
-			echo "$(YELLOW)sshuttle tunnel already running for $$VPC_CIDR$(NC)"; \
-			exit 0; \
-		fi && \
-		echo "$(YELLOW)Note: sshuttle requires sudo privileges. You will be prompted for your local sudo password.$(NC)" && \
-		sudo sshuttle --ssh-cmd "ssh -o ProxyCommand='aws --region $$REGION ssm start-session --target $$BASTION_ID --document-name AWS-StartSSHSession --parameters portNumber=22' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
-			--remote ec2-user@$$BASTION_ID \
-			--dns $$VPC_CIDR \
-			$$VPC_CIDR \
-			--daemon \
-			--pidfile /tmp/sshuttle-egress-zero-$$BASTION_ID.pid && \
-		echo "$(GREEN)sshuttle tunnel started for VPC $$VPC_CIDR$(NC)" && \
-		echo "$(GREEN)All traffic to $$VPC_CIDR is now routed through the bastion$(NC)" && \
-		echo "$(GREEN)You can now use oc login with the direct API URL$(NC)" || \
-		(echo "$(YELLOW)Failed to start tunnel. Check bastion status and AWS credentials.$(NC)" && echo "$(YELLOW)Note: sshuttle requires sudo privileges.$(NC)" && exit 1)
+	fi && \
+	"$$SCRIPT_PATH" "$(INFRA_DIR)" "$(CLUSTER_DIR)"
 
 tunnel-stop: check-cluster
-	@echo "$(BLUE)Stopping sshuttle tunnel...$(NC)"
-	@cd $(CONFIG_DIR) && \
-		BASTION_ID=$$(terraform output -raw bastion_instance_id 2>/dev/null) && \
-		if [ -z "$$BASTION_ID" ] || [ "$$BASTION_ID" = "null" ]; then \
-			echo "$(YELLOW)Bastion not deployed$(NC)"; \
-			exit 0; \
-		fi && \
-		cd ../$(INFRA_DIR) && \
-		VPC_CIDR=$$(terraform output -raw vpc_cidr_block 2>/dev/null || terraform output -json 2>/dev/null | jq -r '.vpc_cidr_block.value // empty') && \
-		PIDFILE="/tmp/sshuttle-egress-zero-$$BASTION_ID.pid" && \
-		if [ -f "$$PIDFILE" ]; then \
-			PID=$$(cat $$PIDFILE 2>/dev/null) && \
-			if [ -n "$$PID" ] && kill -0 $$PID 2>/dev/null; then \
-				sudo kill $$PID && \
-				rm -f $$PIDFILE && \
-				echo "$(GREEN)Tunnel stopped$(NC)"; \
-			else \
-				rm -f $$PIDFILE && \
-				echo "$(YELLOW)Tunnel process not found (cleaned up PID file)$(NC)"; \
-			fi; \
-		else \
-			if [ -n "$$VPC_CIDR" ] && pgrep -f "sshuttle.*$$VPC_CIDR" >/dev/null 2>&1; then \
-				sudo pkill -f "sshuttle.*$$VPC_CIDR" && \
-				echo "$(GREEN)Tunnel stopped$(NC)"; \
-			else \
-				echo "$(YELLOW)No tunnel found running$(NC)"; \
-			fi \
-		fi
+	@REPO_ROOT=$$(git rev-parse --show-toplevel 2>/dev/null || pwd) && \
+	SCRIPT_PATH="$$REPO_ROOT/scripts/tunnel-stop.sh" && \
+	if [ ! -f "$$SCRIPT_PATH" ]; then \
+		SCRIPT_PATH="$$(pwd)/../../scripts/tunnel-stop.sh"; \
+	fi && \
+	if [ ! -f "$$SCRIPT_PATH" ]; then \
+		echo "$(YELLOW)Error: tunnel-stop.sh script not found$(NC)"; \
+		exit 1; \
+	fi && \
+	"$$SCRIPT_PATH" "$(INFRA_DIR)"
 
 tunnel-status: check-cluster
 	@echo "$(BLUE)Checking sshuttle tunnel status...$(NC)"
-	@cd $(CONFIG_DIR) && \
-		BASTION_ID=$$(terraform output -raw bastion_instance_id 2>/dev/null) && \
+	@cd $(INFRA_DIR) && \
+		BASTION_ID=$$(terraform output -no-color -raw bastion_instance_id 2>/dev/null | tr -d '\n\r' | sed 's/[[:space:]]*$$//') && \
 		if [ -z "$$BASTION_ID" ] || [ "$$BASTION_ID" = "null" ]; then \
 			echo "$(YELLOW)Bastion not deployed$(NC)"; \
 			exit 1; \
 		fi && \
-		cd ../$(INFRA_DIR) && \
-		VPC_CIDR=$$(terraform output -raw vpc_cidr_block 2>/dev/null || terraform output -json 2>/dev/null | jq -r '.vpc_cidr_block.value // empty') && \
+		VPC_CIDR=$$(terraform output -no-color -raw vpc_cidr_block 2>/dev/null | tr -d '\n\r' | sed 's/[[:space:]]*$$//' || terraform output -no-color -json 2>/dev/null | jq -r '.vpc_cidr_block.value // empty' | tr -d '\n\r') && \
 		if [ -z "$$VPC_CIDR" ]; then \
 			echo "$(YELLOW)VPC CIDR not found$(NC)"; \
 			exit 1; \
@@ -517,14 +485,13 @@ bastion-connect: check-cluster
 		echo "$(YELLOW)Error: aws CLI not found. Please install AWS CLI.$(NC)"; \
 		exit 1; \
 	fi
-	@cd $(CONFIG_DIR) && \
-		BASTION_ID=$$(terraform output -raw bastion_instance_id 2>/dev/null) && \
+	@cd $(INFRA_DIR) && \
+		BASTION_ID=$$(terraform output -no-color -raw bastion_instance_id 2>/dev/null | tr -d '\n\r' | sed 's/[[:space:]]*$$//') && \
 		if [ -z "$$BASTION_ID" ] || [ "$$BASTION_ID" = "null" ]; then \
 			echo "$(YELLOW)Error: Bastion not deployed. Enable bastion with enable_bastion=true$(NC)"; \
 			exit 1; \
 		fi && \
-		cd ../$(INFRA_DIR) && \
-		REGION=$$(terraform output -raw region 2>/dev/null || terraform output -json 2>/dev/null | jq -r '.region.value // empty' || echo "us-east-1") && \
+		REGION=$$(terraform output -no-color -raw region 2>/dev/null | tr -d '\n\r' | sed 's/[[:space:]]*$$//' || terraform output -no-color -json 2>/dev/null | jq -r '.region.value // empty' | tr -d '\n\r' || echo "us-east-1") && \
 		if [ -z "$$REGION" ]; then \
 			REGION=$$(grep -E "^region\s*=" ../$(CLUSTER_DIR)/terraform.tfvars 2>/dev/null | cut -d'"' -f2 | cut -d"'" -f2 | head -1 || echo "us-east-1"); \
 		fi && \

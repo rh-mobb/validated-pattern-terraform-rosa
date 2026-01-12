@@ -1,12 +1,6 @@
 # GitOps Module
 
-This module creates the namespace for the OpenShift GitOps operator (ArgoCD) on a ROSA HCP cluster using the Kubernetes provider.
-
-## Current Status
-
-**Currently, this module only creates the GitOps namespace.** The operator installation resources (OperatorGroup, Subscription, CSV) are not yet implemented due to a known limitation with `kubernetes_manifest` resources that require API schema validation during planning, which currently fails with authentication errors even though the provider is correctly configured.
-
-The namespace resource (`kubernetes_namespace_v1`) works correctly, confirming that Kubernetes provider authentication is functioning properly. The issue is specific to `kubernetes_manifest` resources.
+This module deploys the OpenShift GitOps operator (ArgoCD) on a ROSA HCP cluster using the OpenShift Operator provider.
 
 ## Features
 

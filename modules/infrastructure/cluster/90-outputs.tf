@@ -36,3 +36,32 @@ output "cloudwatch_audit_logging_role_arn" {
   value       = local.destroy_enabled == false && var.enable_audit_logging && length(aws_iam_role.cloudwatch_audit_logging) > 0 ? aws_iam_role.cloudwatch_audit_logging[0].arn : null
   sensitive   = false
 }
+
+output "default_machine_pools" {
+  description = "Map of default machine pool IDs keyed by pool name"
+  value = local.destroy_enabled == false ? {
+    for idx, pool_name in local.hcp_machine_pools : pool_name => rhcs_hcp_machine_pool.default[idx].id
+  } : {}
+  sensitive = false
+}
+
+output "additional_machine_pools" {
+  description = "Map of additional machine pool IDs keyed by pool name"
+  value = local.destroy_enabled == false ? {
+    for k, v in rhcs_hcp_machine_pool.additional : k => v.id
+  } : {}
+  sensitive = false
+}
+
+output "all_machine_pools" {
+  description = "Map of all machine pool IDs (default + additional) keyed by pool name"
+  value = merge(
+    local.destroy_enabled == false ? {
+      for idx, pool_name in local.hcp_machine_pools : pool_name => rhcs_hcp_machine_pool.default[idx].id
+    } : {},
+    local.destroy_enabled == false ? {
+      for k, v in rhcs_hcp_machine_pool.additional : k => v.id
+    } : {}
+  )
+  sensitive = false
+}

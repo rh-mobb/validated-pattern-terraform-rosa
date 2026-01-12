@@ -88,7 +88,7 @@ resource "aws_iam_role_policy_attachment" "worker_ecr_readonly" {
   count = var.zero_egress && local.destroy_enabled == false ? 1 : 0
 
   role       = "${local.account_role_prefix_final}-HCP-ROSA-Worker-Role"
-  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 
   # Ensure the account_roles module has created the worker role before attaching the policy
   depends_on = [module.account_roles]

@@ -1,1 +1,1 @@
-path = "../clusters/prod-egress-zero-01/configuration.tfstate"
+path = "../clusters/default/configuration.tfstate"
