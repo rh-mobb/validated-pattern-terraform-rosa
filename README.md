@@ -13,9 +13,8 @@ The repository is organized into two main categories:
 - **Infrastructure**: Foundational AWS and ROSA resources (VPC, IAM roles, cluster)
 - **Configuration**: Cluster configuration and Day 2 operations (GitOps, identity providers, bastion)
 
-Each cluster example has separate `infrastructure/` and `configuration/` directories with independent Terraform state files. Configuration reads infrastructure outputs via `terraform_remote_state` data sources.
+Each cluster example has separate `infrastructure/` and `configuration/` directories with independent Terraform state files. Configuration receives infrastructure outputs as input variables (via environment variables or tfvars files), making it pipeline-friendly and suitable for CI/CD.
 
-> **⚠️ Known Issue**: The egress-zero cluster example (`examples/egress-zero/`) is currently non-functional. Worker nodes are not starting successfully. Investigation is ongoing. See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ## Quick Start
 
@@ -36,36 +35,74 @@ export TF_VAR_admin_password="your-secure-password"  # Optional, for admin user
 ```
 
 **2. Initialize, plan, and apply:**
+
+Using Makefile (recommended for local development):
 ```bash
 # Initialize Terraform
-make init.public
+make cluster.public.init
 
 # Review the plan
-make plan.public
+make cluster.public.plan
 
 # Apply the configuration
-make apply.public
+make cluster.public.apply
+```
+
+Or using scripts directly (recommended for CI/CD):
+```bash
+# Initialize infrastructure
+./scripts/cluster/init-infrastructure.sh public
+
+# Plan infrastructure
+./scripts/cluster/plan-infrastructure.sh public
+
+# Apply infrastructure
+./scripts/cluster/apply-infrastructure.sh public
+
+# Generate configuration.tfvars
+./scripts/cluster/generate-config-tfvars.sh public
+
+# Initialize configuration
+./scripts/cluster/init-configuration.sh public
+
+# Plan configuration
+./scripts/cluster/plan-configuration.sh public
+
+# Apply configuration
+./scripts/cluster/apply-configuration.sh public
 ```
 
 **3. Access the cluster:**
 ```bash
 # Show cluster endpoints
-make show-endpoints.public
+make cluster.public.show-endpoints
+# or
+./scripts/info/show-endpoints.sh public
 
 # Login to the cluster
-make login.public
+make cluster.public.login
+# or
+./scripts/info/login.sh public
 
 # Show admin credentials
-make show-credentials.public
+make cluster.public.show-credentials
+# or
+./scripts/info/show-credentials.sh public
 ```
 
 **4. Destroy the cluster:**
 ```bash
-# Destroy all resources (sets enable_destroy=true and runs terraform apply)
-make destroy.public
+# Destroy all resources (with confirmation)
+make cluster.public.destroy
+# or
+./scripts/cluster/destroy-configuration.sh public
+./scripts/cluster/destroy-infrastructure.sh public
 
-# Same as destroy, but with interactive confirmation
-make cleanup.public
+# Cleanup (auto-approve, CI/CD friendly)
+make cluster.public.cleanup
+# or
+AUTO_APPROVE=true ./scripts/cluster/cleanup-configuration.sh public
+AUTO_APPROVE=true ./scripts/cluster/cleanup-infrastructure.sh public
 ```
 
 ## Repository Structure
@@ -86,13 +123,10 @@ rosa-hcp-infrastructure/
 │   └── configuration/          # Configuration modules
 │       └── gitops/             # OpenShift GitOps operator
 └── clusters/                   # Cluster configurations
-    └── examples/               # Example cluster configurations
-        ├── public/             # Development example (public API)
-        │   ├── infrastructure/ # Infrastructure state (network, iam, cluster, identity-admin)
-        │   └── configuration/  # Configuration state (gitops)
-        └── egress-zero/        # Production-ready example (⚠️ WIP)
-            ├── infrastructure/
-            └── configuration/
+    ├── public/                 # Example public cluster (reference)
+    │   └── terraform.tfvars   # Cluster-specific variables
+    └── egress-zero/            # Example egress-zero cluster (reference)
+        └── terraform.tfvars   # Cluster-specific variables
 ```
 
 ### Infrastructure vs Configuration
@@ -104,11 +138,12 @@ rosa-hcp-infrastructure/
 - ROSA HCP cluster
 - Bastion host (optional, for access)
 
-**Configuration** (`configuration/` directory):
+**Configuration** (`terraform/configuration/` directory):
 - Configures cluster after it's created
 - OpenShift GitOps operator deployment
 - Identity providers (admin user, external IDP)
-- Reads infrastructure outputs via `terraform_remote_state` data source
+- Receives infrastructure outputs as input variables (via environment variables or tfvars files)
+- Pipeline-friendly: no dependency on local state files
 
 **Benefits of Separation**:
 - **Different Lifecycles**: Infrastructure changes infrequently; configuration changes more often
@@ -134,9 +169,9 @@ The modules are designed to be **composable** and **reusable**. You can mix and 
 Here's how the example clusters compose modules:
 
 ```hcl
-# examples/public/infrastructure/10-main.tf
+# terraform/infrastructure/10-main.tf
 module "network" {
-  source = "../../../../modules/infrastructure/network-public"
+  source = "../../modules/infrastructure/network-public"
 
   name_prefix = var.cluster_name
   vpc_cidr    = var.vpc_cidr
@@ -145,7 +180,7 @@ module "network" {
 }
 
 module "iam" {
-  source = "../../../../modules/infrastructure/iam"
+  source = "../../modules/infrastructure/iam"
 
   cluster_name         = var.cluster_name
   account_role_prefix  = var.cluster_name
@@ -154,7 +189,7 @@ module "iam" {
 }
 
 module "cluster" {
-  source = "../../../../modules/infrastructure/cluster"
+  source = "../../modules/infrastructure/cluster"
 
   cluster_name       = var.cluster_name
   region             = var.region
@@ -170,34 +205,33 @@ module "cluster" {
 ```
 
 ```hcl
-# examples/public/configuration/10-main.tf
-# Read infrastructure outputs via remote state
-data "terraform_remote_state" "infrastructure" {
-  backend = "local"
-  config = {
-    path = "../infrastructure/terraform.tfstate"
-  }
-}
+# terraform/configuration/10-main.tf
+# Configuration receives infrastructure outputs as input variables (pipeline-friendly)
+# Infrastructure outputs are passed via TF_VAR_* environment variables or configuration.tfvars
 
-# Deploy GitOps operator
 module "gitops" {
-  source = "../../../../modules/configuration/gitops"
+  source = "../../modules/configuration/gitops"
 
-  cluster_id   = data.terraform_remote_state.infrastructure.outputs.cluster_id
-  cluster_name = data.terraform_remote_state.infrastructure.outputs.cluster_name
-  api_url      = data.terraform_remote_state.infrastructure.outputs.api_url
-
-  admin_username = var.admin_username
-  admin_password = var.admin_password
+  cluster_id   = var.cluster_id      # From infrastructure outputs
+  cluster_name = var.cluster_name    # From infrastructure outputs
+  api_url      = var.api_url         # From infrastructure outputs
+  k8s_token    = var.k8s_token      # Obtained via oc login (ephemeral)
 }
+```
 
-# Create admin user
-module "identity_admin" {
-  source = "../../../../modules/infrastructure/identity-admin"
+**Pipeline-Friendly Approach**: The configuration layer accepts infrastructure outputs as input variables rather than reading from remote state. This makes it suitable for CI/CD pipelines where infrastructure and configuration may be deployed in separate stages:
 
-  cluster_id     = data.terraform_remote_state.infrastructure.outputs.cluster_id
-  admin_password = var.admin_password
-}
+```bash
+# Infrastructure stage outputs
+terraform output -json > infrastructure-outputs.json
+
+# Configuration stage receives outputs as environment variables
+export TF_VAR_cluster_id=$(jq -r '.cluster_id.value' infrastructure-outputs.json)
+export TF_VAR_api_url=$(jq -r '.api_url.value' infrastructure-outputs.json)
+# ... etc
+
+# Or generate configuration.tfvars for configuration stage
+./scripts/cluster/generate-config-tfvars.sh <cluster-name>
 ```
 
 ### Multi-Team Scenarios
@@ -233,15 +267,10 @@ output "private_subnet_ids" {
 
 **Platform Team** (`clusters/production/cluster/`):
 ```hcl
-# Platform team uses network team's outputs via data sources or remote state
-data "terraform_remote_state" "network" {
-  backend = "s3"
-  config = {
-    bucket = "my-org-terraform-state"
-    key    = "production/network/terraform.tfstate"
-    region = "us-east-1"
-  }
-}
+# Platform team receives network team's outputs as input variables
+# In a multi-team scenario, network outputs would be passed via:
+# - Environment variables: TF_VAR_vpc_id, TF_VAR_subnet_ids, etc.
+# - Or a shared tfvars file generated from network team's outputs
 
 module "iam" {
   source = "../../../modules/iam"
@@ -251,11 +280,16 @@ module "iam" {
 module "cluster" {
   source = "../../../modules/cluster"
 
-  vpc_id     = data.terraform_remote_state.network.outputs.vpc_id
-  subnet_ids = data.terraform_remote_state.network.outputs.private_subnet_ids
+  vpc_id     = var.vpc_id      # From network team's outputs
+  subnet_ids = var.subnet_ids  # From network team's outputs
   # ... cluster configuration
 }
 ```
+
+**Note**: In a multi-team scenario, teams would coordinate via:
+- **Shared state outputs**: Network team exports outputs, platform team imports as variables
+- **CI/CD pipeline**: Infrastructure stage outputs → Configuration stage inputs
+- **Terraform workspaces**: Separate workspaces with output sharing
 
 #### Scenario 2: IAM Team Owns Roles
 
@@ -290,22 +324,15 @@ output "oidc_config_id" {
 
 **Platform Team** (`clusters/production/cluster/`):
 ```hcl
-# Platform team uses IAM team's outputs
-data "terraform_remote_state" "iam" {
-  backend = "s3"
-  config = {
-    bucket = "my-org-terraform-state"
-    key    = "production/iam/terraform.tfstate"
-    region = "us-east-1"
-  }
-}
+# Platform team receives IAM team's outputs as input variables
+# IAM outputs would be passed via environment variables or tfvars file
 
 module "cluster" {
   source = "../../../modules/cluster"
 
-  installer_role_arn = data.terraform_remote_state.iam.outputs.installer_role_arn
-  worker_role_arn    = data.terraform_remote_state.iam.outputs.worker_role_arn
-  oidc_config_id     = data.terraform_remote_state.iam.outputs.oidc_config_id
+  installer_role_arn = var.installer_role_arn  # From IAM team's outputs
+  worker_role_arn    = var.worker_role_arn     # From IAM team's outputs
+  oidc_config_id     = var.oidc_config_id      # From IAM team's outputs
   # ... cluster configuration
 }
 ```
@@ -470,14 +497,14 @@ make apply.my-cluster
 - **network-private**: Private VPC with PrivateLink API
   - Private subnets only
   - VPC endpoints for all AWS services
-  - Optional Regional NAT Gateway for internet egress
+  - Optional Regional NAT Gateway for internet egress (default: enabled)
+  - **Egress-zero mode**: Set `enable_strict_egress = true` to disable NAT Gateway and enable strict egress controls
+  - VPC Flow Logs support (optional, via `flow_log_s3_bucket`)
   - ROSA-required subnet tags
 
-- **network-egress-zero**: Egress-zero VPC ⚠️ **Work in Progress**
-  - Strict egress controls
-  - Network ACLs for additional restrictions
-  - VPC Flow Logs support
-  - **Currently non-functional**
+- **network-egress-zero**: ⚠️ **DEPRECATED** - Use `network-private` with `enable_strict_egress = true`
+  - This module remains for backward compatibility but is deprecated
+  - New deployments should use the consolidated `network-private` module
 
 ### Core Modules
 
@@ -503,7 +530,22 @@ make apply.my-cluster
   - Pre-installed tools (`oc`, `kubectl`)
   - **Development/demo use only** - not for production
 
-## Makefile Usage
+## Scripts and Automation
+
+This repository uses bash scripts for cluster management, with a Makefile wrapper for convenience. Scripts can be called directly from CI/CD pipelines without requiring Make.
+
+### Script-Based Approach
+
+All cluster operations are implemented as bash scripts in the `scripts/` directory:
+
+- **`scripts/cluster/`**: Infrastructure and configuration management
+- **`scripts/tunnel/`**: Tunnel management for egress-zero clusters
+- **`scripts/utils/`**: Utility functions (password retrieval, token management, etc.)
+- **`scripts/info/`**: Cluster information and access
+
+See [scripts/README.md](scripts/README.md) for complete documentation.
+
+### Makefile Usage
 
 The Makefile provides convenient targets for managing clusters. Use **pattern syntax** for flexibility:
 
@@ -554,7 +596,6 @@ make tunnel-start.egress-zero
 - `make fmt` - Format all Terraform files
 - `make validate` - Validate all Terraform configurations
 - `make validate-modules` - Validate all modules
-- `make validate-examples` - Validate all example clusters
 
 **Utilities:**
 - `make clean` - Clean Terraform files
@@ -636,8 +677,23 @@ terraform {
 ```
 
 **Multi-Team State Sharing:**
+**Multi-Team Output Sharing**:
 ```hcl
-# Read other team's state
+# Teams share outputs via input variables (pipeline-friendly approach)
+# Network team exports outputs, platform team receives as variables
+
+# Network team exports:
+# terraform output -json > network-outputs.json
+
+# Platform team receives via:
+# - Environment variables: TF_VAR_vpc_id, TF_VAR_subnet_ids, etc.
+# - Or tfvars file: configuration.tfvars
+# - Or CI/CD pipeline: infrastructure outputs → configuration inputs
+```
+
+**Alternative: Remote State** (if needed):
+```hcl
+# If remote state access is required, use terraform_remote_state data source
 data "terraform_remote_state" "network" {
   backend = "s3"
   config = {
@@ -647,6 +703,8 @@ data "terraform_remote_state" "network" {
   }
 }
 ```
+
+**Note**: The default approach uses input variables for better CI/CD pipeline integration and state isolation.
 
 ## Security Best Practices
 
@@ -747,7 +805,7 @@ This allows destroying the cluster while preserving IAM roles and OIDC configura
 
 - ✅ **network-public**: Production-ready
 - ✅ **network-private**: Production-ready
-- ⚠️ **network-egress-zero**: Work in Progress (non-functional)
+- ⚠️ **network-egress-zero**: Deprecated (use `network-private` with `enable_strict_egress = true`)
 - ✅ **iam**: Production-ready
 - ✅ **cluster**: Production-ready
 - ✅ **identity-admin**: Production-ready

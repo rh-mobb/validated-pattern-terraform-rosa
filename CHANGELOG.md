@@ -42,6 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reference implementation: `./reference/rosa-hcp-dedicated-vpc/terraform/1.main.tf:212-233`
 
 ### Removed
+- **BREAKING**: Removed `modules/infrastructure/network-egress-zero/` module
+  - Egress-zero functionality has been consolidated into `network-private` module
+  - Use `network-private` with `enable_strict_egress = true` and `enable_nat_gateway = false` for egress-zero mode
+  - Migration: Update module source from `network-egress-zero` to `network-private` and add `enable_strict_egress = true`
+  - Updated all documentation and references to reflect consolidation
+  - Updated `modules/infrastructure/bastion/` and `modules/infrastructure/network-existing/` READMEs
 - **BREAKING**: Removed `examples/private/` cluster example
   - Private cluster example removed (only public and egress-zero examples remain)
   - Private network module (`modules/infrastructure/network-private/`) retained for use with egress-zero clusters
@@ -243,7 +249,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ROSA automatically adds tags like `kubernetes.io/cluster/{cluster_id}` to subnets
   - Added `lifecycle { ignore_changes = [tags] }` to all subnet resources in network modules
   - Prevents Terraform from removing service-managed tags on subsequent runs
-  - Applied to all three network modules: `network-public`, `network-private`, `network-egress-zero`
+  - Applied to network modules: `network-public`, `network-private` (egress-zero functionality consolidated into network-private)
 - Fixed null reference errors in machine pool resource:
   - Added null checks for `subnet_id`, `auto_repair`, and `aws_node_pool` in `rhcs_hcp_machine_pool` resource
   - When these values are null (e.g., during initial cluster creation), use appropriate defaults:

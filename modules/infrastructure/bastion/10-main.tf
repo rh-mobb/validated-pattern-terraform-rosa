@@ -199,7 +199,7 @@ resource "aws_vpc_endpoint" "ssmmessages" {
   })
 }
 
-# Note: S3 Gateway endpoint is created by the network module (network-egress-zero)
+# Note: S3 Gateway endpoint is created by the network module (network-private with egress-zero mode)
 # No need to create it here - the bastion instance can use the existing endpoint
 
 # Bastion EC2 Instance

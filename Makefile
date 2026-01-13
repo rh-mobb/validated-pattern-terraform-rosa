@@ -1,80 +1,72 @@
 .PHONY: help init plan apply destroy fmt validate clean
-.PHONY: init-all plan-all validate-modules validate-examples install-provider
+.PHONY: init-all plan-all validate-modules install-provider
 .DEFAULT_GOAL := help
 
 include Makefile.common
 
-# Example directories
-EXAMPLES := public egress-zero
-
-# Delegate to example Makefiles
-# Pattern: make <example>.<target>.<cluster> or make <example>.<target> (defaults to "default" cluster)
-# Examples: make public.apply.dev-public-01, make public.init (uses default cluster)
-# Match pattern: <example>.<target>.<cluster> where example is public or egress-zero
-public.% egress-zero.%:
-	@EXAMPLE=$$(echo "$@" | cut -d'.' -f1); \
-	REST=$$(echo "$@" | cut -d'.' -f2-); \
-	if [ ! -f "examples/$$EXAMPLE/Makefile" ]; then \
-		echo "$(YELLOW)Error: Example '$$EXAMPLE' not found$(NC)"; \
-		echo "$(YELLOW)Available examples: $(EXAMPLES)$(NC)"; \
+# Delegate to unified cluster Makefile
+# Pattern: make cluster.<cluster-name>.<operation>
+# Examples: make cluster.public.init, make cluster.egress-zero.apply, make cluster.egress-zero2.init
+# Match pattern: cluster.<cluster-name>.<operation> where cluster-name is the directory under clusters/
+cluster.%:
+	@CLUSTER_NAME=$$(echo "$@" | cut -d'.' -f2); \
+	OPERATION=$$(echo "$@" | cut -d'.' -f3-); \
+	if [ -z "$$CLUSTER_NAME" ] || [ -z "$$OPERATION" ]; then \
+		echo "$(YELLOW)Error: Invalid pattern. Use: make cluster.<cluster-name>.<operation>$(NC)"; \
+		echo "$(YELLOW)Examples: make cluster.public.init, make cluster.egress-zero.apply$(NC)"; \
 		exit 1; \
 	fi; \
-	if echo "$$REST" | grep -q '\.'; then \
-		TARGET=$$(echo "$$REST" | cut -d'.' -f1); \
-		CLUSTER=$$(echo "$$REST" | cut -d'.' -f2-); \
-	else \
-		TARGET=$$REST; \
-		CLUSTER="default"; \
-		echo "$(BLUE)No cluster specified, using default cluster$(NC)"; \
+	if [ ! -d "clusters/$$CLUSTER_NAME" ]; then \
+		echo "$(YELLOW)Error: Cluster directory 'clusters/$$CLUSTER_NAME' does not exist$(NC)"; \
+		echo "$(YELLOW)Available clusters:$$(ls -1 clusters/ 2>/dev/null | sed 's/^/  - /' || echo '  (none)')$(NC)"; \
+		exit 1; \
 	fi; \
-	$(MAKE) -C examples/$$EXAMPLE $$TARGET CLUSTER=$$CLUSTER
+	$(MAKE) -f Makefile.cluster CLUSTER_NAME=$$CLUSTER_NAME $$OPERATION
+
 
 help: ## Show this help message
 	@echo "$(BLUE)ROSA HCP Infrastructure - Root Makefile$(NC)"
 	@echo ""
-	@echo "$(GREEN)Usage:$(NC) make <example>.<target> [.<cluster>]"
+	@echo "$(GREEN)Usage:$(NC) make cluster.<type>.<operation> [CLUSTER=<cluster-name>]"
 	@echo ""
-	@echo "$(GREEN)Examples:$(NC)"
-	@echo "  make public.init                     Initialize public example (uses default cluster)"
-	@echo "  make public.init.dev-public-01       Initialize specific cluster"
-	@echo "  make public.plan                    Plan public example (uses default cluster)"
-	@echo "  make public.apply.dev-public-01      Apply specific cluster"
-	@echo "  make egress-zero.apply.prod-egress-zero-01  Apply egress-zero cluster"
+	@echo "$(GREEN)Unified Cluster Management (Recommended):$(NC)"
+	@echo "  make cluster.public.init                     Initialize public cluster"
+	@echo "  make cluster.public.plan                     Plan public cluster"
+	@echo "  make cluster.public.apply                    Apply public cluster"
+	@echo "  make cluster.egress-zero.init                Initialize egress-zero cluster"
+	@echo "  make cluster.egress-zero.apply               Apply egress-zero cluster"
+	@echo "  make cluster.egress-zero2.init               Initialize another egress-zero cluster"
+	@echo "  make cluster.us-east-1-production.apply      Apply production cluster"
 	@echo ""
-	@echo "$(GREEN)Available examples:$(NC)"
-	@for example in $(EXAMPLES); do \
-		echo "  - $$example"; \
-	done
-	@echo ""
-	@echo "$(GREEN)Common Targets:$(NC)"
-	@echo "  <example>.init.<cluster>       Initialize both infrastructure and configuration"
-	@echo "  <example>.plan.<cluster>       Plan both infrastructure and configuration"
-	@echo "  <example>.apply.<cluster>      Apply both (infrastructure first, then configuration)"
-	@echo "  <example>.destroy.<cluster>     Destroy all resources"
-	@echo "  <example>.cleanup.<cluster>     Same as destroy (no confirmation)"
+	@echo "$(GREEN)Common Operations:$(NC)"
+	@echo "  cluster.<type>.init              Initialize both infrastructure and configuration"
+	@echo "  cluster.<type>.plan              Plan both infrastructure and configuration"
+	@echo "  cluster.<type>.apply             Apply both (infrastructure first, then configuration)"
+	@echo "  cluster.<type>.destroy           Destroy all resources"
+	@echo "  cluster.<type>.cleanup           Same as destroy (no confirmation)"
 	@echo ""
 	@echo "$(GREEN)Infrastructure Management:$(NC)"
-	@echo "  <example>.init-infrastructure.<cluster>       Initialize infrastructure only"
-	@echo "  <example>.plan-infrastructure.<cluster>       Plan infrastructure changes"
-	@echo "  <example>.apply-infrastructure.<cluster>      Apply infrastructure"
-	@echo "  <example>.destroy-infrastructure.<cluster>     Destroy infrastructure resources"
+	@echo "  cluster.<type>.init-infrastructure       Initialize infrastructure only"
+	@echo "  cluster.<type>.plan-infrastructure       Plan infrastructure changes"
+	@echo "  cluster.<type>.apply-infrastructure      Apply infrastructure"
+	@echo "  cluster.<type>.destroy-infrastructure    Destroy infrastructure resources"
 	@echo ""
 	@echo "$(GREEN)Configuration Management:$(NC)"
-	@echo "  <example>.init-configuration.<cluster>         Initialize configuration only"
-	@echo "  <example>.plan-configuration.<cluster>         Plan configuration changes"
-	@echo "  <example>.apply-configuration.<cluster>         Apply configuration"
-	@echo "  <example>.destroy-configuration.<cluster>        Destroy configuration resources"
+	@echo "  cluster.<type>.init-configuration         Initialize configuration only"
+	@echo "  cluster.<type>.plan-configuration         Plan configuration changes"
+	@echo "  cluster.<type>.apply-configuration        Apply configuration"
+	@echo "  cluster.<type>.destroy-configuration      Destroy configuration resources"
 	@echo ""
 	@echo "$(GREEN)Cluster Access:$(NC)"
-	@echo "  <example>.show-endpoints.<cluster>    Show API and console URLs"
-	@echo "  <example>.show-credentials.<cluster>  Show admin credentials and endpoints"
-	@echo "  <example>.login.<cluster>             Login to cluster using oc CLI"
+	@echo "  cluster.<type>.show-endpoints    Show API and console URLs"
+	@echo "  cluster.<type>.show-credentials Show admin credentials and endpoints"
+	@echo "  cluster.<type>.login             Login to cluster using oc CLI"
 	@echo ""
 	@echo "$(GREEN)Bastion & Tunnel Management:$(NC)"
-	@echo "  <example>.tunnel-start.<cluster>     Start sshuttle VPN tunnel via bastion"
-	@echo "  <example>.tunnel-stop.<cluster>      Stop sshuttle tunnel"
-	@echo "  <example>.tunnel-status.<cluster>    Check if tunnel is running"
-	@echo "  <example>.bastion-connect.<cluster>   Connect to bastion via SSM Session Manager"
+	@echo "  cluster.<type>.tunnel-start      Start sshuttle VPN tunnel via bastion (egress-zero only)"
+	@echo "  cluster.<type>.tunnel-stop       Stop sshuttle tunnel"
+	@echo "  cluster.<type>.tunnel-status    Check if tunnel is running"
+	@echo "  cluster.<type>.bastion-connect   Connect to bastion via SSM Session Manager"
 	@echo ""
 	@echo "$(GREEN)Global Targets:$(NC)"
 	@echo "  make fmt                  Format all Terraform files"
@@ -91,7 +83,7 @@ fmt: ## Format all Terraform files
 	@echo "$(BLUE)Formatting Terraform files...$(NC)"
 	terraform fmt -recursive
 
-validate: validate-modules validate-examples ## Validate all Terraform code
+validate: validate-modules ## Validate all Terraform code
 
 validate-modules: ## Validate all modules
 	@echo "$(BLUE)Validating modules...$(NC)"
@@ -100,13 +92,6 @@ validate-modules: ## Validate all modules
 			echo "Validating $$dir..."; \
 			cd $$dir && terraform init -backend=false >/dev/null 2>&1 && terraform validate && cd - >/dev/null || echo "  ✗ Failed: $$dir"; \
 		fi; \
-	done
-
-validate-examples: ## Validate all example clusters
-	@echo "$(BLUE)Validating example clusters...$(NC)"
-	@for example in $(EXAMPLES); do \
-		echo "Validating $$example..."; \
-		$(MAKE) -C examples/$$example validate || echo "  ✗ Failed: $$example"; \
 	done
 
 # Install OpenShift Provider

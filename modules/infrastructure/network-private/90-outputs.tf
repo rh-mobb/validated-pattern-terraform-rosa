@@ -46,3 +46,15 @@ output "private_subnet_azs" {
   value       = aws_subnet.private[*].availability_zone
   sensitive   = false
 }
+
+output "security_group_id" {
+  description = "ID of the security group for worker nodes with strict egress control (null if enable_strict_egress is false or enable_destroy_network is true)"
+  value       = length(aws_security_group.worker_nodes) > 0 ? one(aws_security_group.worker_nodes[*].id) : null
+  sensitive   = false
+}
+
+output "rosa_api_vpc_endpoint_id" {
+  description = "ID of the ROSA-created VPC endpoint for API server access (if cluster_id was provided and endpoint found, null if enable_destroy_network is true)"
+  value       = length(data.aws_vpc_endpoint.rosa_api) > 0 ? data.aws_vpc_endpoint.rosa_api[0].id : null
+  sensitive   = false
+}

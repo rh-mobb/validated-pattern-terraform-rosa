@@ -18,35 +18,30 @@ rosa-hcp-infrastructure/
 ├── modules/
 │   ├── infrastructure/         # Infrastructure modules
 │   │   ├── network-public/     # Public VPC with NAT Gateways
-│   │   ├── network-private/    # Private VPC (PrivateLink API, no public subnets)
-│   │   ├── network-egress-zero/# Egress Zero VPC (no internet egress)
+│   │   ├── network-private/     # Private VPC (PrivateLink API, supports egress-zero mode)
+│   │   ├── network-egress-zero/ # ⚠️ DEPRECATED - Use network-private with enable_strict_egress
 │   │   ├── iam/                # IAM & OIDC module
 │   │   ├── cluster/            # ROSA HCP Cluster module
 │   │   ├── bastion/            # Bastion host for private cluster access
 │   │   └── identity-admin/     # Admin user creation (temporary bootstrap, uses OCM provider)
 │   └── configuration/          # Configuration modules
 │       └── gitops/             # OpenShift GitOps operator
+├── terraform/
+│   ├── infrastructure/          # Unified infrastructure Terraform (shared across clusters)
+│   │   ├── 00-providers.tf
+│   │   ├── 01-variables.tf
+│   │   ├── 10-main.tf           # Conditionally uses network-public or network-private
+│   │   └── 90-outputs.tf
+│   └── configuration/          # Unified configuration Terraform (shared across clusters)
+│       ├── 00-providers.tf     # Receives infrastructure outputs as input variables
+│       ├── 01-variables.tf     # Input variables for infrastructure outputs
+│       ├── 10-main.tf          # GitOps operator deployment
+│       └── 90-outputs.tf
 └── clusters/
-    └── examples/
-        └── public/
-            ├── infrastructure/  # Infrastructure state (network, iam, cluster)
-            │   ├── 00-providers.tf
-            │   ├── 01-variables.tf
-            │   ├── 10-main.tf
-            │   ├── 90-outputs.tf
-            │   └── terraform.tfvars
-            └── configuration/   # Configuration state (gitops)
-            ├── 00-providers.tf
-            ├── 01-variables.tf
-                ├── 10-main.tf   # Uses terraform_remote_state to read infrastructure
-            ├── 90-outputs.tf
-                └── terraform.tfvars
-        └── private/
-            ├── infrastructure/
-            └── configuration/
-        └── egress-zero/
-            ├── infrastructure/
-            └── configuration/
+    ├── public/                  # Example public cluster (reference)
+    │   └── terraform.tfvars    # Cluster-specific variables (network_type="public")
+    └── egress-zero/            # Example egress-zero cluster (reference)
+        └── terraform.tfvars    # Cluster-specific variables (network_type="private", enable_strict_egress=true)
 ```
 
 ---
@@ -117,10 +112,16 @@ rosa-hcp-infrastructure/
 - Private Subnets (for Worker Nodes): 3 subnets across 3 AZs if `multi_az = true`, 1 subnet if `multi_az = false`
 - **NO Public Subnets** (PrivateLink only)
 - **NO Internet Gateway**
-- **NO NAT Gateways**
+- **NAT Gateway** (optional, controlled by `enable_nat_gateway`):
+  - Default: Enabled for standard private clusters (allows internet egress via NAT)
+  - Disabled when `enable_strict_egress = true` (egress-zero mode)
 - VPC endpoints for all AWS services (S3, ECR, CloudWatch, STS, etc.)
 - Route tables for private subnets only
 - PrivateLink endpoints configuration
+- **Egress-zero mode** (when `enable_strict_egress = true`):
+  - Additional security group with strict egress rules (HTTPS 443, DNS 53 only)
+  - VPC Flow Logs support (optional, via `flow_log_s3_bucket`)
+  - ROSA API VPC endpoint lookup (optional, via `cluster_id`)
 
 **Tags** (CRITICAL):
 - Private Subnets: `kubernetes.io/role/internal-elb = "1"`
@@ -131,6 +132,10 @@ rosa-hcp-infrastructure/
 - `availability_zones` (list of AZs - should match `multi_az`: 3 AZs if true, 1 AZ if false)
 - `multi_az` (default: true, boolean - creates resources across multiple AZs for HA)
 - `private_subnet_cidrs` (list - length should match number of AZs)
+- `enable_nat_gateway` (default: true, boolean - set to false for egress-zero mode)
+- `enable_strict_egress` (default: false, boolean - enables egress-zero mode when true)
+- `flow_log_s3_bucket` (optional, string - enables VPC Flow Logs if provided)
+- `cluster_id` (optional, string - ROSA cluster ID for VPC endpoint lookup)
 - `tags`
 
 **Outputs**:
@@ -138,48 +143,36 @@ rosa-hcp-infrastructure/
 - `vpc_cidr_block`
 - `private_subnet_ids` (list)
 - `vpc_endpoint_ids` (map of service -> endpoint ID)
+- `security_group_id` (for egress-zero mode, null otherwise)
+- `rosa_api_vpc_endpoint_id` (if cluster_id provided and endpoint found, null otherwise)
 
-**Note**: This topology requires PrivateLink for API access and VPC endpoints for all AWS service access.
+**Note**: This topology requires PrivateLink for API access and VPC endpoints for all AWS service access. When `enable_strict_egress = true`, the module operates in egress-zero mode with no internet egress allowed.
 
 ---
 
-### 2.3 Network Module: Egress Zero
+### 2.3 Network Module: Egress Zero (Consolidated)
 
-**Path**: `modules/infrastructure/network-egress-zero/`
+**⚠️ DEPRECATED**: The `network-egress-zero` module has been **consolidated into `network-private`**.
 
-**Provider**: `hashicorp/aws`
+**Migration**: Use `network-private` with `enable_nat_gateway = false` and `enable_strict_egress = true` to achieve egress-zero functionality.
 
-**Resources**:
-- 1 VPC with `enable_dns_hostnames = true` and `enable_dns_support = true`
-- Private Subnets (for Worker Nodes): 3 subnets across 3 AZs if `multi_az = true`, 1 subnet if `multi_az = false`
-- **NO Public Subnets**
-- **NO Internet Gateway**
-- **NO NAT Gateways**
-- VPC endpoints for AWS services (S3, ECR, CloudWatch, STS, etc.)
-- Route tables for private subnets only
-- Additional security groups and NACLs for strict egress control
-- VPC Flow Logs to S3 for audit
+**Path**: `modules/infrastructure/network-private/` (with `enable_strict_egress = true`)
 
-**Tags** (CRITICAL):
-- Private Subnets: `kubernetes.io/role/internal-elb = "1"`
-- All resources: Standard tags
+**How to Use**:
+```hcl
+module "network" {
+  source = "../../modules/infrastructure/network-private"
 
-**Variables**:
-- `vpc_cidr`
-- `availability_zones` (list of AZs - should match `multi_az`: 3 AZs if true, 1 AZ if false)
-- `multi_az` (default: true, boolean - creates resources across multiple AZs for HA)
-- `private_subnet_cidrs` (list - length should match number of AZs)
-- `flow_log_s3_bucket` (optional)
-- `tags`
+  # ... standard variables ...
 
-**Outputs**:
-- `vpc_id`
-- `vpc_cidr_block`
-- `private_subnet_ids` (list)
-- `vpc_endpoint_ids` (map)
-- `security_group_id` (for egress control)
+  enable_nat_gateway    = false  # No NAT Gateway for egress-zero
+  enable_strict_egress  = true   # Enable strict egress controls
+  flow_log_s3_bucket    = var.flow_log_s3_bucket  # Optional: VPC Flow Logs
+  cluster_id            = module.cluster.cluster_id  # Optional: For ROSA API endpoint lookup
+}
+```
 
-**Note**: This is the most restrictive topology - no internet egress allowed. All external access must go through VPC endpoints or approved proxies.
+**Note**: The standalone `network-egress-zero` module remains for backward compatibility but is deprecated. New deployments should use the consolidated `network-private` module.
 
 ---
 
@@ -323,28 +316,41 @@ rosa-hcp-infrastructure/
 
 This step creates **three example clusters** demonstrating different network topologies and security postures:
 
-1. **Public Cluster** (`examples/public/`) - Development example
-2. **Private Cluster** (`examples/private/`) - Development example
-3. **Egress-Zero Cluster** (`examples/egress-zero/`) - Production-ready example with extra hardening
+1. **Public Cluster** (`clusters/public/`) - Development example (reference)
+2. **Egress-Zero Cluster** (`clusters/egress-zero/`) - Production-ready example with extra hardening (reference)
 
 ### 5.1 Example 1: Public Cluster (Development)
 
-**Path**: `examples/public/infrastructure/` and `examples/public/configuration/`
+**Path**: `clusters/public/` (uses unified `terraform/infrastructure/` and `terraform/configuration/`)
 
 **Purpose**: Development/Testing cluster with internet access via NAT Gateway
 
-**Infrastructure Configuration** (`infrastructure/10-main.tf`):
+**Infrastructure Configuration** (`terraform/infrastructure/10-main.tf`):
+
+The infrastructure layer uses a unified configuration that conditionally selects the network module based on `network_type`:
 
 ```hcl
-module "network" {
-  source = "../../../../modules/infrastructure/network-public"
-
-  vpc_cidr           = var.vpc_cidr
-  availability_zones = var.availability_zones
-  multi_az           = var.multi_az
-  nat_gateway_type   = "regional"  # Cost-effective default
-  tags               = var.tags
+# Conditionally select network module based on network_type
+module "network_public" {
+  count  = var.network_type == "public" ? 1 : 0
+  source = "../../modules/infrastructure/network-public"
+  # ... variables
 }
+
+module "network_private" {
+  count  = var.network_type == "private" ? 1 : 0
+  source = "../../modules/infrastructure/network-private"
+
+  enable_nat_gateway   = !local.is_egress_zero  # Disable NAT for egress-zero
+  enable_strict_egress = local.is_egress_zero   # Enable strict egress for egress-zero
+  # ... other variables
+}
+
+locals {
+  is_egress_zero = var.network_type == "private" && var.enable_strict_egress
+  network = var.network_type == "public" ? module.network_public[0] : module.network_private[0]
+}
+```
 
 module "iam" {
   source = "../../../../modules/iam"
@@ -391,62 +397,53 @@ module "cluster" {
 }
 ```
 
-**Infrastructure State Management** (`infrastructure/00-providers.tf`):
+**Infrastructure State Management** (`terraform/infrastructure/00-providers.tf`):
 
 ```hcl
 terraform {
-  backend "s3" {
-    bucket         = "my-org-terraform-state"
-    key            = "examples/public/infrastructure/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "terraform-locks"
-    encrypt        = true
+  # Backend configuration is provided via -backend-config flags or environment variables
+  # For local development: terraform init -backend-config="path=../../clusters/<name>/infrastructure.tfstate"
+  # For CI/CD with S3: terraform init -backend-config="bucket=..." -backend-config="key=..." etc.
+  backend "local" {
+    # path provided via -backend-config flag or environment variable
   }
   # ... providers
 }
 ```
 
-**Configuration State Management** (`configuration/00-providers.tf`):
+**Configuration State Management** (`terraform/configuration/00-providers.tf`):
 
 ```hcl
 terraform {
-  backend "s3" {
-    bucket         = "my-org-terraform-state"
-    key            = "examples/public/configuration/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "terraform-locks"
-    encrypt        = true
+  # Backend configuration is provided via -backend-config flags or environment variables
+  # For local development: terraform init -backend-config="path=../../clusters/<name>/configuration.tfstate"
+  # For CI/CD with S3: terraform init -backend-config="bucket=..." -backend-config="key=..." etc.
+  backend "local" {
+    # path provided via -backend-config flag or environment variable
   }
   # ... providers
 }
 
-# Read infrastructure outputs
-data "terraform_remote_state" "infrastructure" {
-  backend = "s3"
-  config = {
-    bucket = "my-org-terraform-state"
-    key    = "examples/public/infrastructure/terraform.tfstate"
-    region = "us-east-1"
-  }
-}
+# Configuration receives infrastructure outputs as input variables (not terraform_remote_state)
+# See terraform/configuration/01-variables.tf for all input variables
 ```
 
-**Infrastructure Variables** (`clusters/default.tfvars`):
+**Infrastructure Variables** (`clusters/public/terraform.tfvars`):
 
 ```hcl
-cluster_name      = "dev-public-01"
-region            = "us-east-1"
-vpc_cidr          = "10.10.0.0/16"
-multi_az          = false  # Single AZ for dev cost savings
-availability_zones = ["us-east-1a"]
-instance_type     = "m5.large"  # Smaller instance for dev
+network_type = "public"
+enable_strict_egress = false  # Public clusters don't use strict egress
+region       = "us-east-1"
+vpc_cidr     = "10.10.0.0/16"
+multi_az     = false  # Single AZ for dev cost savings
+instance_type = "m5.large"  # Smaller instance for dev
 ```
 
 ---
 
 ### 5.2 Example 2: Private Cluster (Development)
 
-**Path**: `examples/private/infrastructure/` and `examples/private/configuration/`
+**Note**: Private cluster example has been consolidated into `clusters/public/` with `network_type="private"`. See public cluster example.
 
 **Purpose**: Development cluster with PrivateLink API but VPC endpoints for AWS services
 
@@ -511,7 +508,7 @@ module "cluster" {
 terraform {
   backend "s3" {
     bucket         = "my-org-terraform-state"
-    key            = "examples/private/terraform.tfstate"
+    key            = "clusters/private/terraform.tfstate"
     region         = "us-east-1"
     dynamodb_table = "terraform-locks"
     encrypt        = true
@@ -535,22 +532,34 @@ instance_type     = "m5.large"
 
 ### 5.3 Example 3: Egress-Zero Cluster (Production-Ready)
 
-**Path**: `examples/egress-zero/infrastructure/` and `examples/egress-zero/configuration/`
+**Path**: `clusters/egress-zero/` (uses unified `terraform/infrastructure/` and `terraform/configuration/`)
 
 **Purpose**: Production-ready cluster with maximum security hardening and zero internet egress
 
-**Main Configuration** (`10-main.tf`):
+**Main Configuration** (`terraform/infrastructure/10-main.tf`):
+
+The infrastructure layer uses a unified configuration. For egress-zero clusters, set `network_type = "private"` and `enable_strict_egress = true`:
 
 ```hcl
-module "network" {
-  source = "../../../../modules/network-egress-zero"
+# In clusters/egress-zero/terraform.tfvars:
+network_type = "private"
+enable_strict_egress = true
+flow_log_s3_bucket = var.flow_log_s3_bucket  # Optional: Audit logging
+```
 
-  vpc_cidr           = var.vpc_cidr
-  availability_zones = var.availability_zones
-  multi_az           = var.multi_az
-  flow_log_s3_bucket = var.flow_log_s3_bucket  # Audit logging
-  tags               = var.tags
+The unified infrastructure configuration will automatically use `network-private` with egress-zero settings:
+
+```hcl
+module "network_private" {
+  count  = var.network_type == "private" ? 1 : 0
+  source = "../../modules/infrastructure/network-private"
+
+  enable_nat_gateway   = !local.is_egress_zero  # false for egress-zero
+  enable_strict_egress = local.is_egress_zero   # true for egress-zero
+  flow_log_s3_bucket   = var.flow_log_s3_bucket
+  # ... other variables
 }
+```
 
 module "iam" {
   source = "../../../../modules/iam"
@@ -610,55 +619,42 @@ module "cluster" {
 }
 ```
 
-**State Management** (`00-providers.tf`):
+**State Management**: Backend configuration is provided via `-backend-config` flags or environment variables. See infrastructure state management section above for details.
+
+**Terraform Variables** (`clusters/egress-zero/terraform.tfvars`):
 
 ```hcl
-terraform {
-  backend "s3" {
-    bucket         = "my-org-terraform-state"
-    key            = "examples/egress-zero/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "terraform-locks"
-    encrypt        = true
-  }
-  # ... providers
-}
-```
-
-**Terraform Variables** (`terraform.tfvars`):
-
-```hcl
-cluster_name      = "prod-egress-zero-01"
-region            = "us-east-1"
-vpc_cidr          = "10.30.0.0/16"
-multi_az          = true
-availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+network_type = "private"
+enable_strict_egress = true  # Enables egress-zero mode
+region       = "us-east-1"
+vpc_cidr     = "10.30.0.0/16"
+multi_az     = true
 
 # Production instance sizing
-instance_type     = "m5.xlarge"
-max_replicas     = 12
+instance_type = "m5.xlarge"
+max_replicas  = 12
 
 # Encryption
-kms_key_arn      = "arn:aws:kms:us-east-1:123456789012:key/abc123..."
+kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/abc123..."
 
 # Version pinning for production
 openshift_version = "4.15.0"
 
 # Network CIDRs (customize if needed)
-service_cidr      = "172.30.0.0/16"
-pod_cidr          = "10.128.0.0/14"
-host_prefix       = 23
+service_cidr = "172.30.0.0/16"
+pod_cidr     = "10.128.0.0/14"
+host_prefix  = 23
 
 # Compliance
-fips              = false  # Set to true for FIPS 140-2 compliance
+fips = false  # Set to true for FIPS 140-2 compliance
 
 # Audit logging
 flow_log_s3_bucket = "my-org-vpc-flow-logs"
 
 tags = {
   Environment = "production"
-  ManagedBy  = "terraform"
-  Project    = "rosa-hcp"
+  ManagedBy   = "terraform"
+  Project     = "rosa-hcp"
 }
 ```
 
@@ -815,11 +811,11 @@ locals {
 |-------|------|--------|------|
 | 1 | Prepare | Fork/Clone `terraform-redhat/terraform-rhcs-rosa-hcp` as reference | Git |
 | 2 | Repo 1 | Build `network-public` module. Use Regional NAT Gateway (default) with zonal option. Ensure tags are correct | Terraform |
-| 3 | Repo 1 | Build `network-private` module. Ensure VPC endpoints are configured | Terraform |
-| 4 | Repo 1 | Build `network-egress-zero` module. Ensure strict egress controls | Terraform |
+| 3 | Repo 1 | Build `network-private` module with egress-zero support. Ensure VPC endpoints are configured and strict egress controls are available via `enable_strict_egress` | Terraform |
+| 4 | Repo 1 | ~~Build `network-egress-zero` module~~ **CONSOLIDATED**: Egress-zero functionality is now part of `network-private` module | N/A |
 | 5 | Repo 1 | Build `iam` module. Use rhcs provider for account & operator roles | Terraform |
 | 6 | Repo 1 | Build `cluster` module. Reference hardened specs (Private, Encrypted) | Terraform |
-| 7 | Repo 1 | Create three example clusters in `examples/`: public (dev), private (dev), egress-zero (prod-ready) | Terraform |
+| 7 | Repo 1 | Create example clusters in `clusters/`: public (dev), egress-zero (prod-ready) | Terraform |
 | 8 | Verify | Run end-to-end `terraform apply` for each example. Verify configurations and connectivity | CLI |
 | 9 | Future | Build Repository 2 for Bootstrap, GitOps, IDP, Logging, Monitoring | Terraform/GitOps |
 

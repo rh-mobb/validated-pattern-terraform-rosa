@@ -242,7 +242,7 @@ resource "aws_security_group" "vpc_endpoint" {
   count = local.destroy_enabled == false ? 1 : 0
 
   name        = "${var.name_prefix}-vpc-endpoint-sg"
-  description = "Security group for VPC endpoints"
+  description = var.enable_strict_egress ? "Security group for VPC endpoints with strict egress control" : "Security group for VPC endpoints"
   vpc_id      = one(aws_vpc.main[*].id)
 
   ingress {
@@ -253,16 +253,139 @@ resource "aws_security_group" "vpc_endpoint" {
     cidr_blocks = [var.vpc_cidr]
   }
 
-  egress {
-    description = "All outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+  # Egress: all if NAT Gateway enabled, none if strict egress
+  dynamic "egress" {
+    for_each = var.enable_strict_egress ? [] : [1]
+    content {
+      description = "All outbound"
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
   }
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-vpc-endpoint-sg"
+  })
+}
+
+# Security group for worker nodes with strict egress control (only if enable_strict_egress is true)
+resource "aws_security_group" "worker_nodes" {
+  count = local.destroy_enabled == false && var.enable_strict_egress ? 1 : 0
+
+  name        = "${var.name_prefix}-worker-nodes-sg"
+  description = "Security group for ROSA HCP worker nodes with strict egress control"
+  vpc_id      = one(aws_vpc.main[*].id)
+
+  ingress {
+    description = "All traffic from VPC"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  # Egress rules for VPC endpoints only (strict egress control)
+  # Worker nodes need HTTPS to reach VPC endpoints for ECR, STS, CloudWatch, etc.
+  egress {
+    description = "HTTPS to VPC endpoints"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  # DNS egress for VPC endpoint DNS resolution (UDP)
+  egress {
+    description = "DNS to VPC (UDP)"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  # DNS egress for VPC endpoint DNS resolution (TCP for large responses)
+  egress {
+    description = "DNS to VPC (TCP)"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.name_prefix}-worker-nodes-sg"
+  })
+}
+
+# VPC Flow Logs (if S3 bucket provided)
+resource "aws_flow_log" "vpc" {
+  count = local.destroy_enabled == false && var.flow_log_s3_bucket != null ? 1 : 0
+
+  iam_role_arn    = aws_iam_role.vpc_flow_log[0].arn
+  log_destination = "arn:aws:s3:::${var.flow_log_s3_bucket}"
+  traffic_type    = "ALL"
+  vpc_id          = one(aws_vpc.main[*].id)
+
+  tags = merge(local.common_tags, {
+    Name = "${var.name_prefix}-vpc-flow-log"
+  })
+}
+
+# IAM role for VPC Flow Logs
+resource "aws_iam_role" "vpc_flow_log" {
+  count = local.destroy_enabled == false && var.flow_log_s3_bucket != null ? 1 : 0
+
+  name = "${var.name_prefix}-vpc-flow-log-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "vpc-flow-logs.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = merge(local.common_tags, {
+    Name = "${var.name_prefix}-vpc-flow-log-role"
+  })
+}
+
+# IAM policy for VPC Flow Logs
+resource "aws_iam_role_policy" "vpc_flow_log" {
+  count = local.destroy_enabled == false && var.flow_log_s3_bucket != null ? 1 : 0
+
+  name = "${var.name_prefix}-vpc-flow-log-policy"
+  role = aws_iam_role.vpc_flow_log[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject"
+        ]
+        Resource = "arn:aws:s3:::${var.flow_log_s3_bucket}/*"
+      }
+    ]
   })
 }
 
@@ -285,5 +408,34 @@ data "aws_availability_zones" "available" {
   filter {
     name   = "state"
     values = ["available"]
+  }
+}
+
+# Data source to look up ROSA-created VPC endpoint for API server access
+# ROSA HCP creates a VPC endpoint for worker nodes to connect to the hosted control plane API
+# This endpoint is tagged with:
+# - red-hat-managed=true
+# - red-hat-clustertype=rosa
+# - api.openshift.com/id=<cluster_id>
+# Note: VPC endpoints get IP addresses in the VPC CIDR, so the existing security group rules
+# (allowing HTTPS 443 TCP to VPC CIDR) already allow traffic to this endpoint.
+data "aws_vpc_endpoint" "rosa_api" {
+  count = local.destroy_enabled == false && var.cluster_id != null ? 1 : 0
+
+  vpc_id = one(aws_vpc.main[*].id)
+
+  filter {
+    name   = "tag:red-hat-managed"
+    values = ["true"]
+  }
+
+  filter {
+    name   = "tag:red-hat-clustertype"
+    values = ["rosa"]
+  }
+
+  filter {
+    name   = "tag:api.openshift.com/id"
+    values = [var.cluster_id]
   }
 }

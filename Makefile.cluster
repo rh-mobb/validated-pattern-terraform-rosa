@@ -1,0 +1,188 @@
+# Unified Cluster Makefile
+# Thin wrapper around bash scripts for CI/CD compatibility
+# Called from root Makefile with CLUSTER_NAME variable
+# Network type is read from terraform.tfvars
+
+include Makefile.common
+
+# Cluster name from root Makefile
+CLUSTER_NAME ?= $(error CLUSTER_NAME must be set)
+
+# Script directory
+SCRIPT_DIR := scripts
+
+# Directories
+TERRAFORM_INFRA_DIR := terraform/infrastructure
+TERRAFORM_CONFIG_DIR := terraform/configuration
+CLUSTER_DIR := clusters/$(CLUSTER_NAME)
+
+# Check cluster exists
+check-cluster:
+	@$(SCRIPT_DIR)/utils/check-cluster.sh $(CLUSTER_NAME)
+
+.PHONY: help init plan apply destroy cleanup fmt validate clean
+.PHONY: init-infrastructure init-configuration plan-infrastructure plan-configuration
+.PHONY: apply-infrastructure apply-configuration destroy-infrastructure destroy-configuration
+.PHONY: cleanup-infrastructure cleanup-configuration
+.PHONY: show-endpoints show-credentials login
+.PHONY: tunnel-start tunnel-stop tunnel-status bastion-connect
+.PHONY: generate-config-tfvars
+
+help: ## Show this help message
+	@$(SCRIPT_DIR)/utils/get-network-config.sh $(CLUSTER_DIR) >/dev/null 2>&1 || true; \
+	NETWORK_TYPE=$$(grep -E "^network_type\s*=" $(CLUSTER_DIR)/terraform.tfvars 2>/dev/null | sed -E 's/.*=\s*"([^"]+)"|.*=\s*([^"#\s]+).*/\1\2/' | tr -d ' ' || echo "unknown"); \
+	ENABLE_STRICT_EGRESS=$$(grep -E "^enable_strict_egress\s*=" $(CLUSTER_DIR)/terraform.tfvars 2>/dev/null | sed -E 's/.*=\s*"([^"]+)"|.*=\s*([^"#\s]+).*/\1\2/' | tr -d ' ' || echo "false"); \
+	if [ "$$NETWORK_TYPE" = "private" ] && [ "$$ENABLE_STRICT_EGRESS" = "true" ]; then \
+		MODE="egress-zero"; \
+	else \
+		MODE="$$NETWORK_TYPE"; \
+	fi; \
+	echo "$(GREEN)Unified Cluster Management - $(CLUSTER_NAME) ($$MODE)$(NC)"; \
+	echo ""; \
+	echo "$(BLUE)Usage:$(NC) make cluster.$(CLUSTER_NAME).<operation>"; \
+	echo ""; \
+	echo "$(GREEN)Cluster Management (Infrastructure + Configuration):$(NC)"; \
+	echo "  make cluster.$(CLUSTER_NAME).init              Initialize both infrastructure and configuration"; \
+	echo "  make cluster.$(CLUSTER_NAME).plan              Plan both infrastructure and configuration"; \
+	echo "  make cluster.$(CLUSTER_NAME).apply             Apply both (infrastructure first, then configuration)"; \
+	echo "  make cluster.$(CLUSTER_NAME).destroy           Destroy all resources (sets enable_destroy=true)"; \
+	echo "  make cluster.$(CLUSTER_NAME).cleanup           Same as destroy (no confirmation)"; \
+	echo ""; \
+	echo "$(GREEN)Infrastructure Management:$(NC)"; \
+	echo "  make cluster.$(CLUSTER_NAME).init-infrastructure       Initialize infrastructure only"; \
+	echo "  make cluster.$(CLUSTER_NAME).plan-infrastructure       Plan infrastructure changes"; \
+	echo "  make cluster.$(CLUSTER_NAME).apply-infrastructure      Apply infrastructure"; \
+	echo "  make cluster.$(CLUSTER_NAME).destroy-infrastructure    Destroy infrastructure resources"; \
+	echo "  make cluster.$(CLUSTER_NAME).cleanup-infrastructure    Same as destroy (no confirmation)"; \
+	echo ""; \
+	echo "$(GREEN)Configuration Management:$(NC)"; \
+	echo "  make cluster.$(CLUSTER_NAME).init-configuration         Initialize configuration only"; \
+	echo "  make cluster.$(CLUSTER_NAME).plan-configuration         Plan configuration changes"; \
+	echo "  make cluster.$(CLUSTER_NAME).apply-configuration        Apply configuration"; \
+	echo "  make cluster.$(CLUSTER_NAME).destroy-configuration      Destroy configuration resources"; \
+	echo "  make cluster.$(CLUSTER_NAME).cleanup-configuration      Same as destroy (no confirmation)"; \
+	echo ""; \
+	echo "$(GREEN)Cluster Access:$(NC)"; \
+	echo "  make cluster.$(CLUSTER_NAME).show-endpoints    Show API and console URLs"; \
+	echo "  make cluster.$(CLUSTER_NAME).show-credentials Show admin credentials and endpoints"; \
+	echo "  make cluster.$(CLUSTER_NAME).login             Login to cluster using oc CLI"; \
+	echo ""; \
+	echo "$(GREEN)Bastion & Tunnel Management:$(NC)"; \
+	echo "  make cluster.$(CLUSTER_NAME).tunnel-start      Start sshuttle VPN tunnel via bastion"; \
+	echo "  make cluster.$(CLUSTER_NAME).tunnel-stop       Stop sshuttle tunnel"; \
+	echo "  make cluster.$(CLUSTER_NAME).tunnel-status    Check if tunnel is running"; \
+	echo "  make cluster.$(CLUSTER_NAME).bastion-connect   Connect to bastion via SSM Session Manager"; \
+	echo ""; \
+	echo "$(BLUE)Network Type:$(NC) $$NETWORK_TYPE (mode: $$MODE)"; \
+	echo "$(BLUE)Available clusters:$(NC)"; \
+	ls -1 clusters/ 2>/dev/null | sed 's/^/  - /' || echo "  (none)"
+
+# Infrastructure operations
+init-infrastructure: check-cluster
+	@$(SCRIPT_DIR)/cluster/init-infrastructure.sh $(CLUSTER_NAME)
+
+plan-infrastructure: init-infrastructure
+	@$(SCRIPT_DIR)/cluster/plan-infrastructure.sh $(CLUSTER_NAME)
+
+apply-infrastructure: plan-infrastructure
+	@$(SCRIPT_DIR)/cluster/apply-infrastructure.sh $(CLUSTER_NAME)
+
+destroy-infrastructure:
+	@$(SCRIPT_DIR)/cluster/destroy-infrastructure.sh $(CLUSTER_NAME)
+
+cleanup-infrastructure:
+	@AUTO_APPROVE=true $(SCRIPT_DIR)/cluster/cleanup-infrastructure.sh $(CLUSTER_NAME)
+
+# Configuration operations
+init-configuration: check-cluster
+	@$(SCRIPT_DIR)/cluster/init-configuration.sh $(CLUSTER_NAME)
+
+plan-configuration: init-configuration
+	@$(SCRIPT_DIR)/cluster/plan-configuration.sh $(CLUSTER_NAME)
+
+apply-configuration: plan-configuration
+	@$(SCRIPT_DIR)/cluster/apply-configuration.sh $(CLUSTER_NAME)
+
+destroy-configuration:
+	@$(SCRIPT_DIR)/cluster/destroy-configuration.sh $(CLUSTER_NAME)
+
+cleanup-configuration:
+	@AUTO_APPROVE=true $(SCRIPT_DIR)/cluster/cleanup-configuration.sh $(CLUSTER_NAME)
+
+# Combined operations
+init: init-infrastructure init-configuration
+	@echo "$(GREEN)Initialized $(CLUSTER_NAME) (infrastructure + configuration)$(NC)"
+
+plan: plan-infrastructure plan-configuration
+	@echo "$(GREEN)Planned $(CLUSTER_NAME) (infrastructure + configuration)$(NC)"
+
+apply: apply-infrastructure apply-configuration
+	@echo "$(GREEN)Applied $(CLUSTER_NAME) (infrastructure + configuration)$(NC)"
+
+destroy: destroy-configuration destroy-infrastructure
+	@echo "$(GREEN)Destroyed $(CLUSTER_NAME) (configuration + infrastructure)$(NC)"
+	@echo "$(GREEN)All resources have been deleted from Kubernetes and AWS.$(NC)"
+
+cleanup: cleanup-configuration cleanup-infrastructure
+	@echo "$(GREEN)Cleanup completed for $(CLUSTER_NAME)$(NC)"
+	@echo "$(GREEN)All resources have been deleted from Kubernetes and AWS.$(NC)"
+
+# Generate configuration.tfvars
+generate-config-tfvars: check-cluster
+	@$(SCRIPT_DIR)/cluster/generate-config-tfvars.sh $(CLUSTER_NAME)
+
+# Info operations
+show-endpoints: check-cluster
+	@$(SCRIPT_DIR)/info/show-endpoints.sh $(CLUSTER_NAME)
+
+show-credentials: show-endpoints
+	@$(SCRIPT_DIR)/info/show-credentials.sh $(CLUSTER_NAME)
+
+login: check-cluster
+	@$(SCRIPT_DIR)/info/login.sh $(CLUSTER_NAME)
+
+# Tunnel operations
+tunnel-start: check-cluster
+	@$(SCRIPT_DIR)/tunnel/start.sh $(CLUSTER_NAME)
+
+tunnel-stop: check-cluster
+	@$(SCRIPT_DIR)/tunnel/stop.sh $(CLUSTER_NAME)
+
+tunnel-status: check-cluster
+	@$(SCRIPT_DIR)/tunnel/status.sh $(CLUSTER_NAME)
+
+# Bastion operations
+bastion-connect: check-cluster
+	@echo "$(BLUE)Connecting to bastion via SSM Session Manager...$(NC)"
+	@if ! command -v aws >/dev/null 2>&1; then \
+		echo "$(YELLOW)Error: aws CLI not found. Please install AWS CLI.$(NC)"; \
+		exit 1; \
+	fi
+	@cd $(TERRAFORM_INFRA_DIR) && \
+		BASTION_ID=$$(terraform output -no-color -raw bastion_instance_id 2>/dev/null | tr -d '\n\r' | sed 's/[[:space:]]*$$//') && \
+		if [ -z "$$BASTION_ID" ] || [ "$$BASTION_ID" = "null" ]; then \
+			echo "$(YELLOW)Error: Bastion not deployed. Enable bastion with enable_bastion=true$(NC)"; \
+			exit 1; \
+		fi && \
+		REGION=$$(terraform output -no-color -raw region 2>/dev/null | tr -d '\n\r' | sed 's/[[:space:]]*$$//' || terraform output -no-color -json 2>/dev/null | jq -r '.region.value // empty' | tr -d '\n\r' || echo "us-east-1") && \
+		if [ -z "$$REGION" ]; then \
+			REGION=$$(grep -E "^region\s*=" ../../$(CLUSTER_DIR)/terraform.tfvars 2>/dev/null | cut -d'"' -f2 | cut -d"'" -f2 | head -1 || echo "us-east-1"); \
+		fi && \
+		echo "$(GREEN)Connecting to bastion $$BASTION_ID in region $$REGION...$(NC)" && \
+		aws ssm start-session --target $$BASTION_ID --region $$REGION || \
+		(echo "$(YELLOW)Failed to connect. Check AWS credentials and bastion status.$(NC)" && exit 1)
+
+# Validate
+validate:
+	@cd $(TERRAFORM_INFRA_DIR) && terraform init -backend=false && terraform validate
+	@cd $(TERRAFORM_CONFIG_DIR) && terraform init -backend=false && terraform validate
+
+# Format
+fmt:
+	@terraform fmt -recursive
+
+# Clean
+clean:
+	@find . -type d -name ".terraform" -exec rm -rf {} + 2>/dev/null || true
+	@find . -name ".terraform.lock.hcl" -delete 2>/dev/null || true
+	@find . -name "terraform.tfplan" -delete 2>/dev/null || true
