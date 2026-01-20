@@ -49,6 +49,12 @@ terraform.rc
 # Reference implementations (embedded git repos)
 reference/
 
+# Duplicate/obsolete terraform modules directory (only contains cache)
+terraform/modules/
+
 # OS files
 .DS_Store
 Thumbs.db
+
+# Scratch directory for temporary files (values files, etc.)
+scratch/

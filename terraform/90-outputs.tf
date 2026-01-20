@@ -60,13 +60,26 @@ output "security_group_id" {
 
 output "admin_user_created" {
   description = "Whether admin user was created"
-  value       = length(module.identity_admin) > 0
+  value       = module.cluster.identity_provider_id != null
+  sensitive   = false
+}
+
+output "identity_provider_id" {
+  description = "ID of the HTPasswd identity provider (null if enable_identity_provider is false)"
+  value       = module.cluster.identity_provider_id
+  sensitive   = false
+}
+
+output "identity_provider_name" {
+  description = "Name of the identity provider (null if enable_identity_provider is false)"
+  value       = module.cluster.identity_provider_name
   sensitive   = false
 }
 
 output "admin_password_secret_arn" {
   description = <<EOF
   ARN of the AWS Secrets Manager secret containing the admin password.
+  This secret persists through sleep operations for easy cluster restart.
   Use AWS CLI to retrieve the password:
     aws secretsmanager get-secret-value --secret-id <arn> --query SecretString --output text
   EOF
@@ -95,5 +108,66 @@ output "bastion_ssm_command" {
 output "bastion_sshuttle_command" {
   description = "Command to create VPN-like access via sshuttle"
   value       = var.enable_bastion && length(module.bastion) > 0 ? module.bastion[0].sshuttle_command : null
+  sensitive   = false
+}
+
+output "aws_account_id" {
+  description = "AWS account ID where the cluster is deployed"
+  value       = module.cluster.aws_account_id
+  sensitive   = false
+}
+
+output "efs_file_system_id" {
+  description = "ID of the EFS file system (persists through sleep, null if enable_storage is false or enable_efs is false)"
+  value       = module.cluster.efs_file_system_id
+  sensitive   = false
+}
+
+output "efs_file_system_arn" {
+  description = "ARN of the EFS file system (persists through sleep, null if enable_storage is false or enable_efs is false)"
+  value       = module.cluster.efs_file_system_arn
+  sensitive   = false
+}
+
+output "ebs_kms_key_arn" {
+  description = "ARN of the KMS key for EBS encryption (persists through sleep, null if enable_storage is false)"
+  value       = module.cluster.ebs_kms_key_arn
+  sensitive   = false
+}
+
+output "efs_kms_key_arn" {
+  description = "ARN of the KMS key for EFS encryption (persists through sleep, null if enable_storage is false or enable_efs is false)"
+  value       = module.cluster.efs_kms_key_arn
+  sensitive   = false
+}
+
+output "gitops_bootstrap_enabled" {
+  description = "Whether GitOps bootstrap is enabled"
+  value       = module.cluster.gitops_bootstrap_enabled
+  sensitive   = false
+}
+
+output "gitops_bootstrap_env_vars" {
+  description = "Environment variables for running the GitOps bootstrap script manually"
+  value       = module.cluster.gitops_bootstrap_env_vars
+  sensitive   = false
+}
+
+output "gitops_bootstrap_command" {
+  description = <<EOF
+  Shell commands to export environment variables for the GitOps bootstrap script.
+
+  Usage:
+    # Export variables and run script
+    eval $(terraform output -raw gitops_bootstrap_command)
+    $(terraform output -raw gitops_bootstrap_script_path)
+  EOF
+  value       = module.cluster.gitops_bootstrap_command
+  sensitive   = false
+}
+
+output "gitops_bootstrap_script_path" {
+  description = "Path to the GitOps bootstrap script"
+  value       = module.cluster.gitops_bootstrap_script_path
   sensitive   = false
 }

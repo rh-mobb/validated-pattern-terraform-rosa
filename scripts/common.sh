@@ -44,23 +44,14 @@ get_cluster_dir() {
     echo "$cluster_dir"
 }
 
-# Get terraform directory (infrastructure or configuration)
+# Get terraform directory
 get_terraform_dir() {
     local layer="${1:-}"
     local project_root=$(get_project_root)
 
-    case "$layer" in
-        infrastructure|infra)
-            echo "$project_root/terraform/infrastructure"
-            ;;
-        configuration|config)
-            echo "$project_root/terraform/configuration"
-            ;;
-        *)
-            error "Invalid layer: $layer (must be 'infrastructure' or 'configuration')"
-            exit 1
-            ;;
-    esac
+    # Layer parameter is kept for backward compatibility but ignored
+    # Always return terraform directory
+    echo "$project_root/terraform"
 }
 
 # Check for remote backend configuration
@@ -74,10 +65,10 @@ check_backend_config() {
 # Setup backend configuration arguments for terraform init
 setup_backend_config() {
     local cluster_name="${1:-}"
-    local layer="${2:-}"  # infrastructure or configuration
+    local layer="${2:-infrastructure}"  # Kept for backward compatibility
 
-    if [ -z "$cluster_name" ] || [ -z "$layer" ]; then
-        error "Usage: setup_backend_config <cluster_name> <layer>"
+    if [ -z "$cluster_name" ]; then
+        error "Usage: setup_backend_config <cluster_name> [layer]"
         exit 1
     fi
 
@@ -147,67 +138,5 @@ get_tfvar() {
         echo "$line" | sed -E 's/.*"([^"]+)".*/\1/'
     else
         echo "$line" | sed -E 's/.*=\s*([^"#]+).*/\1/' | sed 's/[[:space:]]*#.*//' | tr -d ' '
-    fi
-}
-
-# Check if configuration state has resources
-# Returns 0 if configuration is empty or doesn't exist, 1 if it has resources
-check_configuration_state_empty() {
-    local cluster_name="${1:-}"
-    local terraform_config_dir="${2:-}"
-    local cluster_dir="${3:-}"  # Optional, will be calculated if not provided
-
-    if [ -z "$cluster_name" ] || [ -z "$terraform_config_dir" ]; then
-        error "Usage: check_configuration_state_empty <cluster_name> <terraform_config_dir> [cluster_dir]"
-        return 1
-    fi
-
-    # Calculate cluster_dir if not provided
-    if [ -z "$cluster_dir" ]; then
-        cluster_dir=$(get_cluster_dir "$cluster_name")
-    fi
-
-    # Check if configuration is initialized
-    if [ ! -d "$terraform_config_dir/.terraform" ]; then
-        # Not initialized, so no resources
-        return 0
-    fi
-
-    # Save current directory
-    local original_dir=$(pwd)
-
-    # Try to list state resources
-    # If state doesn't exist or is empty, terraform state list will return empty or error
-    cd "$terraform_config_dir" || return 0
-
-    # Initialize backend if needed (quietly, suppress all output)
-    if check_backend_config; then
-        terraform init -backend-config="bucket=${TF_BACKEND_CONFIG_BUCKET}" \
-            -backend-config="key=clusters/${cluster_name}/configuration.tfstate" \
-            -backend-config="region=${TF_BACKEND_CONFIG_REGION:-us-east-1}" \
-            $(if [ -n "${TF_BACKEND_CONFIG_DYNAMODB_TABLE:-}" ]; then echo "-backend-config=dynamodb_table=${TF_BACKEND_CONFIG_DYNAMODB_TABLE}"; fi) \
-            -backend-config="encrypt=true" \
-            -input=false -upgrade >/dev/null 2>&1 || true
-    else
-        terraform init -backend-config="path=../../${cluster_dir}/configuration.tfstate" \
-            -input=false -upgrade >/dev/null 2>&1 || true
-    fi
-
-    # List state resources (suppress errors if state doesn't exist)
-    # terraform state list returns non-zero exit code if state is empty or doesn't exist
-    local state_resources=""
-    if terraform state list >/dev/null 2>&1; then
-        state_resources=$(terraform state list 2>/dev/null | grep -v "^$" || echo "")
-    fi
-
-    # Return to original directory
-    cd "$original_dir" || true
-
-    if [ -z "$state_resources" ]; then
-        # State is empty or doesn't exist
-        return 0
-    else
-        # State has resources
-        return 1
     fi
 }

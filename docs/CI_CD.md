@@ -244,19 +244,27 @@ export TF_BACKEND_CONFIG_DYNAMODB_TABLE="terraform-state-lock"  # Optional
 
 ### CI/CD Specific Variables
 
-- `AUTO_APPROVE=true`: Skip confirmation prompts (used by cleanup scripts)
+- `AUTO_APPROVE=true`: Skip confirmation prompts (used by sleep/cleanup scripts)
 - `TF_VAR_k8s_token`: Kubernetes token (if not set, script will obtain via oc login)
 
-## Destroy vs Cleanup
+## Destroy vs Sleep
 
-- **`destroy-*`**: Shows warnings, prompts for confirmation (interactive)
-- **`cleanup-*`**: Same as destroy but uses `-auto-approve` flag (non-interactive, CI/CD friendly)
+- **`destroy-*`**: Shows warnings, prompts for confirmation (interactive). For permanent cluster removal.
+- **`cleanup-*`** (used by `make sleep`): Same as destroy but uses `-auto-approve` flag (non-interactive). Designed for temporarily shutting down clusters while preserving resources.
+
+**Sleep** preserves:
+- DNS domain (if `enable_persistent_dns_domain=true`)
+- Admin password in AWS Secrets Manager
+- IAM roles and OIDC configuration
+- KMS keys and EFS (if not explicitly destroyed)
+- GitOps configurations (automatically redeployed when cluster is recreated)
+
+**Note**: Sleep does NOT hibernate the cluster - it destroys cluster resources. The cluster must be recreated using `make apply` to "wake" it. Since GitOps manages all important configurations and applications, they will be automatically redeployed.
 
 For CI/CD pipelines, use `cleanup-*` scripts or set `AUTO_APPROVE=true`:
 
 ```bash
-# Cleanup (auto-approve)
-AUTO_APPROVE=true ./scripts/cluster/cleanup-configuration.sh my-cluster
+# Sleep cluster (preserves resources for easy restart)
 AUTO_APPROVE=true ./scripts/cluster/cleanup-infrastructure.sh my-cluster
 ```
 
@@ -363,7 +371,7 @@ If configuration layer can't access infrastructure outputs:
 
 1. Ensure infrastructure has been applied
 2. Generate configuration.tfvars: `./scripts/cluster/generate-config-tfvars.sh my-cluster`
-3. Verify infrastructure outputs: `cd terraform/infrastructure && terraform output`
+3. Verify infrastructure outputs: `cd terraform && terraform output`
 
 ## See Also
 

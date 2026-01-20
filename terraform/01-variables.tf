@@ -186,29 +186,29 @@ variable "bastion_public_ssh_key" {
 }
 
 # Destroy Protection Variables
-variable "enable_destroy" {
-  description = "Set to true to allow resource destruction. Default false prevents accidental destroys. To destroy resources, set this to true and run terraform apply, then terraform destroy."
+variable "persists_through_sleep" {
+  description = "Set to false to put cluster in sleep mode (destroys resources). Default true keeps cluster active. To sleep cluster, set this to false and run terraform apply."
   type        = bool
-  default     = false
+  default     = true
   nullable    = false
 }
 
-variable "enable_destroy_cluster" {
-  description = "Override enable_destroy for cluster resources. If null, uses enable_destroy value."
+variable "persists_through_sleep_cluster" {
+  description = "Override persists_through_sleep for cluster resources. If null, uses persists_through_sleep value."
   type        = bool
   default     = null
   nullable    = true
 }
 
-variable "enable_destroy_iam" {
-  description = "Override enable_destroy for IAM resources. If null, uses enable_destroy value."
+variable "persists_through_sleep_iam" {
+  description = "Override persists_through_sleep for IAM resources. If null, uses persists_through_sleep value."
   type        = bool
   default     = null
   nullable    = true
 }
 
-variable "enable_destroy_network" {
-  description = "Override enable_destroy for network resources. If null, uses enable_destroy value."
+variable "persists_through_sleep_network" {
+  description = "Override persists_through_sleep for network resources. If null, uses persists_through_sleep value."
   type        = bool
   default     = null
   nullable    = true
@@ -276,4 +276,34 @@ variable "additional_machine_pools" {
     ])
     error_message = "For each additional machine pool: if autoscaling_enabled is true, min_replicas and max_replicas must be set and replicas must be null. If autoscaling_enabled is false, replicas must be set and min_replicas/max_replicas must be null."
   }
+}
+
+# Storage variables
+variable "enable_efs" {
+  description = "Enable EFS file system creation"
+  type        = bool
+  default     = null
+  nullable    = true
+}
+
+# GitOps Bootstrap variables
+variable "enable_gitops_bootstrap" {
+  description = "Enable GitOps operator bootstrap using Helm charts after cluster creation"
+  type        = bool
+  default     = null
+  nullable    = true
+}
+
+variable "gitops_git_repo_url" {
+  description = "Git repository URL for cluster-config (e.g., https://github.com/org/cluster-config.git)"
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "gitops_git_path" {
+  description = "Git path for cluster configuration directory (e.g., 'dev/pczarkow' for dev/pczarkow/infrastructure.yaml)"
+  type        = string
+  default     = null
+  nullable    = true
 }

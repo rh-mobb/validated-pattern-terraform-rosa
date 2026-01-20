@@ -13,12 +13,7 @@ scripts/
 │   ├── apply-infrastructure.sh
 │   ├── destroy-infrastructure.sh
 │   ├── cleanup-infrastructure.sh
-│   ├── init-configuration.sh
-│   ├── plan-configuration.sh
-│   ├── apply-configuration.sh
-│   ├── destroy-configuration.sh
-│   ├── cleanup-configuration.sh
-│   └── generate-config-tfvars.sh
+│   └── bootstrap-gitops.sh
 ├── tunnel/               # Tunnel management scripts
 │   ├── start.sh
 │   ├── stop.sh
@@ -76,7 +71,7 @@ Shared functions used across all scripts:
 - `error()`, `warn()`, `info()`, `success()` - Colored output functions
 - `get_project_root()` - Get repository root directory
 - `get_cluster_dir()` - Validate and return cluster directory path
-- `get_terraform_dir()` - Get terraform infrastructure/configuration directory
+- `get_terraform_dir()` - Get terraform infrastructure directory
 - `check_backend_config()` - Check for remote backend config
 - `check_required_tools()` - Verify required tools are installed
 - `get_tfvar()` - Extract value from terraform.tfvars
@@ -89,16 +84,32 @@ Shared functions used across all scripts:
 - **`plan-infrastructure.sh`**: Plan infrastructure changes
 - **`apply-infrastructure.sh`**: Apply infrastructure changes
 - **`destroy-infrastructure.sh`**: Destroy infrastructure (with confirmation)
-- **`cleanup-infrastructure.sh`**: Cleanup infrastructure (auto-approve, CI/CD friendly)
+- **`cleanup-infrastructure.sh`**: Sleep infrastructure (destroy with preserved resources, auto-approve, CI/CD friendly)
 
-#### Configuration Scripts
+#### GitOps Bootstrap Script
 
-- **`init-configuration.sh`**: Initialize configuration Terraform backend
-- **`plan-configuration.sh`**: Plan configuration changes (handles tunnel for egress-zero)
-- **`apply-configuration.sh`**: Apply configuration changes (handles tunnel for egress-zero)
-- **`destroy-configuration.sh`**: Destroy configuration (with confirmation)
-- **`cleanup-configuration.sh`**: Cleanup configuration (auto-approve, CI/CD friendly)
-- **`generate-config-tfvars.sh`**: Generate configuration.tfvars from infrastructure outputs
+- **`bootstrap-gitops.sh`**: Bootstrap GitOps operator on ROSA HCP cluster using Helm charts
+
+**Usage:**
+```bash
+# Via Makefile (recommended)
+make cluster.<cluster-name>.bootstrap-cluster
+
+# Directly (with environment variables from Terraform)
+eval $(terraform output -raw gitops_bootstrap_command)
+$(terraform output -raw gitops_bootstrap_script_path)
+```
+
+**Debug mode:**
+Set `DEBUG=true` to enable command tracing (`set -x`):
+```bash
+DEBUG=true make cluster.<cluster-name>.bootstrap-cluster
+```
+
+**Output:**
+- Creates values file at `scratch/cluster-bootstrap-values-<CLUSTER_NAME>.yaml` for inspection
+- Installs OpenShift GitOps operator via Helm charts
+- Configures ArgoCD instances (`cluster-gitops` and `application-gitops`)
 
 ### Utility Scripts
 
@@ -134,7 +145,7 @@ export TF_BACKEND_CONFIG_DYNAMODB_TABLE="terraform-state-lock"  # Optional
 
 ### CI/CD Variables
 
-- `AUTO_APPROVE=true`: Skip confirmation prompts (used by cleanup scripts)
+- `AUTO_APPROVE=true`: Skip confirmation prompts (used by sleep/cleanup scripts)
 - `TF_VAR_k8s_token`: Kubernetes token (if not set, script will obtain via oc login)
 - `TF_VAR_admin_password_override`: Override admin password (if secret not available)
 
@@ -173,18 +184,6 @@ jobs:
 
       - name: Apply infrastructure
         run: ./scripts/cluster/apply-infrastructure.sh my-cluster
-
-      - name: Generate configuration.tfvars
-        run: ./scripts/cluster/generate-config-tfvars.sh my-cluster
-
-      - name: Initialize configuration
-        run: ./scripts/cluster/init-configuration.sh my-cluster
-
-      - name: Plan configuration
-        run: ./scripts/cluster/plan-configuration.sh my-cluster
-
-      - name: Apply configuration
-        run: ./scripts/cluster/apply-configuration.sh my-cluster
 ```
 
 ### GitLab CI Example
@@ -192,7 +191,6 @@ jobs:
 ```yaml
 stages:
   - infrastructure
-  - configuration
 
 variables:
   CLUSTER_NAME: my-cluster
@@ -203,30 +201,26 @@ infrastructure:
     - ./scripts/cluster/init-infrastructure.sh $CLUSTER_NAME
     - ./scripts/cluster/plan-infrastructure.sh $CLUSTER_NAME
     - ./scripts/cluster/apply-infrastructure.sh $CLUSTER_NAME
-    - ./scripts/cluster/generate-config-tfvars.sh $CLUSTER_NAME
-  artifacts:
-    paths:
-      - clusters/$CLUSTER_NAME/configuration.tfvars
-
-configuration:
-  stage: configuration
-  script:
-    - ./scripts/cluster/init-configuration.sh $CLUSTER_NAME
-    - ./scripts/cluster/plan-configuration.sh $CLUSTER_NAME
-    - ./scripts/cluster/apply-configuration.sh $CLUSTER_NAME
-  dependencies:
-    - infrastructure
 ```
 
-## Destroy vs Cleanup
+## Destroy vs Sleep
 
-- **`destroy-*`**: Shows warnings, prompts for confirmation (interactive)
-- **`cleanup-*`**: Same as destroy but uses `-auto-approve` flag (non-interactive, CI/CD friendly)
+- **`destroy-*`**: Shows warnings, prompts for confirmation (interactive). For permanent cluster removal.
+- **`cleanup-*`** (used by `make sleep`): Same as destroy but uses `-auto-approve` flag (non-interactive). Designed for temporarily shutting down clusters while preserving resources.
+
+**Sleep** preserves:
+- DNS domain (if `enable_persistent_dns_domain=true`)
+- Admin password in AWS Secrets Manager
+- IAM roles and OIDC configuration
+- KMS keys and EFS (if not explicitly destroyed)
+- GitOps configurations (automatically redeployed when cluster is recreated)
+
+**Note**: Sleep does NOT hibernate the cluster - it destroys cluster resources. The cluster must be recreated using `make apply` to "wake" it. Since GitOps manages all important configurations and applications, they will be automatically redeployed.
 
 For CI/CD pipelines, use `cleanup-*` scripts or set `AUTO_APPROVE=true`:
 
 ```bash
-AUTO_APPROVE=true ./scripts/cluster/destroy-infrastructure.sh my-cluster
+AUTO_APPROVE=true ./scripts/cluster/cleanup-infrastructure.sh my-cluster
 ```
 
 ## Error Handling
@@ -252,7 +246,7 @@ All scripts follow these standards:
 Scripts require:
 
 - `terraform` - Terraform CLI
-- `oc` - OpenShift CLI (for configuration operations)
+- `oc` - OpenShift CLI (for cluster access)
 - `aws` - AWS CLI (for Secrets Manager access)
 - `jq` - JSON processor (for parsing terraform outputs)
 - `sshuttle` - VPN tunnel tool (for egress-zero clusters)

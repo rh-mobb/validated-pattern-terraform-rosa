@@ -7,13 +7,15 @@ include Makefile.common
 # Delegate to unified cluster Makefile
 # Pattern: make cluster.<cluster-name>.<operation>
 # Examples: make cluster.public.init, make cluster.egress-zero.apply, make cluster.egress-zero2.init
+# If no operation is specified (make cluster.public), defaults to apply then bootstrap-cluster
 # Match pattern: cluster.<cluster-name>.<operation> where cluster-name is the directory under clusters/
 cluster.%:
 	@CLUSTER_NAME=$$(echo "$@" | cut -d'.' -f2); \
 	OPERATION=$$(echo "$@" | cut -d'.' -f3-); \
-	if [ -z "$$CLUSTER_NAME" ] || [ -z "$$OPERATION" ]; then \
+	if [ -z "$$CLUSTER_NAME" ]; then \
 		echo "$(YELLOW)Error: Invalid pattern. Use: make cluster.<cluster-name>.<operation>$(NC)"; \
 		echo "$(YELLOW)Examples: make cluster.public.init, make cluster.egress-zero.apply$(NC)"; \
+		echo "$(YELLOW)Or: make cluster.public (runs apply then bootstrap-cluster)$(NC)"; \
 		exit 1; \
 	fi; \
 	if [ ! -d "clusters/$$CLUSTER_NAME" ]; then \
@@ -21,7 +23,12 @@ cluster.%:
 		echo "$(YELLOW)Available clusters:$$(ls -1 clusters/ 2>/dev/null | sed 's/^/  - /' || echo '  (none)')$(NC)"; \
 		exit 1; \
 	fi; \
-	$(MAKE) -f Makefile.cluster CLUSTER_NAME=$$CLUSTER_NAME $$OPERATION
+	if [ -z "$$OPERATION" ]; then \
+		echo "$(BLUE)No operation specified. Running default: apply then bootstrap-cluster$(NC)"; \
+		$(MAKE) -f Makefile.cluster CLUSTER_NAME=$$CLUSTER_NAME apply bootstrap-cluster; \
+	else \
+		$(MAKE) -f Makefile.cluster CLUSTER_NAME=$$CLUSTER_NAME $$OPERATION; \
+	fi
 
 
 help: ## Show this help message
@@ -30,32 +37,24 @@ help: ## Show this help message
 	@echo "$(GREEN)Usage:$(NC) make cluster.<type>.<operation> [CLUSTER=<cluster-name>]"
 	@echo ""
 	@echo "$(GREEN)Unified Cluster Management (Recommended):$(NC)"
+	@echo "  make cluster.public                            Apply and bootstrap cluster (default)"
 	@echo "  make cluster.public.init                     Initialize public cluster"
 	@echo "  make cluster.public.plan                     Plan public cluster"
 	@echo "  make cluster.public.apply                    Apply public cluster"
+	@echo "  make cluster.public.bootstrap-cluster        Bootstrap GitOps operator"
 	@echo "  make cluster.egress-zero.init                Initialize egress-zero cluster"
 	@echo "  make cluster.egress-zero.apply               Apply egress-zero cluster"
 	@echo "  make cluster.egress-zero2.init               Initialize another egress-zero cluster"
 	@echo "  make cluster.us-east-1-production.apply      Apply production cluster"
 	@echo ""
 	@echo "$(GREEN)Common Operations:$(NC)"
-	@echo "  cluster.<type>.init              Initialize both infrastructure and configuration"
-	@echo "  cluster.<type>.plan              Plan both infrastructure and configuration"
-	@echo "  cluster.<type>.apply             Apply both (infrastructure first, then configuration)"
+	@echo "  cluster.<type>                    Apply infrastructure then bootstrap GitOps (default)"
+	@echo "  cluster.<type>.init              Initialize infrastructure"
+	@echo "  cluster.<type>.plan              Plan infrastructure changes"
+	@echo "  cluster.<type>.apply             Apply infrastructure"
+	@echo "  cluster.<type>.bootstrap-cluster Bootstrap GitOps operator"
 	@echo "  cluster.<type>.destroy           Destroy all resources"
-	@echo "  cluster.<type>.cleanup           Same as destroy (no confirmation)"
-	@echo ""
-	@echo "$(GREEN)Infrastructure Management:$(NC)"
-	@echo "  cluster.<type>.init-infrastructure       Initialize infrastructure only"
-	@echo "  cluster.<type>.plan-infrastructure       Plan infrastructure changes"
-	@echo "  cluster.<type>.apply-infrastructure      Apply infrastructure"
-	@echo "  cluster.<type>.destroy-infrastructure    Destroy infrastructure resources"
-	@echo ""
-	@echo "$(GREEN)Configuration Management:$(NC)"
-	@echo "  cluster.<type>.init-configuration         Initialize configuration only"
-	@echo "  cluster.<type>.plan-configuration         Plan configuration changes"
-	@echo "  cluster.<type>.apply-configuration        Apply configuration"
-	@echo "  cluster.<type>.destroy-configuration      Destroy configuration resources"
+	@echo "  cluster.<type>.sleep             Sleep cluster (destroy with preserved resources)"
 	@echo ""
 	@echo "$(GREEN)Cluster Access:$(NC)"
 	@echo "  cluster.<type>.show-endpoints    Show API and console URLs"
@@ -75,8 +74,8 @@ help: ## Show this help message
 	@echo "  make install-provider     Install OpenShift operator provider"
 	@echo ""
 	@echo "$(GREEN)Destroy Protection:$(NC)"
-	@echo "  Note: By default, enable_destroy=false prevents accidental destruction"
-	@echo "        When enable_destroy=true, resources are actually destroyed"
+	@echo "  Note: By default, persists_through_sleep=true keeps cluster active"
+	@echo "        When persists_through_sleep=false, cluster is put to sleep (resources destroyed)"
 
 # Code quality
 fmt: ## Format all Terraform files
@@ -87,7 +86,7 @@ validate: validate-modules ## Validate all Terraform code
 
 validate-modules: ## Validate all modules
 	@echo "$(BLUE)Validating modules...$(NC)"
-	@for dir in modules/infrastructure/*/ modules/configuration/*/; do \
+	@for dir in modules/infrastructure/*/; do \
 		if [ -d "$$dir" ]; then \
 			echo "Validating $$dir..."; \
 			cd $$dir && terraform init -backend=false >/dev/null 2>&1 && terraform validate && cd - >/dev/null || echo "  ✗ Failed: $$dir"; \
@@ -105,7 +104,7 @@ install-provider: ## Install OpenShift operator provider from GitHub releases (d
 	@chmod +x scripts/install-openshift-provider.sh
 	@scripts/install-openshift-provider.sh $(PROVIDER_VERSION)
 	@echo "$(GREEN)Provider installation complete$(NC)"
-	@echo "$(BLUE)Next steps: Run 'terraform init' in your configuration directory$(NC)"
+	@echo "$(BLUE)Next steps: Run 'terraform init' in your infrastructure directory$(NC)"
 
 # Cleanup
 clean: ## Clean Terraform files (.terraform directories and lock files)

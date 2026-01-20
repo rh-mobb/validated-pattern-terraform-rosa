@@ -28,7 +28,7 @@ info "Planning infrastructure changes..."
 
 cd "$TERRAFORM_INFRA_DIR"
 
-# Calculate relative path from terraform/infrastructure to cluster directory
+# Calculate relative path from terraform to cluster directory
 CLUSTER_TFVARS="$CLUSTER_DIR/terraform.tfvars"
 
 terraform plan \

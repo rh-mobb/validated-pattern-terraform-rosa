@@ -28,35 +28,96 @@ Reference: https://github.com/rh-mobb/mobb-rules/blob/main/content/languages/ter
 
 ## Problem Solving and Debugging
 
+### Validation-First Approach
+
+**CRITICAL**: Before making any changes to fix errors or bugs, **ALWAYS validate inputs, assumptions, and current state first**.
+
+**Validation-First Workflow**:
+1. **Validate inputs** - Compare what we're passing/using vs what's expected/required
+   - Check configuration files, values.yaml, variables, etc.
+   - Compare actual commands/API calls with expected format
+   - Verify all required parameters are present and correct
+2. **Test assumptions** - Don't assume, verify
+   - Use dry-run modes (`terraform plan`, `helm template`, `kubectl --dry-run`)
+   - Test commands in isolation before integrating
+   - Verify tool behavior with minimal examples
+3. **Check current state** - Understand what exists before changing
+   - Review existing code/configuration
+   - Check logs, outputs, or state
+   - Understand dependencies and relationships
+4. **Identify root cause** - Don't add workarounds until root cause is confirmed
+   - Trace the problem to its source
+   - Verify the issue is what you think it is
+   - Rule out configuration errors before assuming tool bugs
+5. **Propose minimal fix** - Fix the root cause, not symptoms
+   - Make targeted, minimal changes
+   - Avoid adding complex workarounds
+   - Fix configuration/input issues before adding logic
+
+**Example Validation Process**:
+```
+## Step 1: Validate Inputs
+- Compare values.yaml with our Helm command
+- Check: Are all required values set? Are formats correct?
+- Test: Run `helm template` to see what gets rendered
+
+## Step 2: Test Assumptions
+- Assumption: "Helm hooks aren't running"
+- Test: Check if hooks exist in manifest, verify hook execution
+- Verify: Are hooks actually failing, or are values wrong?
+
+## Step 3: Check Current State
+- Review: What resources exist? What's in the cluster?
+- Compare: Expected vs actual state
+- Identify: What's missing or incorrect?
+
+## Step 4: Root Cause Analysis
+- Root cause: "Values not set correctly" (not "hooks broken")
+- Fix: Correct the values (not add hook extraction workaround)
+
+## Step 5: Minimal Fix
+- Change: Update Helm command to set correct values
+- Avoid: Adding complex hook extraction logic
+```
+
 ### Discussion Before Implementation
 
-**MANDATORY**: When encountering errors, bugs, or situations with multiple solution approaches, **ALWAYS discuss the issue and potential fixes before implementing**.
+**MANDATORY**: When encountering errors, bugs, or situations with multiple solution approaches, **ALWAYS validate first, then discuss the issue and potential fixes before implementing**.
 
-**When to Discuss First**:
-1. **Any error messages** - Analyze the error, understand root cause, discuss solutions
-2. **Bugs or unexpected behavior** - Understand why it's happening, explore fix options
-3. **Multiple solution approaches** - Present options with pros/cons, get direction
+**When to Validate and Discuss First**:
+1. **Any error messages** - Validate inputs, analyze error, understand root cause, discuss solutions
+2. **Bugs or unexpected behavior** - Validate current state, understand why it's happening, explore fix options
+3. **Multiple solution approaches** - Validate each approach, present options with pros/cons, get direction
 4. **Architectural decisions** - Changes that affect module structure or patterns
 5. **Breaking changes** - Any change that affects existing functionality
 6. **Complex fixes** - Solutions that require changes across multiple files/modules
+7. **Configuration issues** - When tools/commands aren't working as expected, validate configuration first
 
 **Discussion Process**:
-1. **Analyze the problem**: Understand what's happening and why
-2. **Identify root cause**: Don't just fix symptoms, understand the underlying issue
-3. **Present options**: List 2-3 potential solutions with:
+1. **Validate inputs and current state**: Check what we're passing vs what's expected
+2. **Analyze the problem**: Understand what's happening and why
+3. **Identify root cause**: Don't just fix symptoms, understand the underlying issue
+4. **Test assumptions**: Verify assumptions before proposing fixes
+5. **Present options**: List 2-3 potential solutions with:
    - Pros and cons of each approach
    - Impact on existing code
    - Trade-offs and considerations
-4. **Get direction**: Wait for user input on preferred approach
-5. **Implement**: Once direction is given, implement the chosen solution
+   - Validation steps taken
+6. **Get direction**: Wait for user input on preferred approach
+7. **Implement**: Once direction is given, implement the chosen solution with minimal changes
 
 **Example Discussion Format**:
 ```
+## Validation Results
+- Checked: values.yaml vs Helm command
+- Found: Missing gitRepoUrl overrides for applications
+- Tested: helm template shows incorrect values
+
 ## Problem Analysis
 [Describe the error/issue]
 
 ## Root Cause
-[Explain why this is happening]
+[Explain why this is happening - based on validation]
 
 ## Potential Solutions
 
@@ -64,17 +125,19 @@ Reference: https://github.com/rh-mobb/mobb-rules/blob/main/content/languages/ter
 - Pros: ...
 - Cons: ...
 - Impact: ...
+- Validation: [How this was tested/verified]
 
 ### Option 2: [Approach Name]
 - Pros: ...
 - Cons: ...
 - Impact: ...
+- Validation: [How this was tested/verified]
 
 ## Recommendation
 [Which option do you prefer and why?]
 ```
 
-**Exception**: Simple, obvious fixes (typos, syntax errors, missing imports) can be fixed immediately without discussion.
+**Exception**: Simple, obvious fixes (typos, syntax errors, missing imports) can be fixed immediately without discussion, but still validate the fix works.
 
 ## Documentation Requirements
 
@@ -643,17 +706,21 @@ When writing new Terraform code, ensure:
 ## Workflow Checklist
 
 Before committing code, ensure:
-1. [ ] **Issues discussed** - Errors, bugs, or multiple solution approaches discussed before implementing
-2. [ ] Code follows PLAN.md specifications
-3. [ ] PLAN.md updated if architecture changed
-4. [ ] CHANGELOG.md updated with changes
-5. [ ] All documentation updated (README.md, module docs)
-6. [ ] Code passes linting/validation
-7. [ ] Security scanning completed (checkov)
-8. [ ] Variables and outputs documented
-9. [ ] Sensitive data properly handled
-10. [ ] Version numbers updated if needed
-11. [ ] Git commit message references PLAN.md if deviating
+1. [ ] **Inputs validated** - Configuration, values, and parameters validated against requirements
+2. [ ] **Assumptions tested** - Verified assumptions with dry-run, template, or test commands
+3. [ ] **Root cause identified** - Understood underlying issue, not just symptoms
+4. [ ] **Issues discussed** - Errors, bugs, or multiple solution approaches discussed before implementing
+5. [ ] **Minimal changes made** - Fixed root cause with targeted changes, avoided workarounds
+6. [ ] Code follows PLAN.md specifications
+7. [ ] PLAN.md updated if architecture changed
+8. [ ] CHANGELOG.md updated with changes
+9. [ ] All documentation updated (README.md, module docs)
+10. [ ] Code passes linting/validation
+11. [ ] Security scanning completed (checkov)
+12. [ ] Variables and outputs documented
+13. [ ] Sensitive data properly handled
+14. [ ] Version numbers updated if needed
+15. [ ] Git commit message references PLAN.md if deviating
 
 ## Reference Repositories
 

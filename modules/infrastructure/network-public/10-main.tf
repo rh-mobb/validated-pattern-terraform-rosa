@@ -1,6 +1,6 @@
 locals {
-  # Determine if destroy is enabled (use override if provided, else global)
-  destroy_enabled = var.enable_destroy_network != null ? var.enable_destroy_network : var.enable_destroy
+  # Determine if cluster persists/is active (use override if provided, else global)
+  persists_through_sleep = var.persists_through_sleep_network != null ? var.persists_through_sleep_network : var.persists_through_sleep
 
   # Determine number of AZs based on multi_az
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/modules/terraform-rosa-networking/data.tf
@@ -56,7 +56,7 @@ locals {
 
 # VPC
 resource "aws_vpc" "main" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
@@ -69,7 +69,7 @@ resource "aws_vpc" "main" {
 
 # Internet Gateway (required for public subnets and NAT Gateways)
 resource "aws_internet_gateway" "main" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   vpc_id = one(aws_vpc.main[*].id)
 
@@ -80,7 +80,7 @@ resource "aws_internet_gateway" "main" {
 
 # Private Subnets (for Worker Nodes)
 resource "aws_subnet" "private" {
-  count = local.destroy_enabled == false ? local.az_count : 0
+  count = local.persists_through_sleep ? local.az_count : 0
 
   vpc_id            = one(aws_vpc.main[*].id)
   cidr_block        = local.private_subnet_cidrs[count.index]
@@ -100,7 +100,7 @@ resource "aws_subnet" "private" {
 
 # Public Subnets (for NAT Gateways and load balancers)
 resource "aws_subnet" "public" {
-  count = local.destroy_enabled == false ? local.az_count : 0
+  count = local.persists_through_sleep ? local.az_count : 0
 
   vpc_id                  = one(aws_vpc.main[*].id)
   cidr_block              = local.public_subnet_cidrs[count.index]
@@ -121,7 +121,7 @@ resource "aws_subnet" "public" {
 
 # Elastic IPs for NAT Gateways
 resource "aws_eip" "nat" {
-  count = local.destroy_enabled == false && var.enable_nat_gateway ? local.az_count : 0
+  count = local.persists_through_sleep && var.enable_nat_gateway ? local.az_count : 0
 
   domain = "vpc"
 
@@ -134,7 +134,7 @@ resource "aws_eip" "nat" {
 
 # NAT Gateways (one per AZ)
 resource "aws_nat_gateway" "main" {
-  count = local.destroy_enabled == false && var.enable_nat_gateway ? local.az_count : 0
+  count = local.persists_through_sleep && var.enable_nat_gateway ? local.az_count : 0
 
   allocation_id = aws_eip.nat[count.index].id
   subnet_id     = aws_subnet.public[count.index].id
@@ -148,7 +148,7 @@ resource "aws_nat_gateway" "main" {
 
 # Route table for public subnets
 resource "aws_route_table" "public" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   vpc_id = one(aws_vpc.main[*].id)
 
@@ -164,7 +164,7 @@ resource "aws_route_table" "public" {
 
 # Route table associations for public subnets
 resource "aws_route_table_association" "public" {
-  count = local.destroy_enabled == false ? local.az_count : 0
+  count = local.persists_through_sleep ? local.az_count : 0
 
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = one(aws_route_table.public[*].id)
@@ -172,7 +172,7 @@ resource "aws_route_table_association" "public" {
 
 # Route tables for private subnets
 resource "aws_route_table" "private" {
-  count = local.destroy_enabled == false ? local.az_count : 0
+  count = local.persists_through_sleep ? local.az_count : 0
 
   vpc_id = one(aws_vpc.main[*].id)
 
@@ -188,7 +188,7 @@ resource "aws_route_table" "private" {
 
 # Route table associations for private subnets
 resource "aws_route_table_association" "private" {
-  count = local.destroy_enabled == false ? local.az_count : 0
+  count = local.persists_through_sleep ? local.az_count : 0
 
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private[count.index].id
@@ -196,7 +196,7 @@ resource "aws_route_table_association" "private" {
 
 # VPC Endpoints for cost optimization (S3, ECR)
 resource "aws_vpc_endpoint" "s3" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   vpc_id            = one(aws_vpc.main[*].id)
   service_name      = "com.amazonaws.${data.aws_region.current.id}.s3"
@@ -209,7 +209,7 @@ resource "aws_vpc_endpoint" "s3" {
 }
 
 resource "aws_vpc_endpoint" "ecr_dkr" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.ecr.dkr"
@@ -224,7 +224,7 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
 }
 
 resource "aws_vpc_endpoint" "ecr_api" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.ecr.api"
@@ -244,7 +244,7 @@ resource "aws_vpc_endpoint" "ecr_api" {
 # - Performance (lower latency, traffic stays within AWS network)
 # - Security (traffic doesn't traverse the internet)
 resource "aws_vpc_endpoint" "sts" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.sts"
@@ -260,7 +260,7 @@ resource "aws_vpc_endpoint" "sts" {
 
 # Security group for VPC endpoints
 resource "aws_security_group" "vpc_endpoint" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   name        = "${var.name_prefix}-vpc-endpoint-sg"
   description = "Security group for VPC endpoints"

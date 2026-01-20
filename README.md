@@ -4,16 +4,13 @@ Production-grade Terraform repository for deploying Red Hat OpenShift Service on
 
 ## Overview
 
-This repository provides reusable Terraform modules and example configurations for deploying ROSA HCP clusters with different network topologies and security postures. The architecture follows a **Directory-Per-Cluster** pattern with **Infrastructure/Configuration separation** to ensure state isolation and proper lifecycle management.
+This repository provides reusable Terraform modules and example configurations for deploying ROSA HCP clusters with different network topologies and security postures. The architecture follows a **Directory-Per-Cluster** pattern to ensure state isolation and proper lifecycle management.
 
 ### Repository Structure
 
-The repository is organized into two main categories:
+The repository is organized around infrastructure modules:
 
-- **Infrastructure**: Foundational AWS and ROSA resources (VPC, IAM roles, cluster)
-- **Configuration**: Cluster configuration and Day 2 operations (GitOps, identity providers, bastion)
-
-Each cluster example has separate `infrastructure/` and `configuration/` directories with independent Terraform state files. Configuration receives infrastructure outputs as input variables (via environment variables or tfvars files), making it pipeline-friendly and suitable for CI/CD.
+- **Infrastructure**: Foundational AWS and ROSA resources (VPC, IAM roles, cluster, GitOps bootstrap)
 
 
 ## Quick Start
@@ -58,18 +55,6 @@ Or using scripts directly (recommended for CI/CD):
 
 # Apply infrastructure
 ./scripts/cluster/apply-infrastructure.sh public
-
-# Generate configuration.tfvars
-./scripts/cluster/generate-config-tfvars.sh public
-
-# Initialize configuration
-./scripts/cluster/init-configuration.sh public
-
-# Plan configuration
-./scripts/cluster/plan-configuration.sh public
-
-# Apply configuration
-./scripts/cluster/apply-configuration.sh public
 ```
 
 **3. Access the cluster:**
@@ -90,38 +75,40 @@ make cluster.public.show-credentials
 ./scripts/info/show-credentials.sh public
 ```
 
-**4. Destroy the cluster:**
+**4. Bootstrap GitOps (after cluster is ready):**
+```bash
+# Bootstrap GitOps operator on the cluster
+make cluster.public.bootstrap-cluster
+```
+
+**5. Destroy the cluster:**
 ```bash
 # Destroy all resources (with confirmation)
 make cluster.public.destroy
 # or
-./scripts/cluster/destroy-configuration.sh public
 ./scripts/cluster/destroy-infrastructure.sh public
 
-# Cleanup (auto-approve, CI/CD friendly)
-make cluster.public.cleanup
+# Sleep cluster (preserves DNS, admin password, IAM, etc. for easy restart)
+make cluster.public.sleep
 # or
-AUTO_APPROVE=true ./scripts/cluster/cleanup-configuration.sh public
 AUTO_APPROVE=true ./scripts/cluster/cleanup-infrastructure.sh public
 ```
 
 ## Repository Structure
 
-The repository is organized to separate **infrastructure** (foundational AWS/ROSA resources) from **configuration** (cluster configuration, GitOps, identity providers) with independent state files:
+The repository is organized around infrastructure modules:
 
 ```
 rosa-hcp-infrastructure/
 ├── modules/                    # Reusable Terraform modules
-│   ├── infrastructure/         # Infrastructure modules
-│   │   ├── network-public/     # Public VPC with NAT Gateways
-│   │   ├── network-private/    # Private VPC (PrivateLink API)
-│   │   ├── network-egress-zero/# Egress Zero VPC (⚠️ WIP)
-│   │   ├── iam/                # IAM roles and OIDC configuration
-│   │   ├── cluster/            # ROSA HCP Cluster module
-│   │   ├── bastion/            # Bastion host for egress-zero cluster access
-│   │   └── identity-admin/     # Admin user creation (temporary bootstrap, uses OCM provider)
-│   └── configuration/          # Configuration modules
-│       └── gitops/             # OpenShift GitOps operator
+│   └── infrastructure/         # Infrastructure modules
+│       ├── network-public/     # Public VPC with NAT Gateways
+│       ├── network-private/    # Private VPC (PrivateLink API)
+│       ├── network-existing/   # Use existing VPC
+│       ├── iam/                # IAM roles and OIDC configuration
+│       ├── cluster/            # ROSA HCP Cluster module (includes GitOps bootstrap)
+│       ├── bastion/            # Bastion host for egress-zero cluster access
+│       └── identity-admin/     # Admin user creation (temporary bootstrap, uses OCM provider)
 └── clusters/                   # Cluster configurations
     ├── public/                 # Example public cluster (reference)
     │   └── terraform.tfvars   # Cluster-specific variables
@@ -129,27 +116,16 @@ rosa-hcp-infrastructure/
         └── terraform.tfvars   # Cluster-specific variables
 ```
 
-### Infrastructure vs Configuration
+### Infrastructure Modules
 
-**Infrastructure** (`infrastructure/` directory):
+**Infrastructure** (`modules/infrastructure/`):
 - Creates foundational AWS and ROSA resources
 - Network (VPC, subnets, NAT gateways, VPC endpoints)
 - IAM roles and OIDC configuration
 - ROSA HCP cluster
+- GitOps bootstrap (integrated into cluster module)
+- Storage resources (KMS keys, EFS)
 - Bastion host (optional, for access)
-
-**Configuration** (`terraform/configuration/` directory):
-- Configures cluster after it's created
-- OpenShift GitOps operator deployment
-- Identity providers (admin user, external IDP)
-- Receives infrastructure outputs as input variables (via environment variables or tfvars files)
-- Pipeline-friendly: no dependency on local state files
-
-**Benefits of Separation**:
-- **Different Lifecycles**: Infrastructure changes infrequently; configuration changes more often
-- **Reduced Blast Radius**: Configuration changes don't risk infrastructure resources
-- **Independent Updates**: Update GitOps/identity without touching infrastructure
-- **State Isolation**: Each has its own state file for better management
 
 ### Module Architecture
 
@@ -169,7 +145,7 @@ The modules are designed to be **composable** and **reusable**. You can mix and 
 Here's how the example clusters compose modules:
 
 ```hcl
-# terraform/infrastructure/10-main.tf
+# terraform/10-main.tf
 module "network" {
   source = "../../modules/infrastructure/network-public"
 
@@ -204,35 +180,7 @@ module "cluster" {
 }
 ```
 
-```hcl
-# terraform/configuration/10-main.tf
-# Configuration receives infrastructure outputs as input variables (pipeline-friendly)
-# Infrastructure outputs are passed via TF_VAR_* environment variables or configuration.tfvars
-
-module "gitops" {
-  source = "../../modules/configuration/gitops"
-
-  cluster_id   = var.cluster_id      # From infrastructure outputs
-  cluster_name = var.cluster_name    # From infrastructure outputs
-  api_url      = var.api_url         # From infrastructure outputs
-  k8s_token    = var.k8s_token      # Obtained via oc login (ephemeral)
-}
-```
-
-**Pipeline-Friendly Approach**: The configuration layer accepts infrastructure outputs as input variables rather than reading from remote state. This makes it suitable for CI/CD pipelines where infrastructure and configuration may be deployed in separate stages:
-
-```bash
-# Infrastructure stage outputs
-terraform output -json > infrastructure-outputs.json
-
-# Configuration stage receives outputs as environment variables
-export TF_VAR_cluster_id=$(jq -r '.cluster_id.value' infrastructure-outputs.json)
-export TF_VAR_api_url=$(jq -r '.api_url.value' infrastructure-outputs.json)
-# ... etc
-
-# Or generate configuration.tfvars for configuration stage
-./scripts/cluster/generate-config-tfvars.sh <cluster-name>
-```
+The cluster module includes GitOps bootstrap functionality, which automatically deploys the OpenShift GitOps operator and configures it to use your cluster-config Git repository.
 
 ### Multi-Team Scenarios
 
@@ -288,7 +236,7 @@ module "cluster" {
 
 **Note**: In a multi-team scenario, teams would coordinate via:
 - **Shared state outputs**: Network team exports outputs, platform team imports as variables
-- **CI/CD pipeline**: Infrastructure stage outputs → Configuration stage inputs
+- **CI/CD pipeline**: Infrastructure outputs → Platform team inputs
 - **Terraform workspaces**: Separate workspaces with output sharing
 
 #### Scenario 2: IAM Team Owns Roles
@@ -563,11 +511,11 @@ make tunnel-start.egress-zero
 
 ### Available Actions
 
-**Cluster Management (Infrastructure + Configuration):**
-- `init.<cluster>` - Initialize both infrastructure and configuration
-- `plan.<cluster>` - Plan both (infrastructure first, then configuration)
-- `apply.<cluster>` - Apply both (infrastructure first, then configuration)
-- `destroy.<cluster>` - Destroy both (configuration first, then infrastructure)
+**Cluster Management:**
+- `init.<cluster>` - Initialize infrastructure
+- `plan.<cluster>` - Plan infrastructure changes
+- `apply.<cluster>` - Apply infrastructure
+- `destroy.<cluster>` - Destroy infrastructure
 
 **Infrastructure Management:**
 - `init-infrastructure.<cluster>` - Initialize infrastructure only
@@ -575,11 +523,8 @@ make tunnel-start.egress-zero
 - `apply-infrastructure.<cluster>` - Apply infrastructure
 - `destroy-infrastructure.<cluster>` - Destroy infrastructure
 
-**Configuration Management:**
-- `init-configuration.<cluster>` - Initialize configuration only
-- `plan-configuration.<cluster>` - Plan configuration changes
-- `apply-configuration.<cluster>` - Apply configuration
-- `destroy-configuration.<cluster>` - Destroy configuration
+**GitOps:**
+- `bootstrap-cluster.<cluster>` - Bootstrap GitOps operator on cluster
 
 **Cluster Access:**
 - `login.<cluster>` - Login to cluster using `oc`
@@ -687,7 +632,7 @@ terraform {
 
 # Platform team receives via:
 # - Environment variables: TF_VAR_vpc_id, TF_VAR_subnet_ids, etc.
-# - Or tfvars file: configuration.tfvars
+# - Or tfvars file: terraform.tfvars
 # - Or CI/CD pipeline: infrastructure outputs → configuration inputs
 ```
 
@@ -720,79 +665,108 @@ This repository implements a **destroy protection pattern** to prevent accidenta
 
 ### How It Works
 
-By default, all resources are protected from destruction. The `enable_destroy` variable (default: `false`) controls whether resources can be destroyed. Resources are gated using the `count` meta-argument:
+By default, all resources are active and managed by Terraform. The `persists_through_sleep` variable (default: `true`) controls whether resources persist or are put to sleep. Resources are gated using the `count` meta-argument:
 
-- **When `enable_destroy = false` (default)**: `count = 1` → Resources exist and are managed by Terraform
-- **When `enable_destroy = true`**: `count = 0` → Terraform destroys the resources (calls provider delete methods)
+- **When `persists_through_sleep = true` (default)**: `count = 1` → Resources exist and are managed by Terraform
+- **When `persists_through_sleep = false`**: `count = 0` → Terraform puts resources to sleep (calls provider delete methods)
 
-When you set `enable_destroy = true` and run `terraform apply`, Terraform sees that `count` has changed from `1` to `0`, which triggers resource destruction. This prevents accidental `terraform destroy` operations by requiring an explicit variable change.
+When you set `persists_through_sleep = false` and run `terraform apply`, Terraform sees that `count` has changed from `1` to `0`, which triggers resource destruction. This prevents accidental `terraform destroy` operations by requiring an explicit variable change.
 
 ### Usage
 
 **Default Behavior (Protected):**
 ```hcl
 # In terraform.tfvars
-enable_destroy = false  # Default - resources are protected
+persists_through_sleep = true  # Default - resources are active
 ```
 
 **To Allow Destruction:**
 ```hcl
 # In terraform.tfvars
-enable_destroy = true  # Allows resource destruction
+persists_through_sleep = false  # Puts cluster to sleep (destroys resources)
 ```
 
 **Workflow for Intentional Destruction:**
 
 **Option 1: Using Makefile (Recommended)**
 ```bash
-# Destroy all resources (sets enable_destroy=true and runs terraform apply)
-make destroy.<cluster>
+# Permanently destroy all infrastructure (uses terraform destroy)
+# Prompts for confirmation, destroys everything including preserved resources
+make cluster.<cluster>.destroy
 
-# Same as destroy, but with interactive confirmation
-make cleanup.<cluster>
+# Force destroy without confirmation prompt
+make cluster.<cluster>.destroy_force
+
+# Sleep cluster (sets persists_through_sleep=false and runs terraform apply)
+# No confirmation prompt, preserves DNS, admin password, IAM, KMS, EFS, etc.
+make cluster.<cluster>.sleep
 ```
 
 **Option 2: Manual Terraform Commands**
-1. Set `enable_destroy = true` in `terraform.tfvars` (or use `TF_VAR_enable_destroy=true`)
-2. Run `terraform apply` - Terraform will destroy resources (because `count` becomes `0`)
-3. Set `enable_destroy = false` again (or remove the variable) for future protection
+1. **For sleep**: Set `persists_through_sleep = false` in `terraform.tfvars` (or use `TF_VAR_persists_through_sleep=false`) and run `terraform apply` - Terraform will sleep cluster (because `count` becomes `0`)
+2. **For destroy**: Run `terraform destroy` - This destroys everything regardless of `persists_through_sleep` settings
+3. Set `persists_through_sleep = true` again (or remove the variable) for future protection
 
 ### Per-Resource Overrides
 
-For fine-grained control, you can override the global `enable_destroy` setting for specific resource types:
+For fine-grained control, you can override the global `persists_through_sleep` setting for specific resource types:
 
 ```hcl
 # Global setting
-enable_destroy = false
+persists_through_sleep = true
 
 # Per-resource overrides
-enable_destroy_cluster = true   # Allow destroying cluster while preserving other resources
-enable_destroy_iam     = true   # Allow destroying IAM roles while preserving OIDC
-enable_destroy_network = false  # Keep network protected even if global is true
+persists_through_sleep_cluster = false  # Allow sleeping cluster while preserving other resources
+persists_through_sleep_iam     = false  # Allow sleeping IAM roles while preserving OIDC
+persists_through_sleep_network = true   # Keep network active even if global is false
 ```
 
-### Resources That Are Never Protected
+### Resources That Persist Through Sleep
 
-Some resources are **never gated** and can always be destroyed:
+Some resources are **never gated** and persist even when cluster is slept:
 - **OIDC Configuration and Provider**: Shared across clusters, preserved for reuse
 - **Subnet Tags**: Read-only tags managed by ROSA (in `network-existing` module)
 
 ### Benefits
 
-- **Safety**: Prevents accidental destroys by default
+- **Safety**: Prevents accidental sleeps by default
 - **Compliance**: Works with permission constraints and change control processes
-- **Flexibility**: Per-resource overrides for common scenarios (e.g., destroy cluster but preserve IAM/OIDC)
+- **Flexibility**: Per-resource overrides for common scenarios (e.g., sleep cluster but preserve IAM/OIDC)
 - **Bank-Ready**: Designed for enterprise environments with strict change control
 
-### Example: Destroying a Cluster While Preserving IAM
+### Example: Sleeping a Cluster While Preserving IAM
 
 ```hcl
 # terraform.tfvars
-enable_destroy = false
-enable_destroy_cluster = true  # Only cluster resources can be destroyed
+persists_through_sleep = true
+persists_through_sleep_cluster = false  # Only cluster resources can be slept
 ```
 
-This allows destroying the cluster while preserving IAM roles and OIDC configuration for reuse with other clusters.
+This allows sleeping the cluster while preserving IAM roles and OIDC configuration for reuse with other clusters.
+
+### Sleep vs Destroy
+
+**Sleep** (`make sleep.<cluster>`) is designed for temporarily shutting down a cluster while preserving resources for easy restart:
+
+- **Preserves**:
+  - DNS domain (if `enable_persistent_dns_domain=true`) - cluster will use the same domain when recreated
+  - Admin password in AWS Secrets Manager - same credentials work after restart
+  - IAM roles and OIDC configuration - reused when cluster is recreated
+  - KMS keys and EFS (if not explicitly destroyed) - storage encryption keys preserved
+  - GitOps configurations - all cluster configs and applications are managed via GitOps, so they'll be automatically redeployed when the cluster is recreated
+
+- **Destroys**:
+  - ROSA HCP cluster (compute nodes, control plane)
+  - VPC and networking resources (unless protected)
+  - Bastion host (if created)
+
+**Important Notes**:
+- **Sleep does NOT hibernate the cluster** - it destroys the cluster resources
+- The cluster must be recreated using `make apply.<cluster>` to "wake" it
+- Since GitOps manages all important configurations and applications, they will be automatically redeployed when the cluster is recreated
+- This is ideal for cost savings (turn off clusters when not in use) while maintaining the same configuration
+
+**Destroy** (`make cluster.<cluster>.destroy`) is for permanent removal and prompts for confirmation. Use `make cluster.<cluster>.destroy_force` to skip the confirmation prompt.
 
 ## Documentation
 

@@ -12,21 +12,17 @@ CLUSTER_NAME ?= $(error CLUSTER_NAME must be set)
 SCRIPT_DIR := scripts
 
 # Directories
-TERRAFORM_INFRA_DIR := terraform/infrastructure
-TERRAFORM_CONFIG_DIR := terraform/configuration
+TERRAFORM_DIR := terraform
 CLUSTER_DIR := clusters/$(CLUSTER_NAME)
 
 # Check cluster exists
 check-cluster:
 	@$(SCRIPT_DIR)/utils/check-cluster.sh $(CLUSTER_NAME)
 
-.PHONY: help init plan apply destroy cleanup fmt validate clean
-.PHONY: init-infrastructure init-configuration plan-infrastructure plan-configuration
-.PHONY: apply-infrastructure apply-configuration destroy-infrastructure destroy-configuration
-.PHONY: cleanup-infrastructure cleanup-configuration
+.PHONY: help init plan apply destroy destroy_force sleep fmt validate clean
 .PHONY: show-endpoints show-credentials login
 .PHONY: tunnel-start tunnel-stop tunnel-status bastion-connect
-.PHONY: generate-config-tfvars
+.PHONY: bootstrap-cluster
 
 help: ## Show this help message
 	@$(SCRIPT_DIR)/utils/get-network-config.sh $(CLUSTER_DIR) >/dev/null 2>&1 || true; \
@@ -41,26 +37,16 @@ help: ## Show this help message
 	echo ""; \
 	echo "$(BLUE)Usage:$(NC) make cluster.$(CLUSTER_NAME).<operation>"; \
 	echo ""; \
-	echo "$(GREEN)Cluster Management (Infrastructure + Configuration):$(NC)"; \
-	echo "  make cluster.$(CLUSTER_NAME).init              Initialize both infrastructure and configuration"; \
-	echo "  make cluster.$(CLUSTER_NAME).plan              Plan both infrastructure and configuration"; \
-	echo "  make cluster.$(CLUSTER_NAME).apply             Apply both (infrastructure first, then configuration)"; \
-	echo "  make cluster.$(CLUSTER_NAME).destroy           Destroy all resources (sets enable_destroy=true)"; \
-	echo "  make cluster.$(CLUSTER_NAME).cleanup           Same as destroy (no confirmation)"; \
+	echo "$(GREEN)Cluster Management:$(NC)"; \
+	echo "  make cluster.$(CLUSTER_NAME).init              Initialize infrastructure"; \
+	echo "  make cluster.$(CLUSTER_NAME).plan              Plan infrastructure changes"; \
+	echo "  make cluster.$(CLUSTER_NAME).apply             Apply infrastructure"; \
+	echo "  make cluster.$(CLUSTER_NAME).destroy           Destroy all resources (sets persists_through_sleep=false)"; \
+	echo "  make cluster.$(CLUSTER_NAME).destroy_force     Destroy all resources without confirmation prompt"; \
+	echo "  make cluster.$(CLUSTER_NAME).sleep             Sleep cluster (destroy with preserved resources)"; \
 	echo ""; \
-	echo "$(GREEN)Infrastructure Management:$(NC)"; \
-	echo "  make cluster.$(CLUSTER_NAME).init-infrastructure       Initialize infrastructure only"; \
-	echo "  make cluster.$(CLUSTER_NAME).plan-infrastructure       Plan infrastructure changes"; \
-	echo "  make cluster.$(CLUSTER_NAME).apply-infrastructure      Apply infrastructure"; \
-	echo "  make cluster.$(CLUSTER_NAME).destroy-infrastructure    Destroy infrastructure resources"; \
-	echo "  make cluster.$(CLUSTER_NAME).cleanup-infrastructure    Same as destroy (no confirmation)"; \
-	echo ""; \
-	echo "$(GREEN)Configuration Management:$(NC)"; \
-	echo "  make cluster.$(CLUSTER_NAME).init-configuration         Initialize configuration only"; \
-	echo "  make cluster.$(CLUSTER_NAME).plan-configuration         Plan configuration changes"; \
-	echo "  make cluster.$(CLUSTER_NAME).apply-configuration        Apply configuration"; \
-	echo "  make cluster.$(CLUSTER_NAME).destroy-configuration      Destroy configuration resources"; \
-	echo "  make cluster.$(CLUSTER_NAME).cleanup-configuration      Same as destroy (no confirmation)"; \
+	echo "$(GREEN)GitOps:$(NC)"; \
+	echo "  make cluster.$(CLUSTER_NAME).bootstrap-cluster Bootstrap GitOps operator on cluster"; \
 	echo ""; \
 	echo "$(GREEN)Cluster Access:$(NC)"; \
 	echo "  make cluster.$(CLUSTER_NAME).show-endpoints    Show API and console URLs"; \
@@ -77,59 +63,60 @@ help: ## Show this help message
 	echo "$(BLUE)Available clusters:$(NC)"; \
 	ls -1 clusters/ 2>/dev/null | sed 's/^/  - /' || echo "  (none)"
 
-# Infrastructure operations
-init-infrastructure: check-cluster
+# Cluster operations
+init: check-cluster
 	@$(SCRIPT_DIR)/cluster/init-infrastructure.sh $(CLUSTER_NAME)
+	@echo "$(GREEN)Initialized $(CLUSTER_NAME)$(NC)"
 
-plan-infrastructure: init-infrastructure
+plan: init
 	@$(SCRIPT_DIR)/cluster/plan-infrastructure.sh $(CLUSTER_NAME)
+	@echo "$(GREEN)Planned $(CLUSTER_NAME)$(NC)"
 
-apply-infrastructure: plan-infrastructure
+apply: plan
 	@$(SCRIPT_DIR)/cluster/apply-infrastructure.sh $(CLUSTER_NAME)
+	@echo "$(GREEN)Applied $(CLUSTER_NAME)$(NC)"
 
-destroy-infrastructure:
+destroy: check-cluster
 	@$(SCRIPT_DIR)/cluster/destroy-infrastructure.sh $(CLUSTER_NAME)
+	@echo "$(GREEN)Destroyed $(CLUSTER_NAME)$(NC)"
+	@echo "$(GREEN)All resources have been deleted from AWS.$(NC)"
 
-cleanup-infrastructure:
+destroy_force: check-cluster
+	@AUTO_APPROVE=true $(SCRIPT_DIR)/cluster/destroy-infrastructure.sh $(CLUSTER_NAME)
+	@echo "$(GREEN)Destroyed $(CLUSTER_NAME)$(NC)"
+	@echo "$(GREEN)All resources have been deleted from AWS.$(NC)"
+
+sleep: check-cluster
 	@AUTO_APPROVE=true $(SCRIPT_DIR)/cluster/cleanup-infrastructure.sh $(CLUSTER_NAME)
+	@echo "$(GREEN)Cluster put to sleep for $(CLUSTER_NAME)$(NC)"
+	@echo "$(GREEN)Cluster resources have been destroyed, but preserved resources remain:$(NC)"
+	@echo "$(GREEN)  - DNS domain (if enable_persistent_dns_domain=true)$(NC)"
+	@echo "$(GREEN)  - Admin password in AWS Secrets Manager$(NC)"
+	@echo "$(GREEN)  - IAM roles and OIDC configuration$(NC)"
+	@echo "$(GREEN)  - KMS keys and EFS (if not explicitly destroyed)$(NC)"
+	@echo "$(GREEN)$(NC)"
+	@echo "$(GREEN)To wake the cluster, run: make cluster.$(CLUSTER_NAME).apply$(NC)"
 
-# Configuration operations
-init-configuration: check-cluster
-	@$(SCRIPT_DIR)/cluster/init-configuration.sh $(CLUSTER_NAME)
-
-plan-configuration: init-configuration
-	@$(SCRIPT_DIR)/cluster/plan-configuration.sh $(CLUSTER_NAME)
-
-apply-configuration: plan-configuration
-	@$(SCRIPT_DIR)/cluster/apply-configuration.sh $(CLUSTER_NAME)
-
-destroy-configuration:
-	@$(SCRIPT_DIR)/cluster/destroy-configuration.sh $(CLUSTER_NAME)
-
-cleanup-configuration:
-	@AUTO_APPROVE=true $(SCRIPT_DIR)/cluster/cleanup-configuration.sh $(CLUSTER_NAME)
-
-# Combined operations
-init: init-infrastructure init-configuration
-	@echo "$(GREEN)Initialized $(CLUSTER_NAME) (infrastructure + configuration)$(NC)"
-
-plan: plan-infrastructure plan-configuration
-	@echo "$(GREEN)Planned $(CLUSTER_NAME) (infrastructure + configuration)$(NC)"
-
-apply: apply-infrastructure apply-configuration
-	@echo "$(GREEN)Applied $(CLUSTER_NAME) (infrastructure + configuration)$(NC)"
-
-destroy: destroy-configuration destroy-infrastructure
-	@echo "$(GREEN)Destroyed $(CLUSTER_NAME) (configuration + infrastructure)$(NC)"
-	@echo "$(GREEN)All resources have been deleted from Kubernetes and AWS.$(NC)"
-
-cleanup: cleanup-configuration cleanup-infrastructure
-	@echo "$(GREEN)Cleanup completed for $(CLUSTER_NAME)$(NC)"
-	@echo "$(GREEN)All resources have been deleted from Kubernetes and AWS.$(NC)"
-
-# Generate configuration.tfvars
-generate-config-tfvars: check-cluster
-	@$(SCRIPT_DIR)/cluster/generate-config-tfvars.sh $(CLUSTER_NAME)
+# GitOps operations
+bootstrap-cluster: check-cluster
+	@echo "$(BLUE)Bootstrapping GitOps operator for $(CLUSTER_NAME)...$(NC)"
+	@cd $(TERRAFORM_DIR) && \
+		if ! terraform output -no-color gitops_bootstrap_enabled 2>/dev/null | grep -q "true"; then \
+			echo "$(YELLOW)Warning: GitOps bootstrap is not enabled for this cluster.$(NC)"; \
+			echo "$(YELLOW)Set enable_gitops_bootstrap=true in terraform.tfvars and run terraform apply.$(NC)"; \
+			exit 1; \
+		fi && \
+		SCRIPT_PATH=$$(terraform output -no-color -raw gitops_bootstrap_script_path 2>/dev/null | tr -d '\n\r' | sed 's/[[:space:]]*$$//') && \
+		if [ -z "$$SCRIPT_PATH" ] || [ "$$SCRIPT_PATH" = "null" ]; then \
+			echo "$(YELLOW)Error: GitOps bootstrap script path not found. Run terraform apply first.$(NC)"; \
+			exit 1; \
+		fi && \
+		echo "$(BLUE)Exporting environment variables from Terraform outputs...$(NC)" && \
+		eval $$(terraform output -no-color -raw gitops_bootstrap_command 2>/dev/null) && \
+		echo "$(BLUE)Running GitOps bootstrap script: $$SCRIPT_PATH$(NC)" && \
+		bash "$$SCRIPT_PATH" || \
+		(echo "$(YELLOW)GitOps bootstrap failed. Check the output above for details.$(NC)" && exit 1)
+	@echo "$(GREEN)GitOps bootstrap completed for $(CLUSTER_NAME)$(NC)"
 
 # Info operations
 show-endpoints: check-cluster
@@ -158,7 +145,7 @@ bastion-connect: check-cluster
 		echo "$(YELLOW)Error: aws CLI not found. Please install AWS CLI.$(NC)"; \
 		exit 1; \
 	fi
-	@cd $(TERRAFORM_INFRA_DIR) && \
+	@cd $(TERRAFORM_DIR) && \
 		BASTION_ID=$$(terraform output -no-color -raw bastion_instance_id 2>/dev/null | tr -d '\n\r' | sed 's/[[:space:]]*$$//') && \
 		if [ -z "$$BASTION_ID" ] || [ "$$BASTION_ID" = "null" ]; then \
 			echo "$(YELLOW)Error: Bastion not deployed. Enable bastion with enable_bastion=true$(NC)"; \
@@ -174,8 +161,7 @@ bastion-connect: check-cluster
 
 # Validate
 validate:
-	@cd $(TERRAFORM_INFRA_DIR) && terraform init -backend=false && terraform validate
-	@cd $(TERRAFORM_CONFIG_DIR) && terraform init -backend=false && terraform validate
+	@cd $(TERRAFORM_DIR) && terraform init -backend=false && terraform validate
 
 # Format
 fmt:

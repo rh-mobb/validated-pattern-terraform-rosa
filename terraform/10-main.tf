@@ -8,21 +8,21 @@ locals {
 # Note: Terraform requires the source to be a literal string, so we use separate module blocks with count
 module "network_public" {
   count  = var.network_type == "public" ? 1 : 0
-  source = "../../modules/infrastructure/network-public"
+  source = "../modules/infrastructure/network-public"
 
   name_prefix = var.cluster_name
   vpc_cidr    = var.vpc_cidr
   multi_az    = var.multi_az
   # subnet_cidr_size is automatically calculated based on VPC CIDR and number of subnets
 
-  tags                 = local.tags
-  enable_destroy       = var.enable_destroy
-  enable_destroy_network = var.enable_destroy_network
+  tags                      = local.tags
+  persists_through_sleep     = var.persists_through_sleep
+  persists_through_sleep_network = var.persists_through_sleep_network
 }
 
 module "network_private" {
   count  = var.network_type == "private" ? 1 : 0
-  source = "../../modules/infrastructure/network-private"
+  source = "../modules/infrastructure/network-private"
 
   name_prefix = var.cluster_name
   vpc_cidr    = var.vpc_cidr
@@ -36,9 +36,9 @@ module "network_private" {
   flow_log_s3_bucket = var.flow_log_s3_bucket
   cluster_id = null  # Can be set after cluster creation
 
-  tags                 = local.tags
-  enable_destroy       = var.enable_destroy
-  enable_destroy_network = var.enable_destroy_network
+  tags                      = local.tags
+  persists_through_sleep     = var.persists_through_sleep
+  persists_through_sleep_network = var.persists_through_sleep_network
 }
 
 # Create a local to reference the active network module
@@ -51,7 +51,7 @@ locals {
   # Resolve subnet_index to actual subnet IDs from network module
   # Only resolve when destroy is disabled (resources will be created)
   # Remove subnet_index and add subnet_id for the cluster module
-  additional_machine_pools_resolved = var.enable_destroy == false && length(local.network.private_subnet_ids) > 0 ? {
+  additional_machine_pools_resolved = var.persists_through_sleep && length(local.network.private_subnet_ids) > 0 ? {
     for pool_name, pool_config in var.additional_machine_pools : pool_name => merge(
       {
         for k, v in pool_config : k => v if k != "subnet_index"
@@ -64,29 +64,30 @@ locals {
 }
 
 module "iam" {
-  source = "../../modules/infrastructure/iam"
+  source = "../modules/infrastructure/iam"
 
   cluster_name         = var.cluster_name
   account_role_prefix  = var.cluster_name # No trailing dash - account-iam-resources module adds it
   operator_role_prefix = var.cluster_name # No trailing dash - operator-roles module adds it
   zero_egress          = local.is_egress_zero  # Enable zero egress mode for egress-zero clusters
-  tags                 = local.tags
-  enable_destroy       = var.enable_destroy
-  enable_destroy_iam   = var.enable_destroy_iam
+  tags                      = local.tags
+  persists_through_sleep     = var.persists_through_sleep
+  persists_through_sleep_iam = var.persists_through_sleep_iam
 }
 
 module "cluster" {
-  source = "../../modules/infrastructure/cluster"
+  source = "../modules/infrastructure/cluster"
 
   cluster_name       = var.cluster_name
   region             = var.region
   vpc_id             = local.network.vpc_id
   vpc_cidr           = var.vpc_cidr
 
-  # Subnet selection based on network type
+  # Subnet selection - pass private and public separately, cluster module will concatenate
   # Public clusters use both private and public subnets
   # Private and egress-zero clusters use only private subnets
-  subnet_ids = var.network_type == "public" ? concat(local.network.private_subnet_ids, local.network.public_subnet_ids) : local.network.private_subnet_ids
+  private_subnet_ids = local.network.private_subnet_ids
+  public_subnet_ids  = var.network_type == "public" ? local.network.public_subnet_ids : []
 
   installer_role_arn = module.iam.installer_role_arn
   support_role_arn   = module.iam.support_role_arn
@@ -94,8 +95,8 @@ module "cluster" {
   oidc_config_id     = module.iam.oidc_config_id # OIDC is never gated
   oidc_endpoint_url  = module.iam.oidc_endpoint_url # OIDC is never gated
   enable_persistent_dns_domain = var.enable_persistent_dns_domain
-  enable_destroy     = var.enable_destroy
-  enable_destroy_cluster = var.enable_destroy_cluster
+  persists_through_sleep        = var.persists_through_sleep
+  persists_through_sleep_cluster = var.persists_through_sleep_cluster
 
   # Cluster configuration based on network type
   private            = var.network_type != "public"
@@ -103,8 +104,29 @@ module "cluster" {
   multi_az           = var.multi_az
   availability_zones = local.network.private_subnet_azs
 
+  # Identity provider configuration
+  enable_identity_provider = var.persists_through_sleep
+  admin_username           = var.admin_username
+  admin_password_for_bootstrap = var.admin_password_override != null ? var.admin_password_override : random_password.admin_password[0].result
+
   # Production features (for egress-zero and optionally private)
+  # Cluster module will create its own KMS key if enable_storage is true
   kms_key_arn        = var.kms_key_arn
+
+  # Storage configuration - cluster module creates KMS keys and EFS
+  enable_storage       = true
+  enable_efs           = var.enable_efs != null ? var.enable_efs : true
+  private_subnet_cidrs = local.network.private_subnet_cidrs
+
+  # GitOps bootstrap configuration
+  enable_gitops_bootstrap     = var.enable_gitops_bootstrap != null ? var.enable_gitops_bootstrap : false
+  # admin_password_for_bootstrap is set above in identity provider configuration
+  # Storage resources are automatically available from cluster module outputs
+  ebs_kms_key_arn             = null  # Will use cluster module's created KMS key
+  efs_file_system_id          = null  # Will use cluster module's created EFS
+  # GitOps repository configuration
+  git_path                    = var.gitops_git_path
+  gitops_git_repo_url         = var.gitops_git_repo_url
   openshift_version  = var.openshift_version
   service_cidr       = var.service_cidr
   pod_cidr           = var.pod_cidr
@@ -189,6 +211,7 @@ resource "random_password" "admin_password" {
   upper   = true
   lower   = true
   numeric = true
+  override_special = "@#&*-_"
 
   # Ensure password meets ROSA requirements:
   # - 14+ characters (we use 20)
@@ -200,13 +223,16 @@ resource "random_password" "admin_password" {
 # Stores either the override password or the generated random password
 #
 # Admin Password Secret (stored in AWS Secrets Manager)
+# This secret persists through sleep operations to preserve credentials for cluster restart.
 # Recovery window is set to 0 to disable the 7-30 day recovery period.
-# This allows immediate deletion and recreation of secrets with the same name.
+# This allows immediate deletion and recreation of secrets with the same name if needed.
 resource "aws_secretsmanager_secret" "admin_password" {
-  count = var.enable_destroy == false ? 1 : 0
+  # Always create secret (persists through sleep for easy cluster restart)
+  # Secret persists even when persists_through_sleep=false (sleep operation)
+  count = 1
 
   name        = "rosa-hcp-${var.cluster_name}-admin-password"
-  description = "Admin password for ROSA HCP cluster ${var.cluster_name}"
+  description = "Admin password for ROSA HCP cluster ${var.cluster_name} (persists through sleep)"
 
   # Set recovery window to 0 to disable the recovery period (default is 30 days)
   # This allows immediate deletion and recreation of secrets with the same name
@@ -217,46 +243,38 @@ resource "aws_secretsmanager_secret" "admin_password" {
     Cluster     = var.cluster_name
     ManagedBy   = "Terraform"
     Purpose     = "ClusterAdminPassword"
+    persists_through_sleep = "true"
   })
 }
 
 # Store the password in the secret
+# Only create/update secret version when cluster exists (not during sleep)
 resource "aws_secretsmanager_secret_version" "admin_password" {
-  count = var.enable_destroy == false ? 1 : 0
+  count = var.persists_through_sleep ? 1 : 0
 
   secret_id = aws_secretsmanager_secret.admin_password[0].id
   secret_string = var.admin_password_override != null ? var.admin_password_override : random_password.admin_password[0].result
+
+  # Allow secret to be updated manually if password changes
+  lifecycle {
+    ignore_changes = [
+      secret_string
+    ]
+  }
 }
 
-# Admin User (optional, for initial cluster access)
-# This must be created in infrastructure as it's needed for configuration operations
-# This can be removed once an external identity provider is configured
-# Only create if enable_destroy is false (resources should be created)
-module "identity_admin" {
-  count  = var.enable_destroy == false ? 1 : 0
-  source = "../../modules/infrastructure/identity-admin"
-
-  cluster_id     = module.cluster.cluster_id
-  # Use override if provided, otherwise use the random password result
-  admin_password = var.admin_password_override != null ? var.admin_password_override : random_password.admin_password[0].result
-  enable_destroy = var.enable_destroy
-
-  depends_on = [
-    module.cluster,
-    random_password.admin_password,
-    aws_secretsmanager_secret_version.admin_password
-  ]
-}
+# Identity provider is now created in the cluster module
+# See modules/infrastructure/cluster/30-identity-provider.tf
 
 # Bastion Host (optional, for development/demo use only)
 # WARNING: This bastion is provided for development and demonstration purposes only.
 # For production deployments, use AWS Transit Gateway, Direct Connect, or VPN connections.
 # NOTE: For egress-zero clusters, bastion_public_ip should always be false
 # The bastion module creates SSM VPC endpoints required for Session Manager access
-# Only create bastion when enable_destroy is false and network resources exist (prevents errors during cleanup)
+# Only create bastion when persists_through_sleep is true and network resources exist (prevents errors during sleep)
 module "bastion" {
-  count  = var.enable_bastion && var.enable_destroy == false && length(local.network.private_subnet_ids) > 0 ? 1 : 0
-  source = "../../modules/infrastructure/bastion"
+  count  = var.enable_bastion && var.persists_through_sleep && length(local.network.private_subnet_ids) > 0 ? 1 : 0
+  source = "../modules/infrastructure/bastion"
 
   name_prefix            = var.cluster_name
   vpc_id                 = local.network.vpc_id
@@ -266,7 +284,7 @@ module "bastion" {
   vpc_cidr               = var.vpc_cidr
   bastion_public_ip      = var.bastion_public_ip # Should be false for egress-zero
   bastion_public_ssh_key = var.bastion_public_ssh_key
-  enable_destroy         = var.enable_destroy
+  persists_through_sleep  = var.persists_through_sleep
 
   tags = var.tags
 

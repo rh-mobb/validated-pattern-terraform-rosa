@@ -321,11 +321,11 @@ This step creates **three example clusters** demonstrating different network top
 
 ### 5.1 Example 1: Public Cluster (Development)
 
-**Path**: `clusters/public/` (uses unified `terraform/infrastructure/` and `terraform/configuration/`)
+**Path**: `clusters/public/` (uses `terraform/`)
 
 **Purpose**: Development/Testing cluster with internet access via NAT Gateway
 
-**Infrastructure Configuration** (`terraform/infrastructure/10-main.tf`):
+**Infrastructure Configuration** (`terraform/10-main.tf`):
 
 The infrastructure layer uses a unified configuration that conditionally selects the network module based on `network_type`:
 
@@ -397,7 +397,7 @@ module "cluster" {
 }
 ```
 
-**Infrastructure State Management** (`terraform/infrastructure/00-providers.tf`):
+**Infrastructure State Management** (`terraform/00-providers.tf`):
 
 ```hcl
 terraform {
@@ -411,7 +411,7 @@ terraform {
 }
 ```
 
-**Configuration State Management** (`terraform/configuration/00-providers.tf`):
+**Note**: Configuration is now integrated into the infrastructure layer. GitOps bootstrap is handled by the cluster module.
 
 ```hcl
 terraform {
@@ -425,7 +425,7 @@ terraform {
 }
 
 # Configuration receives infrastructure outputs as input variables (not terraform_remote_state)
-# See terraform/configuration/01-variables.tf for all input variables
+# See terraform/01-variables.tf for all input variables
 ```
 
 **Infrastructure Variables** (`clusters/public/terraform.tfvars`):
@@ -532,11 +532,11 @@ instance_type     = "m5.large"
 
 ### 5.3 Example 3: Egress-Zero Cluster (Production-Ready)
 
-**Path**: `clusters/egress-zero/` (uses unified `terraform/infrastructure/` and `terraform/configuration/`)
+**Path**: `clusters/egress-zero/` (uses `terraform/`)
 
 **Purpose**: Production-ready cluster with maximum security hardening and zero internet egress
 
-**Main Configuration** (`terraform/infrastructure/10-main.tf`):
+**Main Configuration** (`terraform/10-main.tf`):
 
 The infrastructure layer uses a unified configuration. For egress-zero clusters, set `network_type = "private"` and `enable_strict_egress = true`:
 

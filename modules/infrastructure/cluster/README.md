@@ -53,7 +53,7 @@ module "cluster" {
   ]
 
   # Optional: DNS domain registration
-  # When enabled, creates rhcs_dns_domain resource that persists between cluster creations (not gated by enable_destroy)
+  # When enabled, creates rhcs_dns_domain resource that persists between cluster creations (not gated by persists_through_sleep)
   # When disabled, ROSA uses default DNS domain
   enable_persistent_dns_domain = false  # Default: false
 
@@ -113,7 +113,7 @@ module "identity_admin" {
 | wait_for_std_compute_nodes_complete | Wait for standard compute nodes to complete before considering cluster creation successful. Set to false if nodes may take longer (e.g., egress-zero clusters) | `bool` | `true` |
 | enable_audit_logging | Enable CloudWatch audit log forwarding. When enabled, creates IAM role and policy for CloudWatch logging | `bool` | `true` |
 | api_endpoint_allowed_cidrs | Optional list of IPv4 CIDR blocks allowed to access the ROSA HCP API endpoint. By default, the VPC endpoint security group only allows access from within the VPC. Useful for VPN ranges, bastion hosts, or other VPCs | `list(string)` | `[]` |
-| enable_persistent_dns_domain | Enable persistent DNS domain registration. When true, creates rhcs_dns_domain resource that persists between cluster creations (not gated by enable_destroy). When false, ROSA uses default DNS domain | `bool` | `false` |
+| enable_persistent_dns_domain | Enable persistent DNS domain registration. When true, creates rhcs_dns_domain resource that persists between cluster creations (not gated by persists_through_sleep). When false, ROSA uses default DNS domain | `bool` | `false` |
 | tags | Tags to apply to the cluster | `map(string)` | `{}` |
 | machine_pools | List of machine pool configurations for default pools | `list(object)` | `[]` |
 | additional_machine_pools | Map of additional custom machine pools beyond default pools. Supports advanced features: taints, labels, kubelet configs, tuning configs, version pinning, capacity reservations | `map(object)` | `{}` |
@@ -142,7 +142,7 @@ module "identity_admin" {
 | kubeconfig | Kubernetes configuration file (sensitive) |
 | cluster_admin_password | Cluster admin password (sensitive) |
 | state | State of the cluster |
-| cloudwatch_audit_logging_role_arn | ARN of the IAM role for CloudWatch audit log forwarding (null if disabled or enable_destroy is true) |
+| cloudwatch_audit_logging_role_arn | ARN of the IAM role for CloudWatch audit log forwarding (null if disabled or persists_through_sleep is false) |
 | default_machine_pools | Map of default machine pool IDs keyed by pool name |
 | additional_machine_pools | Map of additional machine pool IDs keyed by pool name |
 | all_machine_pools | Map of all machine pool IDs (default + additional) keyed by pool name |

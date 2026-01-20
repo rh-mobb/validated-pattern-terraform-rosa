@@ -31,9 +31,3 @@ cd "$TERRAFORM_INFRA_DIR"
 terraform apply terraform.tfplan
 
 success "Infrastructure applied successfully"
-
-# Optionally generate configuration.tfvars
-if [ -f "$SCRIPT_DIR/generate-config-tfvars.sh" ]; then
-    info "Generating configuration.tfvars..."
-    "$SCRIPT_DIR/generate-config-tfvars.sh" "$CLUSTER_NAME" || warn "Failed to generate configuration.tfvars (non-fatal)"
-fi

@@ -77,15 +77,15 @@ variable "tags" {
 }
 
 # Destroy Protection Variables
-variable "enable_destroy" {
-  description = "Set to true to allow resource destruction. Default false prevents accidental destroys. To destroy resources, set this to true and run terraform apply, then terraform destroy."
+variable "persists_through_sleep" {
+  description = "Set to false to put cluster in sleep mode (destroys resources). Default true keeps cluster active. To sleep cluster, set this to false and run terraform apply."
   type        = bool
-  default     = false
+  default     = true
   nullable    = false
 }
 
-variable "enable_destroy_network" {
-  description = "Override enable_destroy for network resources. If null, uses enable_destroy value. Allows destroying network resources while preserving other resources."
+variable "persists_through_sleep_network" {
+  description = "Override persists_through_sleep for network resources. If null, uses persists_through_sleep value. Allows sleeping network resources while preserving other resources."
   type        = bool
   default     = null
   nullable    = true

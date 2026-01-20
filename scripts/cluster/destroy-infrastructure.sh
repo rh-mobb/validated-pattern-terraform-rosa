@@ -17,24 +17,6 @@ fi
 
 CLUSTER_DIR=$(get_cluster_dir "$CLUSTER_NAME")
 TERRAFORM_INFRA_DIR=$(get_terraform_dir infrastructure)
-TERRAFORM_CONFIG_DIR=$(get_terraform_dir configuration)
-
-# Check if configuration state has resources
-info "Checking configuration state..."
-if ! check_configuration_state_empty "$CLUSTER_NAME" "$TERRAFORM_CONFIG_DIR" "$CLUSTER_DIR"; then
-    error "Configuration state still contains resources!"
-    error "Configuration must be destroyed before infrastructure can be destroyed."
-    error ""
-    error "This is a safety check because configuration may create resources"
-    error "external to the cluster (e.g., GitOps operators, external services)."
-    error ""
-    error "To proceed:"
-    error "  1. Destroy configuration first: $SCRIPT_DIR/destroy-configuration.sh $CLUSTER_NAME"
-    error "  2. Or use: make cluster.$CLUSTER_NAME.destroy (destroys both in correct order)"
-    exit 1
-fi
-
-info "Configuration state is empty or doesn't exist - safe to destroy infrastructure"
 
 warn "WARNING: This will destroy the infrastructure!"
 warn "AWS resources (cluster, VPC, IAM roles, etc.) will be deleted."
@@ -49,16 +31,15 @@ if [ "${AUTO_APPROVE:-}" != "true" ]; then
     fi
 fi
 
-info "Setting enable_destroy=true and applying to destroy resources..."
+info "Destroying infrastructure..."
 
 cd "$TERRAFORM_INFRA_DIR"
 
-# Calculate relative path from terraform/infrastructure to cluster directory
+# Calculate relative path from terraform to cluster directory
 CLUSTER_TFVARS="$CLUSTER_DIR/terraform.tfvars"
 
-terraform apply \
+terraform destroy \
     -var-file="$CLUSTER_TFVARS" \
-    -var="enable_destroy=true" \
     -auto-approve
 
 success "Infrastructure destroyed successfully"

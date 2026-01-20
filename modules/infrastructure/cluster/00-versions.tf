@@ -15,5 +15,9 @@ terraform {
       source  = "hashicorp/null"
       version = ">= 3.0"
     }
+    shell = {
+      source  = "scottwinkler/shell"
+      version = ">= 1.7.10"
+    }
   }
 }

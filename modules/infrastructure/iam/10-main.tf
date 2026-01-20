@@ -4,8 +4,8 @@ data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 
 locals {
-  # Determine if destroy is enabled (use override if provided, else global)
-  destroy_enabled = var.enable_destroy_iam != null ? var.enable_destroy_iam : var.enable_destroy
+  # Determine if cluster persists/is active (use override if provided, else global)
+  persists_through_sleep = var.persists_through_sleep_iam != null ? var.persists_through_sleep_iam : var.persists_through_sleep
 
   # Use cluster_name as prefix if not provided
   account_role_prefix_final  = var.account_role_prefix != null ? var.account_role_prefix : var.cluster_name
@@ -43,9 +43,9 @@ locals {
 # CRITICAL: Destroy order must be enforced via depends_on in the calling configuration
 # The calling configuration should create a null_resource that depends on the cluster
 # and then make this module depend on that null_resource to ensure cluster is destroyed first
-# Gate with destroy_enabled flag - allows preserving IAM roles for reuse across clusters
+  # Gate with persists_through_sleep flag - allows preserving IAM roles for reuse across clusters
 module "account_roles" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   source  = "terraform-redhat/rosa-hcp/rhcs//modules/account-iam-resources"
   version = "~> 1.7"
@@ -68,9 +68,9 @@ module "oidc_config_and_provider" {
 # Operator Roles using terraform-redhat/rosa-hcp/rhcs module
 # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/03-roles.tf
 # CRITICAL: Destroy order is handled by Terraform's implicit dependency graph
-# Gate with destroy_enabled flag - allows preserving IAM roles for reuse across clusters
+# Gate with persists_through_sleep flag - allows preserving IAM roles for reuse across clusters
 module "operator_roles" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   source  = "terraform-redhat/rosa-hcp/rhcs//modules/operator-roles"
   version = "~> 1.7"
@@ -83,9 +83,9 @@ module "operator_roles" {
 # Additional policy for worker role when zero_egress is enabled
 # Reference: ECR read-only access is required for egress-zero clusters to pull container images via VPC endpoints
 # The worker role name follows the pattern: {account_role_prefix}-HCP-ROSA-Worker-Role
-# Gate with destroy_enabled flag and zero_egress flag
+# Gate with persists_through_sleep flag and zero_egress flag
 resource "aws_iam_role_policy_attachment" "worker_ecr_readonly" {
-  count = var.zero_egress && local.destroy_enabled == false ? 1 : 0
+  count = var.zero_egress && local.persists_through_sleep ? 1 : 0
 
   role       = "${local.account_role_prefix_final}-HCP-ROSA-Worker-Role"
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"

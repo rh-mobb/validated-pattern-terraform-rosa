@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **DNS Domain Registration**: Added DNS domain registration using `rhcs_dns_domain` resource with feature toggle:
   - New `enable_persistent_dns_domain` variable in cluster module (default: `false`) controls DNS domain registration
-  - When enabled, creates `rhcs_dns_domain` resource in cluster module that persists between cluster creations (not gated by `enable_destroy`)
+  - When enabled, creates `rhcs_dns_domain` resource in cluster module that persists between cluster creations (not gated by `persists_through_sleep`)
   - DNS domain resource is created and managed within the cluster module for better encapsulation
   - When disabled, ROSA uses default DNS domain
   - Infrastructure files pass the toggle to the cluster module
@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Useful for allowing access from VPN ranges, bastion hosts, or other VPCs
   - Automatically finds the ROSA-managed VPC endpoint security group by tag name
   - Creates ingress rules for each specified CIDR block (port 443/TCP)
-  - Only creates resources when CIDRs are provided and `enable_destroy` is false
+  - Only creates resources when CIDRs are provided and `persists_through_sleep` is true
   - Reference implementation: `reference/rosa-hcp-dedicated-vpc/terraform/2.expose-api.tf`
 - **Machine Pool Management**: Added support for additional custom machine pools beyond default pools:
   - New `additional_machine_pools` variable in cluster module for creating custom pools
@@ -66,18 +66,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Security improvement**: Password no longer stored in Terraform state or outputs
 
 ### Added
-- **Destroy Protection Pattern**: Implemented `enable_destroy` pattern to prevent accidental resource destruction:
-  - Global `enable_destroy` variable (default: `false`) controls all resources by default
-  - Per-resource override variables: `enable_destroy_cluster`, `enable_destroy_iam`, `enable_destroy_network`
-  - When `enable_destroy = false`, resources are removed from Terraform state but not destroyed in AWS
-  - To destroy resources: Set `enable_destroy = true`, run `terraform apply`, then `terraform destroy`
+- **Sleep Protection Pattern**: Implemented `persists_through_sleep` pattern to prevent accidental resource destruction:
+  - Global `persists_through_sleep` variable (default: `true`) controls all resources by default
+  - Per-resource override variables: `persists_through_sleep_cluster`, `persists_through_sleep_iam`, `persists_through_sleep_network`
+  - When `persists_through_sleep = true`, resources are active and managed by Terraform
+  - To sleep cluster: Set `persists_through_sleep = false`, run `terraform apply` (resources are destroyed but essential metadata preserved)
   - OIDC configuration and provider are never gated (preserved for reuse across clusters)
   - Subnet tags in `network-existing` module are never gated (read-only, managed by ROSA)
   - All modules updated: cluster, IAM, network (public/private/egress-zero), bastion
-  - All example clusters updated with `enable_destroy = false` by default
-  - Module outputs updated to handle conditional resources (return null when gated)
+  - All example clusters updated with `persists_through_sleep = true` by default
+  - Module outputs updated to handle conditional resources (return null when slept)
   - Example cluster module calls updated to use `try()` for conditional dependencies
   - Comprehensive documentation added to README.md with usage examples and workflow
+  - Resources tagged with `persists_through_sleep = "true"` tag to indicate they persist through sleep operations
   - Designed for enterprise environments with strict change control and permission constraints
 
 ### Changed

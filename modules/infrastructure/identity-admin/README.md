@@ -4,7 +4,7 @@ This module creates an HTPasswd identity provider and admin user for ROSA HCP cl
 
 **Note**: This module belongs in `infrastructure` because it uses the `rhcs` (OCM) provider, not Kubernetes/Terraform providers. Modules are organized by provider type:
 - **Infrastructure modules** (`modules/infrastructure/`): Use OCM providers (`rhcs`) or AWS providers
-- **Configuration modules** (`modules/configuration/`): Use Kubernetes/Terraform providers (`kubernetes`, `openshift`)
+- **Infrastructure modules** (`modules/infrastructure/`): Use Kubernetes/Terraform providers (`kubernetes`, `openshift`) for cluster configuration
 
 ## Features
 

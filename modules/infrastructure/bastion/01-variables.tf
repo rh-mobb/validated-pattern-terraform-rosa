@@ -62,10 +62,10 @@ variable "tags" {
   nullable    = false
 }
 
-# Destroy Protection Variable
-variable "enable_destroy" {
-  description = "Set to true to allow resource destruction. Default false prevents accidental destroys. To destroy resources, set this to true and run terraform apply, then terraform destroy."
+# Sleep Protection Variable
+variable "persists_through_sleep" {
+  description = "Set to false to put cluster in sleep mode (destroys resources). Default true keeps cluster active. To sleep cluster, set this to false and run terraform apply."
   type        = bool
-  default     = false
+  default     = true
   nullable    = false
 }

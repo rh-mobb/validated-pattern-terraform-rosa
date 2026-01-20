@@ -2,8 +2,13 @@
 data "aws_caller_identity" "current" {}
 
 locals {
-  # Determine if destroy is enabled (use override if provided, else global)
-  destroy_enabled = var.enable_destroy_cluster != null ? var.enable_destroy_cluster : var.enable_destroy
+  # Determine if resources persist through sleep (use override if provided, else global)
+  # Note: persists_through_sleep=true means resources persist (don't destroy), which is opposite of destroy_enabled
+  persists_through_sleep = var.persists_through_sleep_cluster != null ? var.persists_through_sleep_cluster : var.persists_through_sleep
+
+  # Concatenate private and public subnet IDs for cluster resource
+  # Cluster needs all subnets (private + public for public clusters, just private for private clusters)
+  subnet_ids = concat(var.private_subnet_ids, var.public_subnet_ids)
 
   # Determine OpenShift version to use
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/04-cluster.tf
@@ -19,7 +24,7 @@ locals {
   # NOTE: hcp_replicas is the TOTAL number of replicas across all subnets, not per subnet
   autoscaling_enabled = length(var.machine_pools) > 0 ? var.machine_pools[0].autoscaling_enabled : true
   hcp_replicas = length(var.machine_pools) > 0 ? var.machine_pools[0].min_replicas : (
-    var.multi_az && length(var.subnet_ids) > 0 ? (1 * length(var.subnet_ids)) : 2
+    var.multi_az && length(local.subnet_ids) > 0 ? (1 * length(local.subnet_ids)) : 2
   )
 
   # Determine machine pool names - HCP creates one pool per subnet if multi-AZ
@@ -28,10 +33,10 @@ locals {
   # For multi-AZ, ROSA creates "workers-0", "workers-1", "workers-2" (one per subnet)
   # Use a list (not set) to match reference implementation for count-based iteration
   # Conditionally set machine pools based on destroy flag
-  machine_pools_to_create = local.destroy_enabled == false ? var.machine_pools : []
-  hcp_machine_pools = local.destroy_enabled == false ? (
+  machine_pools_to_create = local.persists_through_sleep ? var.machine_pools : []
+  hcp_machine_pools = local.persists_through_sleep ? (
     length(var.machine_pools) > 0 ? [for pool in var.machine_pools : pool.name] : (
-      var.multi_az && length(var.subnet_ids) > 0 ? [for idx in range(length(var.subnet_ids)) : "workers-${idx}"] : ["workers"]
+      var.multi_az && length(local.subnet_ids) > 0 ? [for idx in range(length(local.subnet_ids)) : "workers-${idx}"] : ["workers"]
     )
   ) : []
 
@@ -72,7 +77,7 @@ data "rhcs_machine_types" "available" {}
 
 # DNS Domain Registration
 # Reference: ./reference/rosa-hcp-dedicated-vpc/terraform/1.main.tf:17-19
-# DNS domain persists between cluster creations (not gated by enable_destroy)
+# DNS domain persists between cluster creations (not gated by persists_through_sleep)
 resource "rhcs_dns_domain" "dns_domain" {
   count        = var.enable_persistent_dns_domain ? 1 : 0
   cluster_arch = "hcp"
@@ -82,7 +87,7 @@ resource "rhcs_dns_domain" "dns_domain" {
 # Reference: https://registry.terraform.io/providers/terraform-redhat/rhcs/latest/docs/resources/cluster_rosa_hcp
 # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/04-cluster.tf
 resource "rhcs_cluster_rosa_hcp" "main" {
-  count          = local.destroy_enabled == false ? 1 : 0
+  count          = local.persists_through_sleep ? 1 : 0
   name           = var.cluster_name
   cloud_region   = var.region
   aws_account_id = data.aws_caller_identity.current.account_id
@@ -91,7 +96,7 @@ resource "rhcs_cluster_rosa_hcp" "main" {
   aws_billing_account_id = var.aws_billing_account_id != null ? var.aws_billing_account_id : data.aws_caller_identity.current.account_id
 
   # Network configuration
-  aws_subnet_ids     = var.subnet_ids
+  aws_subnet_ids     = local.subnet_ids
   availability_zones = var.availability_zones
   machine_cidr       = var.vpc_cidr # Required: VPC CIDR block
 
@@ -113,14 +118,14 @@ resource "rhcs_cluster_rosa_hcp" "main" {
   private         = var.private
   etcd_encryption = var.etcd_encryption
 
-  # Optional encryption
-  kms_key_arn = var.kms_key_arn
+  # Optional encryption - use created EBS KMS key if available, otherwise use provided kms_key_arn
+  kms_key_arn = length(aws_kms_key.ebs) > 0 ? aws_kms_key.ebs[0].arn : var.kms_key_arn
 
   # CloudWatch audit log forwarding
   # Note: audit_log_arn is not yet available in the official provider release
   # Audit logging is configured via script-based approach in 20-audit-logging.tf
   # Once PR is accepted, we can switch to provider-native implementation:
-  # audit_log_arn = local.destroy_enabled == false && var.enable_audit_logging ? (
+  # audit_log_arn = local.persists_through_sleep && var.enable_audit_logging ? (
   #   length(aws_iam_role.cloudwatch_audit_logging) > 0 ? aws_iam_role.cloudwatch_audit_logging[0].arn : null
   # ) : null
 
@@ -187,8 +192,8 @@ resource "rhcs_cluster_rosa_hcp" "main" {
     # Validate replicas is a multiple of number of subnets for multi-AZ clusters
     # Only validate when destroy is enabled (resource will be created) and subnet_ids is provided
     precondition {
-      condition     = local.destroy_enabled == false && var.multi_az && length(var.subnet_ids) > 0 ? (local.hcp_replicas % length(var.subnet_ids) == 0) : true
-      error_message = "For multi-AZ clusters, replicas (${local.hcp_replicas}) must be a multiple of the number of subnets (${length(var.subnet_ids)}). For ${length(var.subnet_ids)} subnets, use replicas like ${length(var.subnet_ids)}, ${length(var.subnet_ids) * 2}, ${length(var.subnet_ids) * 3}, etc."
+      condition     = local.persists_through_sleep && var.multi_az && length(local.subnet_ids) > 0 ? (local.hcp_replicas % length(local.subnet_ids) == 0) : true
+      error_message = "For multi-AZ clusters, replicas (${local.hcp_replicas}) must be a multiple of the number of subnets (${length(local.subnet_ids)}). For ${length(local.subnet_ids)} subnets, use replicas like ${length(local.subnet_ids)}, ${length(local.subnet_ids) * 2}, ${length(local.subnet_ids) * 3}, etc."
     }
 
     # Validate no name conflicts between default and additional pools
@@ -216,7 +221,7 @@ resource "rhcs_cluster_rosa_hcp" "main" {
 # For HCP, we read the default machine pools created by the cluster, then manage them
 # Using count (not for_each) to match reference implementation for magic import pattern
 data "rhcs_hcp_machine_pool" "default" {
-  count = local.destroy_enabled == false ? length(local.hcp_machine_pools) : 0
+  count = local.persists_through_sleep ? length(local.hcp_machine_pools) : 0
 
   cluster = one(rhcs_cluster_rosa_hcp.main[*].id)
   name    = local.hcp_machine_pools[count.index]
@@ -226,8 +231,8 @@ resource "rhcs_hcp_machine_pool" "default" {
   # Only create resources for pools that exist (magic import pattern)
   # The data source count matches local.hcp_machine_pools, so use that for resource count
   # This ensures we create resources for all expected pools, and the data source will populate values if pools exist
-  # Gate with destroy_enabled flag
-  count = local.destroy_enabled == false ? length(local.hcp_machine_pools) : 0
+  # Gate with persists_through_sleep flag
+  count = local.persists_through_sleep ? length(local.hcp_machine_pools) : 0
 
   # Use expected pool name from local.hcp_machine_pools (not from data source, which may be null)
   # For multi-AZ: "workers-0", "workers-1", "workers-2"
@@ -241,7 +246,7 @@ resource "rhcs_hcp_machine_pool" "default" {
   # For single-AZ: count.index 0 -> subnet_ids[0]
   subnet_id = try(data.rhcs_hcp_machine_pool.default[count.index].subnet_id, null) != null ? (
     data.rhcs_hcp_machine_pool.default[count.index].subnet_id
-  ) : var.subnet_ids[count.index % length(var.subnet_ids)]
+  ) : local.subnet_ids[count.index % length(local.subnet_ids)]
 
   # Handle null auto_repair - default to true (standard ROSA default)
   auto_repair = try(data.rhcs_hcp_machine_pool.default[count.index].auto_repair, null) != null ? (
@@ -320,7 +325,7 @@ resource "rhcs_hcp_machine_pool" "default" {
 # Reference: ./reference/rosa-hcp-dedicated-vpc/terraform/1.main.tf:212-233
 # Use for_each for stable resource addressing (better than count for dynamic resources)
 resource "rhcs_hcp_machine_pool" "additional" {
-  for_each = local.destroy_enabled == false ? var.additional_machine_pools : {}
+  for_each = local.persists_through_sleep ? var.additional_machine_pools : {}
 
   cluster   = one(rhcs_cluster_rosa_hcp.main[*].id)
   name      = each.key # Pool name from map key
@@ -373,8 +378,8 @@ resource "rhcs_hcp_machine_pool" "additional" {
 
     # Validate subnet_id is in the provided subnet_ids list
     precondition {
-      condition     = contains(var.subnet_ids, each.value.subnet_id)
-      error_message = "Subnet ID '${each.value.subnet_id}' for machine pool '${each.key}' must be one of the cluster's subnet IDs: ${join(", ", var.subnet_ids)}"
+      condition     = contains(local.subnet_ids, each.value.subnet_id)
+      error_message = "Subnet ID '${each.value.subnet_id}' for machine pool '${each.key}' must be one of the cluster's subnet IDs: ${join(", ", local.subnet_ids)}"
     }
 
     # Validate autoscaling configuration
@@ -404,7 +409,7 @@ resource "rhcs_hcp_machine_pool" "additional" {
 # Data source to find the VPC endpoint security group created by ROSA
 # ROSA tags the security group with: Name = "${cluster_id}-vpce-private-router"
 data "aws_security_groups" "vpc_endpoint_default" {
-  count = local.destroy_enabled == false && length(var.api_endpoint_allowed_cidrs) > 0 ? 1 : 0
+  count = local.persists_through_sleep && length(var.api_endpoint_allowed_cidrs) > 0 ? 1 : 0
 
   filter {
     name   = "tag:Name"
@@ -419,7 +424,7 @@ data "aws_security_groups" "vpc_endpoint_default" {
 # Create ingress rules for each allowed CIDR block
 # Use for_each instead of count for better resource stability
 resource "aws_vpc_security_group_ingress_rule" "api_endpoint_access" {
-  for_each = local.destroy_enabled == false && length(var.api_endpoint_allowed_cidrs) > 0 ? toset(var.api_endpoint_allowed_cidrs) : toset([])
+  for_each = local.persists_through_sleep && length(var.api_endpoint_allowed_cidrs) > 0 ? toset(var.api_endpoint_allowed_cidrs) : toset([])
 
   security_group_id = data.aws_security_groups.vpc_endpoint_default[0].ids[0]
   cidr_ipv4         = each.value

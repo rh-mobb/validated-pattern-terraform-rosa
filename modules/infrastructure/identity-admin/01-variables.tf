@@ -1,13 +1,13 @@
 variable "cluster_id" {
-  description = "ID of the ROSA HCP cluster (null when enable_destroy is true, must be set when enable_destroy is false)"
+  description = "ID of the ROSA HCP cluster (null when persists_through_sleep is false, must be set when persists_through_sleep is true)"
   type        = string
   nullable    = true
 
   validation {
-    # When enable_destroy is false, resource will be created (count = 1), so cluster_id must not be null
-    # When enable_destroy is true, resource won't be created (count = 0), so cluster_id can be null
-    condition = var.enable_destroy == false ? var.cluster_id != null : true
-    error_message = "cluster_id must not be null when enable_destroy is false (resource will be created)."
+    # When persists_through_sleep is true, resource will be created (count = 1), so cluster_id must not be null
+    # When persists_through_sleep is false, resource won't be created (count = 0), so cluster_id can be null
+    condition = var.persists_through_sleep == true ? var.cluster_id != null : true
+    error_message = "cluster_id must not be null when persists_through_sleep is true (resource will be created)."
   }
 }
 
@@ -35,10 +35,10 @@ variable "admin_group" {
   nullable    = false
 }
 
-# Destroy Protection Variable
-variable "enable_destroy" {
-  description = "Set to true to allow resource destruction. Default false prevents accidental destroys. To destroy resources, set this to true and run terraform apply, then terraform destroy."
+# Sleep Protection Variable
+variable "persists_through_sleep" {
+  description = "Set to false to put cluster in sleep mode (destroys resources). Default true keeps cluster active. To sleep cluster, set this to false and run terraform apply."
   type        = bool
-  default     = false
+  default     = true
   nullable    = false
 }

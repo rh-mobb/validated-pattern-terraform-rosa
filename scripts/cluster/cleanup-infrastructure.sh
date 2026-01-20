@@ -1,6 +1,8 @@
 #!/bin/bash
 # scripts/cluster/cleanup-infrastructure.sh
-# Cleanup infrastructure (auto-approve, CI/CD friendly)
+# Sleep infrastructure (destroy with preserved resources, auto-approve, CI/CD friendly)
+# This script destroys cluster resources while preserving DNS, admin password, IAM, etc.
+# Used by "make sleep" target to temporarily shut down clusters for cost savings.
 # Usage: cleanup-infrastructure.sh <cluster-name>
 
 set -euo pipefail
@@ -17,38 +19,20 @@ fi
 
 CLUSTER_DIR=$(get_cluster_dir "$CLUSTER_NAME")
 TERRAFORM_INFRA_DIR=$(get_terraform_dir infrastructure)
-TERRAFORM_CONFIG_DIR=$(get_terraform_dir configuration)
-
-# Check if configuration state has resources
-info "Checking configuration state..."
-if ! check_configuration_state_empty "$CLUSTER_NAME" "$TERRAFORM_CONFIG_DIR" "$CLUSTER_DIR"; then
-    error "Configuration state still contains resources!"
-    error "Configuration must be destroyed before infrastructure can be destroyed."
-    error ""
-    error "This is a safety check because configuration may create resources"
-    error "external to the cluster (e.g., GitOps operators, external services)."
-    error ""
-    error "To proceed:"
-    error "  1. Cleanup configuration first: AUTO_APPROVE=true $SCRIPT_DIR/cleanup-configuration.sh $CLUSTER_NAME"
-    error "  2. Or use: make cluster.$CLUSTER_NAME.cleanup (cleans up both in correct order)"
-    exit 1
-fi
-
-info "Configuration state is empty or doesn't exist - safe to destroy infrastructure"
 
 warn "WARNING: This will DESTROY the infrastructure!"
 warn "AWS resources (cluster, VPC, IAM roles, etc.) will be deleted."
 
-info "Setting enable_destroy=true and applying to destroy resources..."
+info "Setting persists_through_sleep=false and applying to sleep cluster..."
 
 cd "$TERRAFORM_INFRA_DIR"
 
-# Calculate relative path from terraform/infrastructure to cluster directory
+# Calculate relative path from terraform to cluster directory
 CLUSTER_TFVARS="$CLUSTER_DIR/terraform.tfvars"
 
 terraform apply \
     -var-file="$CLUSTER_TFVARS" \
-    -var="enable_destroy=true" \
+    -var="persists_through_sleep=false" \
     -auto-approve
 
 success "Infrastructure resources have been destroyed"

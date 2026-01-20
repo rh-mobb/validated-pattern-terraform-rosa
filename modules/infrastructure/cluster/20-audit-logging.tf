@@ -20,7 +20,7 @@ locals {
 # IAM Policy for CloudWatch Logging
 # Grants permissions to create log groups, log streams, and write log events to CloudWatch
 resource "aws_iam_policy" "cloudwatch_audit_logging" {
-  count = local.destroy_enabled == false && var.enable_audit_logging ? 1 : 0
+  count = local.persists_through_sleep && var.enable_audit_logging ? 1 : 0
 
   name        = "${var.cluster_name}-rosa-cloudwatch-audit-logging"
   path        = "/"
@@ -57,7 +57,7 @@ resource "aws_iam_policy" "cloudwatch_audit_logging" {
 # Reference: https://access.redhat.com/solutions/7002219
 # Note: The service account is different from regular CloudWatch logging (which uses openshift-logging:cluster-logging)
 resource "aws_iam_role" "cloudwatch_audit_logging" {
-  count = local.destroy_enabled == false && var.enable_audit_logging ? 1 : 0
+  count = local.persists_through_sleep && var.enable_audit_logging ? 1 : 0
 
   name = "${var.cluster_name}-rosa-cloudwatch-audit-logging-role"
 
@@ -88,7 +88,7 @@ resource "aws_iam_role" "cloudwatch_audit_logging" {
 
 # Attach the CloudWatch logging policy to the role
 resource "aws_iam_role_policy_attachment" "cloudwatch_audit_logging" {
-  count = local.destroy_enabled == false && var.enable_audit_logging ? 1 : 0
+  count = local.persists_through_sleep && var.enable_audit_logging ? 1 : 0
 
   role       = aws_iam_role.cloudwatch_audit_logging[0].name
   policy_arn = aws_iam_policy.cloudwatch_audit_logging[0].arn
@@ -99,7 +99,7 @@ resource "aws_iam_role_policy_attachment" "cloudwatch_audit_logging" {
 # Once PR is accepted, we can switch to provider-native implementation in 10-main.tf
 # Reference: ./reference/rosa-hcp-dedicated-vpc/terraform/5.siem-logging.tf
 resource "null_resource" "configure_audit_logging" {
-  count = local.destroy_enabled == false && var.enable_audit_logging && length(rhcs_cluster_rosa_hcp.main) > 0 ? 1 : 0
+  count = local.persists_through_sleep && var.enable_audit_logging && length(rhcs_cluster_rosa_hcp.main) > 0 ? 1 : 0
 
   triggers = {
     cluster_id   = one(rhcs_cluster_rosa_hcp.main[*].id)

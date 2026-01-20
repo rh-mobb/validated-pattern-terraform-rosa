@@ -1,6 +1,6 @@
 locals {
-  # Determine if destroy is enabled (use override if provided, else global)
-  destroy_enabled = var.enable_destroy_network != null ? var.enable_destroy_network : var.enable_destroy
+  # Determine if cluster persists/is active (use override if provided, else global)
+  persists_through_sleep = var.persists_through_sleep_network != null ? var.persists_through_sleep_network : var.persists_through_sleep
 
   # Determine number of AZs based on multi_az
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/modules/terraform-rosa-networking/data.tf
@@ -41,7 +41,7 @@ locals {
 
 # VPC
 resource "aws_vpc" "main" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
@@ -54,7 +54,7 @@ resource "aws_vpc" "main" {
 
 # Internet Gateway (required for Regional NAT Gateway)
 resource "aws_internet_gateway" "main" {
-  count = local.destroy_enabled == false && var.enable_nat_gateway ? 1 : 0
+  count = local.persists_through_sleep && var.enable_nat_gateway ? 1 : 0
 
   vpc_id = one(aws_vpc.main[*].id)
 
@@ -65,7 +65,7 @@ resource "aws_internet_gateway" "main" {
 
 # Private Subnets (for Worker Nodes)
 resource "aws_subnet" "private" {
-  count = local.destroy_enabled == false ? local.az_count : 0
+  count = local.persists_through_sleep ? local.az_count : 0
 
   vpc_id            = one(aws_vpc.main[*].id)
   cidr_block        = local.private_subnet_cidrs[count.index]
@@ -85,7 +85,7 @@ resource "aws_subnet" "private" {
 
 # Elastic IP for Regional NAT Gateway
 resource "aws_eip" "nat" {
-  count = local.destroy_enabled == false && var.enable_nat_gateway ? 1 : 0
+  count = local.persists_through_sleep && var.enable_nat_gateway ? 1 : 0
 
   domain = "vpc"
 
@@ -100,7 +100,7 @@ resource "aws_eip" "nat" {
 # Note: Regional NAT Gateway automatically expands across AZs based on workload presence
 # Reference: https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateways-regional.html
 resource "aws_nat_gateway" "main" {
-  count = local.destroy_enabled == false && var.enable_nat_gateway ? 1 : 0
+  count = local.persists_through_sleep && var.enable_nat_gateway ? 1 : 0
 
   vpc_id            = one(aws_vpc.main[*].id)
   allocation_id     = aws_eip.nat[0].id
@@ -116,7 +116,7 @@ resource "aws_nat_gateway" "main" {
 
 # Route table for private subnets
 resource "aws_route_table" "private" {
-  count = local.destroy_enabled == false ? local.az_count : 0
+  count = local.persists_through_sleep ? local.az_count : 0
 
   vpc_id = one(aws_vpc.main[*].id)
 
@@ -136,7 +136,7 @@ resource "aws_route_table" "private" {
 
 # Route table associations for private subnets
 resource "aws_route_table_association" "private" {
-  count = local.destroy_enabled == false ? local.az_count : 0
+  count = local.persists_through_sleep ? local.az_count : 0
 
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private[count.index].id
@@ -145,7 +145,7 @@ resource "aws_route_table_association" "private" {
 # VPC Endpoints for AWS services
 # S3 Gateway Endpoint (no cost)
 resource "aws_vpc_endpoint" "s3" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   vpc_id            = one(aws_vpc.main[*].id)
   service_name      = "com.amazonaws.${data.aws_region.current.id}.s3"
@@ -159,7 +159,7 @@ resource "aws_vpc_endpoint" "s3" {
 
 # ECR Docker API Endpoint
 resource "aws_vpc_endpoint" "ecr_dkr" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.ecr.dkr"
@@ -175,7 +175,7 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
 
 # ECR API Endpoint
 resource "aws_vpc_endpoint" "ecr_api" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.ecr.api"
@@ -191,7 +191,7 @@ resource "aws_vpc_endpoint" "ecr_api" {
 
 # CloudWatch Logs Endpoint
 resource "aws_vpc_endpoint" "cloudwatch_logs" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.logs"
@@ -207,7 +207,7 @@ resource "aws_vpc_endpoint" "cloudwatch_logs" {
 
 # CloudWatch Monitoring Endpoint
 resource "aws_vpc_endpoint" "cloudwatch_monitoring" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.monitoring"
@@ -223,7 +223,7 @@ resource "aws_vpc_endpoint" "cloudwatch_monitoring" {
 
 # STS Endpoint (required for IAM roles)
 resource "aws_vpc_endpoint" "sts" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   vpc_id              = one(aws_vpc.main[*].id)
   service_name        = "com.amazonaws.${data.aws_region.current.id}.sts"
@@ -239,7 +239,7 @@ resource "aws_vpc_endpoint" "sts" {
 
 # Security group for VPC endpoints
 resource "aws_security_group" "vpc_endpoint" {
-  count = local.destroy_enabled == false ? 1 : 0
+  count = local.persists_through_sleep ? 1 : 0
 
   name        = "${var.name_prefix}-vpc-endpoint-sg"
   description = var.enable_strict_egress ? "Security group for VPC endpoints with strict egress control" : "Security group for VPC endpoints"
@@ -272,7 +272,7 @@ resource "aws_security_group" "vpc_endpoint" {
 
 # Security group for worker nodes with strict egress control (only if enable_strict_egress is true)
 resource "aws_security_group" "worker_nodes" {
-  count = local.destroy_enabled == false && var.enable_strict_egress ? 1 : 0
+  count = local.persists_through_sleep && var.enable_strict_egress ? 1 : 0
 
   name        = "${var.name_prefix}-worker-nodes-sg"
   description = "Security group for ROSA HCP worker nodes with strict egress control"
@@ -321,7 +321,7 @@ resource "aws_security_group" "worker_nodes" {
 
 # VPC Flow Logs (if S3 bucket provided)
 resource "aws_flow_log" "vpc" {
-  count = local.destroy_enabled == false && var.flow_log_s3_bucket != null ? 1 : 0
+  count = local.persists_through_sleep && var.flow_log_s3_bucket != null ? 1 : 0
 
   iam_role_arn    = aws_iam_role.vpc_flow_log[0].arn
   log_destination = "arn:aws:s3:::${var.flow_log_s3_bucket}"
@@ -335,7 +335,7 @@ resource "aws_flow_log" "vpc" {
 
 # IAM role for VPC Flow Logs
 resource "aws_iam_role" "vpc_flow_log" {
-  count = local.destroy_enabled == false && var.flow_log_s3_bucket != null ? 1 : 0
+  count = local.persists_through_sleep && var.flow_log_s3_bucket != null ? 1 : 0
 
   name = "${var.name_prefix}-vpc-flow-log-role"
 
@@ -359,7 +359,7 @@ resource "aws_iam_role" "vpc_flow_log" {
 
 # IAM policy for VPC Flow Logs
 resource "aws_iam_role_policy" "vpc_flow_log" {
-  count = local.destroy_enabled == false && var.flow_log_s3_bucket != null ? 1 : 0
+  count = local.persists_through_sleep && var.flow_log_s3_bucket != null ? 1 : 0
 
   name = "${var.name_prefix}-vpc-flow-log-policy"
   role = aws_iam_role.vpc_flow_log[0].id
@@ -420,7 +420,7 @@ data "aws_availability_zones" "available" {
 # Note: VPC endpoints get IP addresses in the VPC CIDR, so the existing security group rules
 # (allowing HTTPS 443 TCP to VPC CIDR) already allow traffic to this endpoint.
 data "aws_vpc_endpoint" "rosa_api" {
-  count = local.destroy_enabled == false && var.cluster_id != null ? 1 : 0
+  count = local.persists_through_sleep && var.cluster_id != null ? 1 : 0
 
   vpc_id = one(aws_vpc.main[*].id)
 

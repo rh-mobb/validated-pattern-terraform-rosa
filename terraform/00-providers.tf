@@ -23,6 +23,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.6"
     }
+    shell = {
+      source  = "scottwinkler/shell"
+      version = ">= 1.7.10"
+    }
   }
 }
 
@@ -52,4 +56,13 @@ provider "rhcs" {
   # token_url     = "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
   # client_id     = "cloud-services"
   # client_secret = "" # Empty string uses default client secret
+}
+
+# Shell provider for bootstrap scripts
+# This provider must be configured at the root level, not in modules,
+# to avoid making modules "legacy modules" that cannot use depends_on
+provider "shell" {
+  interpreter        = ["/bin/sh", "-c"]
+  enable_parallelism = false
+  sensitive_environment = {}
 }
