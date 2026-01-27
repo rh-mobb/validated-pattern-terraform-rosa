@@ -131,43 +131,43 @@ output "efs_file_system_arn" {
 
 output "ebs_kms_key_arn" {
   description = "ARN of the KMS key for EBS encryption (persists through sleep, null if enable_storage is false)"
-  value       = module.cluster.ebs_kms_key_arn
+  value       = module.iam.ebs_kms_key_arn
   sensitive   = false
 }
 
 output "efs_kms_key_arn" {
   description = "ARN of the KMS key for EFS encryption (persists through sleep, null if enable_storage is false or enable_efs is false)"
-  value       = module.cluster.efs_kms_key_arn
+  value       = module.iam.efs_kms_key_arn
   sensitive   = false
 }
 
 output "etcd_kms_key_id" {
   description = "ID of the KMS key for etcd encryption (persists through sleep, null if enable_storage is false or etcd_encryption is false)"
-  value       = module.cluster.etcd_kms_key_id
+  value       = module.iam.etcd_kms_key_id
   sensitive   = false
 }
 
 output "etcd_kms_key_arn" {
   description = "ARN of the KMS key for etcd encryption (persists through sleep, null if enable_storage is false or etcd_encryption is false)"
-  value       = module.cluster.etcd_kms_key_arn
+  value       = module.iam.etcd_kms_key_arn
   sensitive   = false
 }
 
 output "cert_manager_role_arn" {
   description = "ARN of the IAM role for cert-manager to use AWS Private CA (null if enable_cert_manager_iam is false)"
-  value       = module.cluster.cert_manager_role_arn
+  value       = module.iam.cert_manager_role_arn
   sensitive   = false
 }
 
 output "cloudwatch_logging_role_arn" {
   description = "ARN of the IAM role for CloudWatch logging via OpenShift Logging Operator (null if enable_cloudwatch_logging is false)"
-  value       = module.cluster.cloudwatch_logging_role_arn
+  value       = module.iam.cloudwatch_logging_role_arn
   sensitive   = false
 }
 
 output "secrets_manager_role_arn" {
   description = "ARN of the IAM role for ArgoCD Vault Plugin to access AWS Secrets Manager (null if enable_secrets_manager_iam is false)"
-  value       = module.cluster.secrets_manager_role_arn
+  value       = module.iam.secrets_manager_role_arn
   sensitive   = false
 }
 

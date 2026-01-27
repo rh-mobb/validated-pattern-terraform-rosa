@@ -134,19 +134,28 @@ variable "zero_egress" {
 }
 
 variable "kms_key_arn" {
-  description = "KMS key ARN for encryption (optional). If enable_storage is true, this will be overridden by the created EBS KMS key."
+  description = "KMS key ARN for EBS volume encryption (from IAM module output). Required when cluster is created."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "etcd_kms_key_arn" {
+  description = "KMS key ARN for etcd encryption (from IAM module output). Required when etcd_encryption is true."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "efs_kms_key_arn" {
+  description = "KMS key ARN for EFS encryption (from IAM module output). Required when enable_efs is true."
   type        = string
   default     = null
   nullable    = true
 }
 
 # Storage Configuration
-variable "enable_storage" {
-  description = "Enable creation of KMS keys and EFS file system"
-  type        = bool
-  default     = true
-  nullable    = false
-}
+# Note: KMS keys are created in IAM module, EFS file system is created here
 
 variable "enable_efs" {
   description = "Enable EFS file system creation (requires enable_storage = true)"
@@ -181,12 +190,6 @@ variable "public_subnet_ids" {
   nullable    = false
 }
 
-variable "kms_key_deletion_window" {
-  description = "Deletion window in days for KMS keys"
-  type        = number
-  default     = 10
-  nullable    = false
-}
 
 variable "service_cidr" {
   description = "CIDR block for services"
@@ -319,25 +322,19 @@ variable "api_endpoint_allowed_cidrs" {
 }
 
 variable "enable_audit_logging" {
-  description = "Enable CloudWatch audit log forwarding for the ROSA HCP cluster. When enabled, creates an IAM role for CloudWatch logging and configures the cluster to forward audit logs to CloudWatch."
+  description = "Enable CloudWatch audit log forwarding for the ROSA HCP cluster. When enabled, configures the cluster to forward audit logs to CloudWatch using the IAM role ARN provided via cloudwatch_audit_logging_role_arn variable (from IAM module)."
   type        = bool
   default     = true
   nullable    = false
 }
 
-variable "enable_cloudwatch_logging" {
-  description = "Enable CloudWatch logging for OpenShift Logging Operator. When enabled, creates IAM role and policy for the OpenShift Logging Operator to send logs to CloudWatch. Uses service account: openshift-logging:cluster-logging. This is separate from audit logging (SIEM)."
-  type        = bool
-  nullable    = false
-  default     = false
+variable "cloudwatch_audit_logging_role_arn" {
+  description = "ARN of the CloudWatch audit logging IAM role (from IAM module output). Required when enable_audit_logging is true."
+  type        = string
+  default     = null
+  nullable    = true
 }
 
-variable "enable_cert_manager_iam" {
-  description = "Enable IAM role and policy for cert-manager to use AWS Private CA. When enabled, creates IAM role for cert-manager service account (system:serviceaccount:cert-manager:cert-manager)."
-  type        = bool
-  nullable    = false
-  default     = true
-}
 
 variable "enable_termination_protection" {
   description = "Enable cluster termination protection. When enabled, prevents accidental cluster deletion via ROSA CLI. Default: false. Note: Disabling protection requires manual action via OCM console."
@@ -346,19 +343,6 @@ variable "enable_termination_protection" {
   default     = false
 }
 
-variable "enable_secrets_manager_iam" {
-  description = "Enable IAM role and policy for ArgoCD Vault Plugin to access AWS Secrets Manager. When enabled, creates IAM role for openshift-gitops:vplugin service account. Secrets access is restricted to explicit ARN list for security."
-  type        = bool
-  nullable    = false
-  default     = false
-}
-
-variable "additional_secrets" {
-  description = "Optional list of additional secret names to grant access to via Secrets Manager IAM. Secrets are looked up by name to get exact ARNs. The cluster credentials secret is always included automatically. Example: [\"my-secret-1\", \"my-secret-2\"]"
-  type        = list(string)
-  default     = null
-  nullable    = true
-}
 
 variable "enable_persistent_dns_domain" {
   description = "Enable persistent DNS domain registration. When true, creates rhcs_dns_domain resource that persists between cluster creations. When false, ROSA uses default DNS domain."
@@ -515,10 +499,18 @@ variable "efs_file_system_id" {
   nullable    = true
 }
 
+# Optional variables for GitOps bootstrap (values from IAM module outputs)
 variable "aws_private_ca_arn" {
-  description = "AWS Private CA ARN for certificate management"
+  description = "AWS Private CA ARN for certificate management (for GitOps bootstrap, from IAM module)"
   type        = string
-  default     = ""
+  default     = null
+  nullable    = true
+}
+
+variable "cert_manager_role_arn" {
+  description = "ARN of cert-manager IAM role (from IAM module output, for GitOps bootstrap)"
+  type        = string
+  default     = null
   nullable    = true
 }
 

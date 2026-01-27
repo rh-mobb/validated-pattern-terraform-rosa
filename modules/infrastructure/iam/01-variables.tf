@@ -51,3 +51,75 @@ variable "persists_through_sleep_iam" {
   default     = null
   nullable    = true
 }
+
+# KMS configuration
+variable "enable_storage" {
+  description = "Enable storage resources (KMS keys)"
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "enable_efs" {
+  description = "Enable EFS file system (required for EFS CSI driver IAM role)"
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "etcd_encryption" {
+  description = "Enable etcd encryption (requires etcd KMS key)"
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "kms_key_deletion_window" {
+  description = "KMS key deletion window in days"
+  type        = number
+  default     = 10
+  nullable    = false
+}
+
+# IAM feature flags
+variable "enable_audit_logging" {
+  description = "Enable CloudWatch audit logging IAM resources"
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "enable_cloudwatch_logging" {
+  description = "Enable CloudWatch logging IAM resources"
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "enable_cert_manager_iam" {
+  description = "Enable cert-manager IAM resources"
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "enable_secrets_manager_iam" {
+  description = "Enable Secrets Manager IAM resources"
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "aws_private_ca_arn" {
+  description = "AWS Private CA ARN for cert-manager (optional)"
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "additional_secrets" {
+  description = "Additional Secrets Manager secret names for IAM policy (optional)"
+  type        = list(string)
+  default     = null
+  nullable    = true
+}

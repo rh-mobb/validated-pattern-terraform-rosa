@@ -133,14 +133,14 @@ resource "rhcs_cluster_rosa_hcp" "main" {
   private         = var.private
   etcd_encryption = var.etcd_encryption
 
-  # Optional encryption - use created EBS KMS key if available, otherwise use provided kms_key_arn
+  # Optional encryption - use KMS key ARN from IAM module (via variable)
   # kms_key_arn is used for root volume encryption (EBS volumes)
-  kms_key_arn = length(aws_kms_key.ebs) > 0 ? aws_kms_key.ebs[0].arn : var.kms_key_arn
+  kms_key_arn = var.kms_key_arn
 
-  # Etcd encryption KMS key - use created etcd KMS key if etcd_encryption is enabled
+  # Etcd encryption KMS key - use etcd KMS key ARN from IAM module (via variable)
   # Reference: https://registry.terraform.io/providers/terraform-redhat/rhcs/latest/docs/resources/cluster_rosa_hcp#etcd_kms_key_arn
   # When etcd_encryption is true, etcd_kms_key_arn must be provided
-  etcd_kms_key_arn = var.etcd_encryption && length(aws_kms_key.etcd) > 0 ? aws_kms_key.etcd[0].arn : null
+  etcd_kms_key_arn = var.etcd_encryption ? var.etcd_kms_key_arn : null
 
   # CloudWatch audit log forwarding
   # Note: audit_log_arn is not yet available in the official provider release

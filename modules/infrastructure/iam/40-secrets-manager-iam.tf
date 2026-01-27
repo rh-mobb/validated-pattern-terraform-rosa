@@ -5,11 +5,17 @@
 #
 # IMPORTANT: The OIDC endpoint URL must NOT include the "https://" prefix when used in IAM trust policies.
 # Reference: Red Hat documentation shows stripping https:// from the OIDC endpoint URL
-# The oidc_endpoint_url_normalized local is defined in 10-main.tf
 #
 # SECURITY: This implementation uses explicit secret ARN lists instead of wildcards for maximum security.
 # Only explicitly listed secrets are accessible via GetSecretValue. ListSecrets requires "*" but actual
 # secret access is restricted by the explicit ARN list.
+
+# Data source for cluster credentials secret (lookup by name to avoid circular dependency)
+# Secret name follows pattern: ${cluster_name}-credentials
+data "aws_secretsmanager_secret" "cluster_credentials" {
+  count = local.persists_through_sleep && var.enable_secrets_manager_iam ? 1 : 0
+  name  = "${var.cluster_name}-credentials"
+}
 
 # Data sources for additional secrets (if provided)
 # Lookup secrets by name to get exact ARNs for the IAM policy
@@ -20,8 +26,8 @@ data "aws_secretsmanager_secret" "additional" {
 
 # Build list of all secret ARNs (default + additional)
 locals {
-  # Default secret ARN (cluster credentials - always included if identity provider is enabled)
-  default_secret_arn = local.persists_through_sleep && var.enable_secrets_manager_iam && length(aws_secretsmanager_secret.cluster_credentials) > 0 ? aws_secretsmanager_secret.cluster_credentials[0].arn : null
+  # Default secret ARN (cluster credentials - from data source lookup)
+  default_secret_arn = local.persists_through_sleep && var.enable_secrets_manager_iam && length(data.aws_secretsmanager_secret.cluster_credentials) > 0 ? data.aws_secretsmanager_secret.cluster_credentials[0].arn : null
 
   # Additional secret ARNs from data source lookups
   additional_secret_arns = local.persists_through_sleep && var.enable_secrets_manager_iam && var.additional_secrets != null ? [
@@ -91,7 +97,7 @@ resource "aws_iam_role" "secrets_manager" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${local.oidc_endpoint_url_normalized}"
+          Federated = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${local.oidc_endpoint_url_normalized}"
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {

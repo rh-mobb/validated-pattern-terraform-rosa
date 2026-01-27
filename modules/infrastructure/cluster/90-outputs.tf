@@ -56,29 +56,6 @@ output "state" {
   sensitive   = false
 }
 
-output "cloudwatch_audit_logging_role_arn" {
-  description = "ARN of the IAM role for CloudWatch audit log forwarding (null if persists_through_sleep is false or enable_audit_logging is false)"
-  value       = local.persists_through_sleep && var.enable_audit_logging && length(aws_iam_role.cloudwatch_audit_logging) > 0 ? aws_iam_role.cloudwatch_audit_logging[0].arn : null
-  sensitive   = false
-}
-
-output "cloudwatch_logging_role_arn" {
-  description = "ARN of the IAM role for CloudWatch logging via OpenShift Logging Operator (null if persists_through_sleep is false or enable_cloudwatch_logging is false)"
-  value       = local.persists_through_sleep && var.enable_cloudwatch_logging && length(aws_iam_role.cloudwatch_logging) > 0 ? aws_iam_role.cloudwatch_logging[0].arn : null
-  sensitive   = false
-}
-
-output "cert_manager_role_arn" {
-  description = "ARN of the IAM role for cert-manager to use AWS Private CA (null if persists_through_sleep is false or enable_cert_manager_iam is false)"
-  value       = local.persists_through_sleep && var.enable_cert_manager_iam && length(aws_iam_role.cert_manager) > 0 ? aws_iam_role.cert_manager[0].arn : null
-  sensitive   = false
-}
-
-output "secrets_manager_role_arn" {
-  description = "ARN of the IAM role for ArgoCD Vault Plugin to access AWS Secrets Manager (null if persists_through_sleep is false or enable_secrets_manager_iam is false)"
-  value       = local.persists_through_sleep && var.enable_secrets_manager_iam && length(aws_iam_role.secrets_manager) > 0 ? aws_iam_role.secrets_manager[0].arn : null
-  sensitive   = false
-}
 
 output "default_machine_pools" {
   description = "Map of default machine pool IDs keyed by pool name"
@@ -161,8 +138,8 @@ output "gitops_bootstrap_env_vars" {
     # Optional: ECR account for image pulls
     ECR_ACCOUNT = var.ecr_account
 
-    # Optional: Storage configuration - use cluster module's storage resources if available
-    EBS_KMS_KEY_ARN    = var.ebs_kms_key_arn != null ? var.ebs_kms_key_arn : (length(aws_kms_key.ebs) > 0 ? aws_kms_key.ebs[0].arn : null)
+    # Optional: Storage configuration - KMS keys come from IAM module (via variables)
+    EBS_KMS_KEY_ARN    = var.kms_key_arn
     EFS_FILE_SYSTEM_ID = var.efs_file_system_id != null ? var.efs_file_system_id : (length(aws_efs_file_system.main) > 0 ? aws_efs_file_system.main[0].id : null)
 
     # Optional: AWS Private CA Issuer
@@ -214,13 +191,13 @@ output "gitops_bootstrap_command" {
     var.gitops_git_repo_url != null ? "export GIT_REPO_URL='${var.gitops_git_repo_url}'" : "",
     "export AWS_ACCOUNT_ID='${local.aws_account_id}'",
     var.ecr_account != null ? "export ECR_ACCOUNT='${var.ecr_account}'" : "",
-    var.ebs_kms_key_arn != null ? "export EBS_KMS_KEY_ARN='${var.ebs_kms_key_arn}'" : (length(aws_kms_key.ebs) > 0 ? "export EBS_KMS_KEY_ARN='${aws_kms_key.ebs[0].arn}'" : ""),
+    var.kms_key_arn != null ? "export EBS_KMS_KEY_ARN='${var.kms_key_arn}'" : "",
     var.efs_file_system_id != null ? "export EFS_FILE_SYSTEM_ID='${var.efs_file_system_id}'" : (length(aws_efs_file_system.main) > 0 ? "export EFS_FILE_SYSTEM_ID='${aws_efs_file_system.main[0].id}'" : ""),
     var.aws_private_ca_arn != null ? "export AWS_PRIVATE_CA_ARN='${var.aws_private_ca_arn}'" : "",
     var.awspca_csv != null ? "export AWSPCA_CSV='${var.awspca_csv}'" : "",
     var.awspca_issuer != null ? "export AWSPCA_ISSUER='${var.awspca_issuer}'" : "",
     var.zone_name != null ? "export ZONE_NAME='${var.zone_name}'" : "",
-    local.persists_through_sleep && var.enable_cert_manager_iam && length(aws_iam_role.cert_manager) > 0 ? "export CERT_MANAGER_ROLE_ARN='${aws_iam_role.cert_manager[0].arn}'" : "",
+    var.cert_manager_role_arn != null ? "export CERT_MANAGER_ROLE_ARN='${var.cert_manager_role_arn}'" : "",
     var.hub_credentials_secret_name != null ? "export HUB_CREDENTIALS_SECRET='${var.hub_credentials_secret_name}'" : "",
     var.acm_region != null ? "export ACM_REGION='${var.acm_region}'" : "",
     var.helm_chart_acm_spoke != null ? "export HELM_CHART_ACM_SPOKE='${var.helm_chart_acm_spoke}'" : "",
@@ -241,52 +218,18 @@ output "gitops_bootstrap_script_path" {
 }
 
 # Storage outputs
-# Note: KMS keys and EFS persist through sleep operation, so outputs are available even when cluster is destroyed
-output "ebs_kms_key_id" {
-  description = "ID of the KMS key for EBS encryption (persists through sleep, null if enable_storage is false)"
-  value       = var.enable_storage && length(aws_kms_key.ebs) > 0 ? aws_kms_key.ebs[0].key_id : null
-  sensitive   = false
-}
-
-output "ebs_kms_key_arn" {
-  description = "ARN of the KMS key for EBS encryption (persists through sleep, null if enable_storage is false)"
-  value       = var.enable_storage && length(aws_kms_key.ebs) > 0 ? aws_kms_key.ebs[0].arn : null
-  sensitive   = false
-}
-
-output "efs_kms_key_id" {
-  description = "ID of the KMS key for EFS encryption (persists through sleep, null if enable_storage is false or enable_efs is false)"
-  value       = var.enable_storage && var.enable_efs && length(aws_kms_key.efs) > 0 ? aws_kms_key.efs[0].key_id : null
-  sensitive   = false
-}
-
-output "efs_kms_key_arn" {
-  description = "ARN of the KMS key for EFS encryption (persists through sleep, null if enable_storage is false or enable_efs is false)"
-  value       = var.enable_storage && var.enable_efs && length(aws_kms_key.efs) > 0 ? aws_kms_key.efs[0].arn : null
-  sensitive   = false
-}
-
-output "etcd_kms_key_id" {
-  description = "ID of the KMS key for etcd encryption (persists through sleep, null if enable_storage is false or etcd_encryption is false)"
-  value       = var.enable_storage && var.etcd_encryption && length(aws_kms_key.etcd) > 0 ? aws_kms_key.etcd[0].id : null
-  sensitive   = false
-}
-
-output "etcd_kms_key_arn" {
-  description = "ARN of the KMS key for etcd encryption (persists through sleep, null if enable_storage is false or etcd_encryption is false)"
-  value       = var.enable_storage && var.etcd_encryption && length(aws_kms_key.etcd) > 0 ? aws_kms_key.etcd[0].arn : null
-  sensitive   = false
-}
+# Note: EFS persists through sleep operation, so outputs are available even when cluster is destroyed
+# KMS keys are now in IAM module - see IAM module outputs
 
 output "efs_file_system_id" {
-  description = "ID of the EFS file system (persists through sleep, null if enable_storage is false or enable_efs is false)"
-  value       = var.enable_storage && var.enable_efs && length(aws_efs_file_system.main) > 0 ? aws_efs_file_system.main[0].id : null
+  description = "ID of the EFS file system (persists through sleep, null if enable_efs is false)"
+  value       = var.enable_efs && length(aws_efs_file_system.main) > 0 ? aws_efs_file_system.main[0].id : null
   sensitive   = false
 }
 
 output "efs_file_system_arn" {
-  description = "ARN of the EFS file system (persists through sleep, null if enable_storage is false or enable_efs is false)"
-  value       = var.enable_storage && var.enable_efs && length(aws_efs_file_system.main) > 0 ? aws_efs_file_system.main[0].arn : null
+  description = "ARN of the EFS file system (persists through sleep, null if enable_efs is false)"
+  value       = var.enable_efs && length(aws_efs_file_system.main) > 0 ? aws_efs_file_system.main[0].arn : null
   sensitive   = false
 }
 

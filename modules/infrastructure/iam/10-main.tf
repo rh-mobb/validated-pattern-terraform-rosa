@@ -36,6 +36,11 @@ locals {
   support_role_arn   = "${local.role_prefix}-HCP-ROSA-Support-Role"
   worker_role_arn    = "${local.role_prefix}-HCP-ROSA-Worker-Role"
 
+  # Strip https:// prefix from OIDC endpoint URL if present (as per Red Hat documentation)
+  # The OIDC endpoint URL should be in format: oidc.op1.openshiftapps.com/2nb1con7holccea7ogkfrm7ddjc8ih0q
+  # Used by IAM roles for CloudWatch audit logging, CloudWatch logging, Cert Manager, and CSI drivers
+  oidc_endpoint_url_normalized = module.oidc_config_and_provider.oidc_endpoint_url != null ? replace(module.oidc_config_and_provider.oidc_endpoint_url, "https://", "") : ""
+
 }
 
 # Account Roles using terraform-redhat/rosa-hcp/rhcs module

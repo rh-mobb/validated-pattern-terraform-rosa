@@ -1,15 +1,20 @@
 # Cluster Module
 
-This module is a thin wrapper around the `rhcs_cluster_rosa_hcp` resource that provides organizational defaults while passing through all provider variables.
+This module creates and manages ROSA HCP clusters, machine pools, identity providers, and EFS storage resources.
 
 ## Features
 
-- Thin wrapper - passes through ALL provider variables
-- Organizational defaults for security hardening
+- ROSA HCP cluster creation and management
 - Flexible machine pool configuration
 - Support for custom machine pools or default pool
 - Multi-AZ support
-- Optional HTPasswd identity provider for admin user
+- HTPasswd identity provider for admin user
+- **EFS file system** (storage infrastructure that depends on cluster security groups)
+- CloudWatch audit logging configuration (IAM resources are in IAM module)
+- Cluster termination protection
+- GitOps bootstrap support
+
+**Note**: KMS keys and IAM resources (CloudWatch logging, Cert Manager, Secrets Manager) are created in the IAM module. This module focuses on cluster-specific resources.
 
 ## Usage
 
@@ -29,9 +34,22 @@ module "cluster" {
   oidc_endpoint_url  = module.iam.oidc_endpoint_url
   availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
 
+  # KMS keys from IAM module
+  kms_key_arn      = module.iam.ebs_kms_key_arn
+  etcd_kms_key_arn = module.iam.etcd_kms_key_arn
+  efs_kms_key_arn  = module.iam.efs_kms_key_arn
+
+  # CloudWatch audit logging (IAM role ARN from IAM module)
+  enable_audit_logging              = true
+  cloudwatch_audit_logging_role_arn = module.iam.cloudwatch_audit_logging_role_arn
+
+  # EFS storage configuration
+  enable_efs           = true
+  private_subnet_cidrs = module.network.private_subnet_cidrs
+
   # Organizational defaults (can override)
   private         = true   # Organizational default
-  etcd_encryption = false  # Organizational default
+  etcd_encryption = false  # Organizational default (requires etcd_kms_key_arn from IAM module)
 
   # Optional: Custom machine pools
   machine_pools = [
@@ -62,14 +80,6 @@ module "cluster" {
   }
 }
 
-# Admin user creation is handled by a separate identity-admin module
-# See modules/infrastructure/identity-admin/ for details
-module "identity_admin" {
-  source = "../identity-admin"
-
-  cluster_id     = module.cluster.cluster_id
-  admin_password = "YourSecurePassword123!"
-}
 ```
 
 ## Requirements
@@ -104,15 +114,23 @@ module "identity_admin" {
 | etcd_encryption | Enable etcd encryption | `bool` | `false` |
 | fips | Enable FIPS 140-2 compliance | `bool` | `false` |
 | zero_egress | Enable zero egress mode. Sets zero_egress property to 'true' in cluster properties | `bool` | `false` |
-| kms_key_arn | KMS key ARN for encryption | `string` | `null` |
+| kms_key_arn | KMS key ARN for EBS volume encryption (from IAM module output) | `string` | `null` |
+| etcd_kms_key_arn | KMS key ARN for etcd encryption (from IAM module output, required when etcd_encryption is true) | `string` | `null` |
+| efs_kms_key_arn | KMS key ARN for EFS encryption (from IAM module output, required when enable_efs is true) | `string` | `null` |
+| enable_efs | Enable EFS file system creation | `bool` | `true` |
+| private_subnet_cidrs | List of private subnet CIDR blocks (required for EFS security group rules) | `list(string)` | `[]` |
+| private_subnet_ids | List of private subnet IDs (required for EFS mount targets and cluster creation) | `list(string)` | `[]` |
+| public_subnet_ids | List of public subnet IDs (for public clusters, will be concatenated with private_subnet_ids) | `list(string)` | `[]` |
+| cloudwatch_audit_logging_role_arn | ARN of CloudWatch audit logging IAM role (from IAM module output, required when enable_audit_logging is true) | `string` | `null` |
+| aws_private_ca_arn | AWS Private CA ARN for certificate management (for GitOps bootstrap, from IAM module) | `string` | `null` |
+| cert_manager_role_arn | ARN of cert-manager IAM role (from IAM module output, for GitOps bootstrap) | `string` | `null` |
 | service_cidr | CIDR block for services | `string` | `"172.30.0.0/16"` |
 | pod_cidr | CIDR block for pods | `string` | `"10.128.0.0/14"` |
 | host_prefix | Host prefix for subnet allocation | `number` | `23` |
 | channel_group | Channel group for OpenShift version | `string` | `"stable"` |
 | openshift_version | OpenShift version to pin. If not provided, automatically uses latest installable version | `string` | `null` |
 | wait_for_std_compute_nodes_complete | Wait for standard compute nodes to complete before considering cluster creation successful. Set to false if nodes may take longer (e.g., egress-zero clusters) | `bool` | `true` |
-| enable_audit_logging | Enable CloudWatch audit log forwarding. When enabled, creates IAM role and policy for CloudWatch logging | `bool` | `true` |
-| enable_cert_manager_iam | Enable IAM role and policy for cert-manager to use AWS Private CA. When enabled, creates IAM role for cert-manager service account | `bool` | `false` |
+| enable_audit_logging | Enable CloudWatch audit log forwarding. When enabled, configures cluster to forward audit logs to CloudWatch using IAM role ARN from IAM module | `bool` | `true` |
 | enable_termination_protection | Enable cluster termination protection. When enabled, prevents accidental cluster deletion via ROSA CLI. Note: Disabling protection requires manual action via OCM console | `bool` | `false` |
 | api_endpoint_allowed_cidrs | Optional list of IPv4 CIDR blocks allowed to access the ROSA HCP API endpoint. By default, the VPC endpoint security group only allows access from within the VPC. Useful for VPN ranges, bastion hosts, or other VPCs | `list(string)` | `[]` |
 | enable_persistent_dns_domain | Enable persistent DNS domain registration. When true, creates rhcs_dns_domain resource that persists between cluster creations (not gated by persists_through_sleep). When false, ROSA uses default DNS domain | `bool` | `false` |
@@ -131,7 +149,7 @@ module "identity_admin" {
 
 ### Identity Provider
 
-**Note**: Admin user creation has been moved to a separate `identity-admin` module for independent lifecycle management. See `modules/infrastructure/identity-admin/README.md` for details.
+The module creates an HTPasswd identity provider and admin user when `enable_identity_provider = true`. The admin password is stored in AWS Secrets Manager and persists through sleep operations.
 
 ## Outputs
 
@@ -144,13 +162,24 @@ module "identity_admin" {
 | kubeconfig | Kubernetes configuration file (sensitive) |
 | cluster_admin_password | Cluster admin password (sensitive) |
 | state | State of the cluster |
-| cloudwatch_audit_logging_role_arn | ARN of the IAM role for CloudWatch audit log forwarding (null if disabled or persists_through_sleep is false) |
-| cert_manager_role_arn | ARN of the IAM role for cert-manager to use AWS Private CA (null if disabled or persists_through_sleep is false) |
-| etcd_kms_key_id | ID of the KMS key for etcd encryption (null if enable_storage is false or etcd_encryption is false) |
-| etcd_kms_key_arn | ARN of the KMS key for etcd encryption (null if enable_storage is false or etcd_encryption is false) |
+| identity_provider_id | ID of the HTPasswd identity provider (null if enable_identity_provider is false) |
+| identity_provider_name | Name of the identity provider (null if enable_identity_provider is false) |
+| admin_username | Username of the admin user |
+| admin_group | Group the admin user belongs to |
+| cluster_credentials_secret_name | Name of AWS Secrets Manager secret containing cluster credentials |
+| cluster_credentials_secret_arn | ARN of AWS Secrets Manager secret containing cluster credentials |
+| efs_file_system_id | ID of the EFS file system (null if enable_efs is false) |
+| efs_file_system_arn | ARN of the EFS file system (null if enable_efs is false) |
+| aws_account_id | AWS account ID where the cluster is deployed |
 | default_machine_pools | Map of default machine pool IDs keyed by pool name |
 | additional_machine_pools | Map of additional machine pool IDs keyed by pool name |
 | all_machine_pools | Map of all machine pool IDs (default + additional) keyed by pool name |
+| gitops_bootstrap_enabled | Whether GitOps bootstrap is enabled |
+| gitops_bootstrap_env_vars | Environment variables for running the GitOps bootstrap script |
+| gitops_bootstrap_command | Shell commands to export environment variables for GitOps bootstrap |
+| gitops_bootstrap_script_path | Path to the GitOps bootstrap script |
+
+**Note**: KMS key outputs (EBS, EFS, ETCD) and IAM role outputs (CloudWatch logging, Cert Manager, Secrets Manager) are now in the IAM module. See `modules/infrastructure/iam/README.md` for details.
 
 ## Organizational Defaults
 
@@ -277,13 +306,30 @@ additional_machine_pools = {
 
 **Note**: Additional machine pool names cannot conflict with default pool names (e.g., `"workers"`, `"workers-0"`, `"workers-1"`, etc.). The module validates this automatically.
 
+## EFS Storage
+
+The module creates an EFS file system when `enable_efs = true`. EFS remains in the cluster module because:
+
+- **Cluster-specific infrastructure**: EFS depends on cluster security groups for mount targets
+- **Network integration**: EFS mount targets use cluster subnets and security groups
+- **Lifecycle alignment**: EFS file system lifecycle aligns with cluster lifecycle (though it persists through sleep)
+
+The EFS KMS key is created in the IAM module and passed to this module via `efs_kms_key_arn` variable.
+
+## Dependencies
+
+- **IAM Module**: Provides KMS key ARNs (EBS, EFS, ETCD) and IAM role ARNs (CloudWatch audit logging, etc.)
+- **Network Module**: Provides VPC ID, subnet IDs, and subnet CIDRs
+- **Cluster Resources**: EFS depends on cluster security groups (created by ROSA)
+
 ## Architecture Decision
 
-This module is a **thin wrapper** that:
+This module focuses on **cluster-specific resources**:
 
-- Provides organizational defaults for consistency
-- Passes through ALL provider variables for flexibility
-- Allows overrides of any default
-- Documents organizational standards
+- Cluster creation and management
+- Machine pools
+- Identity providers
+- EFS storage (depends on cluster security groups)
+- Cluster configuration (audit logging, termination protection)
 
-This approach balances consistency with flexibility, ensuring all clusters follow organizational patterns while allowing customization when needed.
+**IAM and KMS resources** are in the IAM module for better separation of concerns and reuse across clusters.

@@ -1,107 +1,24 @@
 # CloudWatch Audit Log Forwarding Configuration
 # Reference: https://access.redhat.com/solutions/7002219
-# This configuration creates an IAM role and policy for CloudWatch audit log forwarding.
-# The role uses OIDC federation to allow the OpenShift audit log exporter service account to assume the role.
+# This configuration configures the cluster to forward audit logs to CloudWatch.
+# The IAM role and policy are created in the IAM module.
 #
-# IMPORTANT: The OIDC endpoint URL must NOT include the "https://" prefix when used in IAM trust policies.
-# Reference: Red Hat documentation shows stripping https:// from the OIDC endpoint URL
-#
-# NOTE: If you see a "Provider produced inconsistent final plan" error from the time provider in the
-# oidc_config_and_provider module, this is a known issue where the upstream module's time_sleep resource
-# sees the OIDC endpoint URL format change. This typically resolves on the next apply. The normalization
-# here only affects our IAM trust policy and does not modify the upstream module's behavior.
-# The oidc_endpoint_url_normalized local is defined in 10-main.tf
-
-# IAM Policy for CloudWatch Logging
-# Grants permissions to create log groups, log streams, and write log events to CloudWatch
-resource "aws_iam_policy" "cloudwatch_audit_logging" {
-  count = local.persists_through_sleep && var.enable_audit_logging ? 1 : 0
-
-  name        = "${var.cluster_name}-rosa-cloudwatch-audit-logging"
-  path        = "/"
-  description = "IAM policy for ROSA HCP CloudWatch audit log forwarding"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams",
-          "logs:PutLogEvents",
-          "logs:PutRetentionPolicy"
-        ]
-        Resource = "arn:aws:logs:*:*:*"
-      }
-    ]
-  })
-
-  tags = merge(local.common_tags, {
-    Name      = "${var.cluster_name}-rosa-cloudwatch-audit-logging-policy"
-    Purpose   = "CloudWatchAuditLogging"
-    ManagedBy = "Terraform"
-  })
-}
-
-# IAM Role for CloudWatch Audit Logging
-# Uses OIDC federation to allow the OpenShift audit log exporter service account to assume this role
-# Service account: system:serviceaccount:openshift-config-managed:cloudwatch-audit-exporter
-# Reference: https://access.redhat.com/solutions/7002219
-# Note: The service account is different from regular CloudWatch logging (which uses openshift-logging:cluster-logging)
-resource "aws_iam_role" "cloudwatch_audit_logging" {
-  count = local.persists_through_sleep && var.enable_audit_logging ? 1 : 0
-
-  name = "${var.cluster_name}-rosa-cloudwatch-audit-logging-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${local.oidc_endpoint_url_normalized}"
-        }
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Condition = {
-          StringEquals = {
-            "${local.oidc_endpoint_url_normalized}:sub" = "system:serviceaccount:openshift-config-managed:cloudwatch-audit-exporter"
-          }
-        }
-      }
-    ]
-  })
-
-  tags = merge(local.common_tags, {
-    Name      = "${var.cluster_name}-rosa-cloudwatch-audit-logging-role"
-    Purpose   = "CloudWatchAuditLogging"
-    ManagedBy = "Terraform"
-  })
-}
-
-# Attach the CloudWatch logging policy to the role
-resource "aws_iam_role_policy_attachment" "cloudwatch_audit_logging" {
-  count = local.persists_through_sleep && var.enable_audit_logging ? 1 : 0
-
-  role       = aws_iam_role.cloudwatch_audit_logging[0].name
-  policy_arn = aws_iam_policy.cloudwatch_audit_logging[0].arn
-}
+# NOTE: The IAM role ARN is provided via cloudwatch_audit_logging_role_arn variable (from IAM module output)
 
 # Configure audit log forwarding on the cluster using ROSA CLI
 # Using script-based approach until audit_log_arn is available in official provider release
 # Once PR is accepted, we can switch to provider-native implementation in 10-main.tf
 # Reference: ./reference/rosa-hcp-dedicated-vpc/terraform/5.siem-logging.tf
 resource "null_resource" "configure_audit_logging" {
-  count = local.persists_through_sleep && var.enable_audit_logging && length(rhcs_cluster_rosa_hcp.main) > 0 ? 1 : 0
+  count = local.persists_through_sleep && var.enable_audit_logging ? 1 : 0
 
   triggers = {
     cluster_id   = one(rhcs_cluster_rosa_hcp.main[*].id)
     cluster_name = var.cluster_name
-    role_arn     = aws_iam_role.cloudwatch_audit_logging[0].arn
-    # Re-run if the role ARN changes
-    role_arn_hash = sha256(aws_iam_role.cloudwatch_audit_logging[0].arn)
+    # Use try() to safely handle null values from module outputs that depend on count
+    role_arn = try(var.cloudwatch_audit_logging_role_arn, "")
+    # Re-run if the role ARN changes (use empty string hash if null)
+    role_arn_hash = try(sha256(var.cloudwatch_audit_logging_role_arn), "")
   }
 
   # Configure audit logging
@@ -138,8 +55,13 @@ resource "null_resource" "configure_audit_logging" {
         echo "Already logged in to ROSA"
       fi
 
-      # Configure audit log ARN
-      rosa edit cluster -c "${var.cluster_name}" --audit-log-arn "${aws_iam_role.cloudwatch_audit_logging[0].arn}" --yes || {
+      # Configure audit log ARN (check if role ARN is available)
+      if [ -z "${var.cloudwatch_audit_logging_role_arn}" ] || [ "${var.cloudwatch_audit_logging_role_arn}" = "null" ]; then
+        echo "ERROR: cloudwatch_audit_logging_role_arn is not set. IAM role may not be created yet."
+        exit 1
+      fi
+
+      rosa edit cluster -c "${var.cluster_name}" --audit-log-arn "${var.cloudwatch_audit_logging_role_arn}" --yes || {
         echo "WARNING: Failed to configure audit logging. Cluster may not be ready yet."
         exit 1
       }
@@ -151,9 +73,7 @@ resource "null_resource" "configure_audit_logging" {
   # Note: No destroy provisioner needed - destroying the cluster automatically removes audit logging configuration
 
   depends_on = [
-    rhcs_cluster_rosa_hcp.main,
-    aws_iam_role.cloudwatch_audit_logging,
-    aws_iam_role_policy_attachment.cloudwatch_audit_logging
+    rhcs_cluster_rosa_hcp.main
   ]
 }
 

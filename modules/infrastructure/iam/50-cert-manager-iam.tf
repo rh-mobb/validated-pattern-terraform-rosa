@@ -5,7 +5,6 @@
 #
 # IMPORTANT: The OIDC endpoint URL must NOT include the "https://" prefix when used in IAM trust policies.
 # Reference: Red Hat documentation shows stripping https:// from the OIDC endpoint URL
-# The oidc_endpoint_url_normalized local is defined in 10-main.tf
 
 # IAM Policy for Cert Manager
 # Grants permissions to interact with AWS Private CA (ACM-PCA)
@@ -56,7 +55,7 @@ resource "aws_iam_role" "cert_manager" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${local.oidc_endpoint_url_normalized}"
+          Federated = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${local.oidc_endpoint_url_normalized}"
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {

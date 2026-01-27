@@ -5,7 +5,6 @@
 #
 # IMPORTANT: The OIDC endpoint URL must NOT include the "https://" prefix when used in IAM trust policies.
 # Reference: Red Hat documentation shows stripping https:// from the OIDC endpoint URL
-# The oidc_endpoint_url_normalized local is defined in 10-main.tf
 #
 # NOTE: This is separate from audit logging (SIEM) which uses openshift-config-managed:cloudwatch-audit-exporter
 # This role is for the OpenShift Logging Operator which uses openshift-logging:cluster-logging service account
@@ -60,7 +59,7 @@ resource "aws_iam_role" "cloudwatch_logging" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${local.oidc_endpoint_url_normalized}"
+          Federated = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${local.oidc_endpoint_url_normalized}"
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {

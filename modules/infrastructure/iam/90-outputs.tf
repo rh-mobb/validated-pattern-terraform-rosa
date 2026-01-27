@@ -50,3 +50,65 @@ output "operator_role_arns" {
   } : null
   sensitive = false
 }
+
+# KMS Key Outputs
+output "ebs_kms_key_id" {
+  description = "ID of the EBS KMS key (null if enable_storage is false)"
+  value       = length(aws_kms_key.ebs) > 0 ? aws_kms_key.ebs[0].key_id : null
+  sensitive   = false
+}
+
+output "ebs_kms_key_arn" {
+  description = "ARN of the EBS KMS key (null if enable_storage is false)"
+  value       = length(aws_kms_key.ebs) > 0 ? aws_kms_key.ebs[0].arn : null
+  sensitive   = false
+}
+
+output "efs_kms_key_id" {
+  description = "ID of the EFS KMS key (null if enable_storage is false)"
+  value       = length(aws_kms_key.efs) > 0 ? aws_kms_key.efs[0].key_id : null
+  sensitive   = false
+}
+
+output "efs_kms_key_arn" {
+  description = "ARN of the EFS KMS key (null if enable_storage is false)"
+  value       = length(aws_kms_key.efs) > 0 ? aws_kms_key.efs[0].arn : null
+  sensitive   = false
+}
+
+output "etcd_kms_key_id" {
+  description = "ID of the ETCD KMS key (null if enable_storage is false or etcd_encryption is false)"
+  value       = length(aws_kms_key.etcd) > 0 ? aws_kms_key.etcd[0].key_id : null
+  sensitive   = false
+}
+
+output "etcd_kms_key_arn" {
+  description = "ARN of the ETCD KMS key (null if enable_storage is false or etcd_encryption is false)"
+  value       = length(aws_kms_key.etcd) > 0 ? aws_kms_key.etcd[0].arn : null
+  sensitive   = false
+}
+
+# IAM Role Outputs
+output "cloudwatch_audit_logging_role_arn" {
+  description = "ARN of the CloudWatch audit logging IAM role (null if enable_audit_logging is false)"
+  value       = length(aws_iam_role.cloudwatch_audit_logging) > 0 ? aws_iam_role.cloudwatch_audit_logging[0].arn : null
+  sensitive   = false
+}
+
+output "cloudwatch_logging_role_arn" {
+  description = "ARN of the CloudWatch logging IAM role (null if enable_cloudwatch_logging is false)"
+  value       = length(aws_iam_role.cloudwatch_logging) > 0 ? aws_iam_role.cloudwatch_logging[0].arn : null
+  sensitive   = false
+}
+
+output "secrets_manager_role_arn" {
+  description = "ARN of the Secrets Manager IAM role (null if enable_secrets_manager_iam is false)"
+  value       = length(aws_iam_role.secrets_manager) > 0 ? aws_iam_role.secrets_manager[0].arn : null
+  sensitive   = false
+}
+
+output "cert_manager_role_arn" {
+  description = "ARN of the cert-manager IAM role (null if enable_cert_manager_iam is false)"
+  value       = length(aws_iam_role.cert_manager) > 0 ? aws_iam_role.cert_manager[0].arn : null
+  sensitive   = false
+}

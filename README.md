@@ -10,7 +10,7 @@ This repository provides reusable Terraform modules and example configurations f
 
 The repository is organized around infrastructure modules:
 
-- **Infrastructure**: Foundational AWS and ROSA resources (VPC, IAM roles, cluster, GitOps bootstrap script)
+- **Infrastructure**: Foundational AWS and ROSA resources (VPC, IAM roles and KMS keys, cluster with EFS, GitOps bootstrap script)
 
 
 ## Quick Start
@@ -105,8 +105,8 @@ rosa-hcp-infrastructure/
 │       ├── network-public/     # Public VPC with NAT Gateways
 │       ├── network-private/    # Private VPC (PrivateLink API)
 │       ├── network-existing/   # Use existing VPC
-│       ├── iam/                # IAM roles and OIDC configuration
-│       ├── cluster/            # ROSA HCP Cluster module (includes identity provider, storage, GitOps bootstrap script)
+│       ├── iam/                # IAM roles, OIDC configuration, KMS keys, operator IAM roles
+│       ├── cluster/            # ROSA HCP Cluster module (includes identity provider, EFS storage, GitOps bootstrap script)
 │       └── bastion/            # Bastion host for egress-zero cluster access
 └── clusters/                   # Cluster configurations
     ├── public/                 # Example public cluster (reference)
@@ -118,13 +118,10 @@ rosa-hcp-infrastructure/
 ### Infrastructure Modules
 
 **Infrastructure** (`modules/infrastructure/`):
-- Creates foundational AWS and ROSA resources
-- Network (VPC, subnets, NAT gateways, VPC endpoints)
-- IAM roles and OIDC configuration
-- ROSA HCP cluster (includes identity provider, storage, GitOps bootstrap script)
-- Storage resources (KMS keys for EBS, EFS, ETCD)
-- IAM roles for operators (cert-manager, external-dns, CloudWatch logging, Secrets Manager)
-- Bastion host (optional, for access)
+- **Network** (`network-public`, `network-private`, `network-existing`): VPC, subnets, NAT gateways, VPC endpoints
+- **IAM** (`iam`): IAM roles, OIDC configuration, **KMS keys** (EBS, EFS, ETCD), **IAM roles for operators** (CloudWatch logging, Cert Manager, Secrets Manager, CSI drivers)
+- **Cluster** (`cluster`): ROSA HCP cluster, machine pools, identity provider, **EFS file system**, GitOps bootstrap script
+- **Bastion** (`bastion`): Optional bastion host for egress-zero cluster access
 
 ### Module Architecture
 
@@ -455,10 +452,15 @@ make apply.my-cluster
 
 ### Core Modules
 
-- **iam**: IAM roles and OIDC configuration
+- **iam**: IAM roles, OIDC configuration, KMS keys, and operator IAM roles
   - Account roles (Installer, Support, Worker)
   - Operator roles (Ingress, Control Plane, CSI, etc.)
   - OIDC configuration and provider
+  - **KMS keys** (EBS, EFS, ETCD encryption)
+  - **Storage IAM resources** (KMS CSI policy, EBS CSI attachment, EFS CSI role/policy)
+  - **CloudWatch logging IAM** (audit logging and application logging)
+  - **Cert Manager IAM** (for AWS Private CA)
+  - **Secrets Manager IAM** (for ArgoCD Vault Plugin)
   - Uses upstream `terraform-redhat/rosa-hcp/rhcs` modules
 
 - **cluster**: ROSA HCP cluster deployment
@@ -467,9 +469,10 @@ make apply.my-cluster
   - Automatic version detection
   - Machine type validation
   - Identity provider (HTPasswd admin user) - integrated
-  - Storage resources (KMS keys, EFS) - integrated
+  - **EFS file system** (storage infrastructure that depends on cluster security groups)
   - GitOps bootstrap script - provided (run manually via `make cluster.<name>.bootstrap`)
-  - IAM roles for operators (cert-manager, external-dns, CloudWatch, Secrets Manager) - integrated
+  - CloudWatch audit logging configuration (IAM role from IAM module)
+  - Cluster termination protection
 
 - **bastion**: Bastion host for egress-zero cluster access
   - SSM Session Manager support
@@ -782,8 +785,8 @@ This allows sleeping the cluster while preserving IAM roles and OIDC configurati
 - ✅ **network-public**: Production-ready
 - ✅ **network-private**: Production-ready
 - ⚠️ **network-egress-zero**: Deprecated (use `network-private` with `enable_strict_egress = true`)
-- ✅ **iam**: Production-ready
-- ✅ **cluster**: Production-ready (includes identity provider, storage, GitOps bootstrap script, operator IAM roles)
+- ✅ **iam**: Production-ready (includes KMS keys, IAM roles for operators)
+- ✅ **cluster**: Production-ready (includes identity provider, EFS storage, GitOps bootstrap script)
 - ✅ **bastion**: Production-ready (dev/demo use only)
 
 ## Development Setup

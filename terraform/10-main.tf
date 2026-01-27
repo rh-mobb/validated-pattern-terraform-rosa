@@ -73,6 +73,23 @@ module "iam" {
   tags                       = local.tags
   persists_through_sleep     = var.persists_through_sleep
   persists_through_sleep_iam = var.persists_through_sleep_iam
+
+  # KMS configuration
+  enable_storage          = true
+  etcd_encryption         = var.etcd_encryption
+  kms_key_deletion_window = var.kms_key_deletion_window
+  enable_efs              = var.enable_efs != null ? var.enable_efs : true
+
+  # IAM feature flags
+  enable_audit_logging       = var.enable_audit_logging
+  enable_cloudwatch_logging  = var.enable_cloudwatch_logging
+  enable_cert_manager_iam    = var.enable_cert_manager_iam
+  enable_secrets_manager_iam = var.enable_secrets_manager_iam
+  aws_private_ca_arn         = var.aws_private_ca_arn
+  additional_secrets         = var.additional_secrets
+
+  # Note: cluster_credentials_secret_arn is no longer passed as a variable
+  # The IAM module looks up the secret by name (${cluster_name}-credentials) to avoid circular dependency
 }
 
 module "cluster" {
@@ -109,35 +126,39 @@ module "cluster" {
   admin_username               = var.admin_username
   admin_password_for_bootstrap = var.admin_password_override != null ? var.admin_password_override : random_password.admin_password[0].result
 
-  # Production features (for egress-zero and optionally private)
-  # Cluster module will create its own KMS key if enable_storage is true
-  kms_key_arn = var.kms_key_arn
+  # KMS keys from IAM module
+  kms_key_arn      = module.iam.ebs_kms_key_arn
+  etcd_kms_key_arn = module.iam.etcd_kms_key_arn
+  efs_kms_key_arn  = module.iam.efs_kms_key_arn
 
-  # Storage configuration - cluster module creates KMS keys and EFS
-  enable_storage       = true
+  # Storage configuration - EFS file system (KMS keys are in IAM module)
   enable_efs           = var.enable_efs != null ? var.enable_efs : true
   private_subnet_cidrs = local.network.private_subnet_cidrs
+
+  # CloudWatch audit logging configuration
+  enable_audit_logging              = var.enable_audit_logging
+  cloudwatch_audit_logging_role_arn = module.iam.cloudwatch_audit_logging_role_arn
 
   # GitOps bootstrap configuration
   enable_gitops_bootstrap = var.enable_gitops_bootstrap != null ? var.enable_gitops_bootstrap : false
   # admin_password_for_bootstrap is set above in identity provider configuration
   # Storage resources are automatically available from cluster module outputs
-  ebs_kms_key_arn    = null # Will use cluster module's created KMS key
-  efs_file_system_id = null # Will use cluster module's created EFS
+  ebs_kms_key_arn    = module.iam.ebs_kms_key_arn # Use IAM module's KMS key
+  efs_file_system_id = null                       # Will use cluster module's created EFS
   # GitOps repository configuration
   git_path            = var.gitops_git_path
   gitops_git_repo_url = var.gitops_git_repo_url
 
-  # Cert Manager, Termination Protection, and CloudWatch Logging
-  enable_cert_manager_iam       = var.enable_cert_manager_iam
+  # Termination Protection (IAM resources are in IAM module)
   enable_termination_protection = var.enable_termination_protection
-  enable_cloudwatch_logging     = var.enable_cloudwatch_logging
-  enable_secrets_manager_iam    = var.enable_secrets_manager_iam
-  additional_secrets            = var.additional_secrets
-  openshift_version             = var.openshift_version
-  service_cidr                  = var.service_cidr
-  pod_cidr                      = var.pod_cidr
-  host_prefix                   = var.host_prefix
+
+  # GitOps bootstrap configuration - IAM role ARNs from IAM module
+  aws_private_ca_arn    = var.aws_private_ca_arn
+  cert_manager_role_arn = module.iam.cert_manager_role_arn
+  openshift_version     = var.openshift_version
+  service_cidr          = var.service_cidr
+  pod_cidr              = var.pod_cidr
+  host_prefix           = var.host_prefix
 
   # Machine pools - conditional based on network type
   # Public clusters have explicit machine_pools configuration

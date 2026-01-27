@@ -50,7 +50,35 @@ variable "instance_type" {
 
 # Production variables (optional, typically used with egress-zero)
 variable "kms_key_arn" {
-  description = "KMS key ARN for encryption"
+  description = "KMS key ARN for encryption (legacy - KMS keys are now created in IAM module)"
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "kms_key_deletion_window" {
+  description = "KMS key deletion window in days"
+  type        = number
+  default     = 10
+  nullable    = false
+}
+
+variable "etcd_encryption" {
+  description = "Enable etcd encryption (requires etcd KMS key from IAM module)"
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "enable_audit_logging" {
+  description = "Enable CloudWatch audit log forwarding. When enabled, creates IAM role in IAM module and configures cluster to forward audit logs to CloudWatch."
+  type        = bool
+  default     = true
+  nullable    = false
+}
+
+variable "aws_private_ca_arn" {
+  description = "AWS Private CA ARN for cert-manager (optional)"
   type        = string
   default     = null
   nullable    = true
