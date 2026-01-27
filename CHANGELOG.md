@@ -8,6 +8,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Termination Protection**: Added cluster termination protection feature
+  - New variable `enable_termination_protection` (default: `false`) in cluster module
+  - Creates `shell_script` resource that uses ROSA CLI to enable/disable delete protection
+  - Prevents accidental cluster deletion via ROSA CLI
+  - Note: Disabling protection requires manual action via OCM console (cannot be done via CLI)
+  - Script: `scripts/cluster/termination-protection.sh`
+  - Reference: `./reference/pfoster/rosa-hcp-dedicated-vpc/terraform/13.termination-protection.tf`
+- **ETCD KMS Key**: Added dedicated KMS key for etcd encryption
+  - Creates `aws_kms_key.etcd` resource when `enable_storage = true` and `etcd_encryption = true`
+  - KMS key persists through sleep operations (like EBS/EFS keys)
+  - Cluster resource automatically uses etcd KMS key ARN when `etcd_encryption = true`
+  - New outputs: `etcd_kms_key_id` and `etcd_kms_key_arn`
+  - Reference: `./reference/pfoster/rosa-hcp-dedicated-vpc/terraform/1.main.tf:5-12`
+- **Cert Manager IAM Roles**: Added IAM role and policy for cert-manager to use AWS Private CA
+  - New variable `enable_cert_manager_iam` (default: `false`) in cluster module
+  - Creates IAM role for `cert-manager:cert-manager` service account
+  - IAM policy grants AWS Private CA permissions (`acm-pca:DescribeCertificateAuthority`, `acm-pca:GetCertificate`, `acm-pca:IssueCertificate`)
+  - Bootstrap script updated to use `CERT_MANAGER_ROLE_ARN` environment variable from Terraform output
+  - New output `cert_manager_role_arn` exposes IAM role ARN
+  - Reference: `./reference/pfoster/rosa-hcp-dedicated-vpc/terraform/6.cert-manager.tf`
+- **Secrets Manager IAM Integration**: Added IAM role and policy for ArgoCD Vault Plugin to access AWS Secrets Manager
+  - New variable `enable_secrets_manager_iam` (default: `false`) in cluster module
+  - New variable `additional_secrets` (optional list of secret names) for granting access to additional secrets
+  - Creates IAM role for `openshift-gitops:vplugin` service account
+  - IAM policy uses explicit secret ARN list for security (not wildcards)
+  - Cluster credentials secret automatically included in policy
+  - Additional secrets looked up by name via data sources to get exact ARNs
+  - New output `secrets_manager_role_arn` exposes IAM role ARN
+  - Reference: `./reference/pfoster/rosa-hcp-dedicated-vpc/terraform/3.secrets.tf`
+- **CloudWatch Logging for OpenShift Logging Operator**: Added IAM role and policy for OpenShift Logging Operator to send logs to CloudWatch
+  - New variable `enable_cloudwatch_logging` (default: `false`) in cluster module
+  - Creates IAM role for `openshift-logging:logging` service account (used by ClusterLogForwarder)
+  - IAM policy grants CloudWatch Logs permissions (CreateLogGroup, CreateLogStream, PutLogEvents, etc.)
+  - New output `cloudwatch_logging_role_arn` exposes IAM role ARN
+  - Reference: `./reference/pfoster/rosa-hcp-dedicated-vpc/terraform/4.logging.tf`
+
+### Added
 - **DNS Domain Registration**: Added DNS domain registration using `rhcs_dns_domain` resource with feature toggle:
   - New `enable_persistent_dns_domain` variable in cluster module (default: `false`) controls DNS domain registration
   - When enabled, creates `rhcs_dns_domain` resource in cluster module that persists between cluster creations (not gated by `persists_through_sleep`)

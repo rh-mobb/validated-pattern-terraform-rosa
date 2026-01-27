@@ -1,340 +1,342 @@
-# TODO
-
-This file tracks work items and improvements for the ROSA HCP Terraform infrastructure repository.
-
-## How to Use This File
-
-- Add new items to the appropriate section
-- Mark items as `[DONE]` when completed
-- Move completed items to the "Completed" section at the bottom
-- Use `[IN PROGRESS]` for items currently being worked on
-- Add your name/initials when starting work on an item
-
-## Priority Legend
-
-- 🔴 **High Priority**: Critical bugs, security issues, blocking issues
-- 🟡 **Medium Priority**: Important features, significant improvements
-- 🟢 **Low Priority**: Nice-to-have features, minor improvements
-
----
-
-## Critical Issues
-
-### Egress-Zero Cluster
-
-- [ ] 🔴 **Fix egress-zero cluster worker node startup**
-  - Worker nodes are not starting successfully (0/1 replicas)
-  - Investigation needed: console logs, security groups, VPC endpoints, IAM permissions
-  - See [CHANGELOG.md](../CHANGELOG.md) for current status
-  - **Status**: Work in Progress - Non-functional
-
----
-
-## Network Modules
-
-- [ ] 🟡 **Investigate and implement Network ACLs for egress-zero module**
-  - Currently using security groups only for access control
-  - NACLs provide stateless filtering at subnet level (defense-in-depth)
-  - Considerations:
-    - NACLs are stateless (require explicit allow rules for both directions)
-    - Must allow ephemeral ports for return traffic
-    - Must allow DNS (UDP and TCP port 53) to VPC CIDR
-    - Must allow HTTPS (443 TCP) to VPC CIDR for VPC endpoints
-    - Must account for ROSA-created VPC endpoint for API server access
-    - Need to handle dynamic VPC endpoint IP addresses (all within VPC CIDR)
-  - Reference: Previous implementation removed due to complexity, needs investigation
-
-- [ ] 🟡 **Add support for custom VPC endpoint policies**
-  - Allow users to specify custom policies for VPC endpoints
-  - Useful for compliance and security requirements
-
-- [ ] 🟢 **Add VPC Flow Logs to network-public and network-private modules**
-  - Currently only network-egress-zero has Flow Logs support
-  - Add optional Flow Logs to other network modules
-
-- [ ] 🟢 **Add support for additional VPC endpoints**
-  - CloudWatch Metrics endpoint
-  - SNS endpoint
-  - SQS endpoint
-  - Others as needed
-
-- [ ] 🟡 **Document VPC endpoint costs and optimization strategies**
-  - Add cost considerations to module READMEs
-  - Document when to use Gateway vs Interface endpoints
-
----
-
-## IAM Module
-
-- [ ] 🟡 **Add support for custom IAM role policies**
-  - Allow attaching additional policies to account roles
-  - Useful for compliance requirements
-
-- [ ] 🟢 **Add validation for role name length**
-  - AWS IAM role names have a 64-character limit
-  - Add validation to prevent errors
-
-- [ ] 🟢 **Document IAM role naming conventions**
-  - Clarify how prefixes are used
-  - Document role name format
-
----
-
-## Cluster Module
-
-- [ ] 🟡 **Add support for additional cluster properties**
-  - Document all available properties
-  - Add examples for common configurations
-
-- [ ] 🟢 **Add support for custom machine pool configurations**
-  - Taints and labels
-  - Additional autoscaling options
-
-- [ ] 🟡 **Improve error messages for validation failures**
-  - Machine type validation
-  - Replica count validation
-  - More helpful error messages
-
-- [ ] 🟢 **Add support for cluster upgrades**
-  - Document upgrade process
-  - Add examples for version upgrades
-
----
-
-## Bastion Module
-
-- [ ] 🟡 **Add support for multiple bastion instances**
-  - High availability bastion setup
-  - Load balancer for bastion access
-
-- [ ] 🟢 **Add pre-installation of additional tools**
-  - `rosa` CLI
-  - `aws` CLI updates
-  - Other utilities
-
-- [ ] 🟢 **Add bastion monitoring and alerting**
-  - CloudWatch metrics
-  - SNS notifications for bastion health
-
-- [ ] 🟡 **Document bastion security hardening**
-  - SSH key rotation
-  - Security group best practices
-  - SSM Session Manager best practices
-
----
-
-## Documentation
-
-- [ ] 🔴 **Document firewall and permission requirements for Terraform deployment**
-  - **Network/Firewall Requirements**:
-    - Outbound HTTPS (443) to ROSA API endpoints (api.openshift.com, console.redhat.com)
-    - Outbound HTTPS (443) to AWS APIs (EC2, IAM, STS, S3, ECR, CloudWatch, etc.)
-    - Outbound HTTPS (443) to Terraform Registry (registry.terraform.io)
-    - DNS resolution (UDP 53) for all above domains
-    - If using S3 backend: Outbound HTTPS (443) to S3 endpoints
-    - If using DynamoDB backend: Outbound HTTPS (443) to DynamoDB endpoints
-  - **IAM Permissions Required**:
-    - Full IAM permissions (for creating roles, policies, OIDC provider)
-    - EC2 permissions (VPC, subnets, security groups, instances, NAT gateways, VPC endpoints)
-    - S3 permissions (if using S3 backend or VPC Flow Logs)
-    - DynamoDB permissions (if using DynamoDB for state locking)
-    - CloudWatch Logs permissions (if using VPC Flow Logs)
-    - KMS permissions (if using customer-managed KMS keys)
-    - Route53 permissions (if managing DNS)
-  - **RHCS API Access**:
-    - ROSA API token with appropriate permissions
-    - Access to create/manage clusters, machine pools, identity providers
-  - **Bastion/Managed Server Considerations**:
-    - Document running Terraform from bastion hosts
-    - Document running Terraform from CI/CD systems (GitHub Actions, GitLab CI, Jenkins)
-    - Document running Terraform from managed servers with egress proxies
-    - Network egress requirements from bastion/managed server
-    - IAM role assumption requirements (if using cross-account or role assumption)
-  - **Multi-Account Scenarios**:
-    - Cross-account IAM role assumptions
-    - Network connectivity between accounts (VPC peering, Transit Gateway)
-    - State sharing across accounts
-  - Create comprehensive guide: `docs/DEPLOYMENT_REQUIREMENTS.md`
-
-- [ ] 🟡 **Add architecture diagrams**
-  - Network topology diagrams for each module
-  - Cluster architecture diagrams
-  - Multi-team workflow diagrams
-
-- [ ] 🟢 **Add troubleshooting guide**
-  - Common issues and solutions
-  - Debugging steps
-  - ROSA CLI troubleshooting commands
-
-- [ ] 🟢 **Add migration guide**
-  - Migrating from manual ROSA deployments
-  - Migrating between network types
-  - Version upgrade guides
-
-- [ ] 🟡 **Add examples for common use cases**
-  - Multi-region deployments
-  - Disaster recovery setup
-  - Development/staging/production patterns
-
-- [ ] 🟢 **Add video tutorials or walkthroughs**
-  - Quick start video
-  - Module composition tutorial
-  - Troubleshooting walkthrough
-
----
-
-## Testing & Quality
-
-- [ ] 🟡 **Add Terraform tests**
-  - Unit tests for modules
-  - Integration tests for example clusters
-  - Use `terratest` or similar framework
-
-- [ ] 🟡 **Add pre-commit hooks**
-  - `terraform fmt`
-  - `terraform validate`
-  - `checkov` security scanning
-  - Documentation checks
-
-- [ ] 🟢 **Add CI/CD pipeline**
-  - GitHub Actions or GitLab CI
-  - Automated testing
-  - Automated security scanning
-  - Automated documentation generation
-
-- [ ] 🟡 **Add example cluster tests**
-  - Validate example clusters can be deployed
-  - Smoke tests for cluster functionality
-
----
-
-## Security
-
-- [ ] 🟡 **Add security scanning automation**
-  - Integrate `checkov` into CI/CD
-  - Add security policy documentation
-  - Regular security audits
-
-- [ ] 🟢 **Add secrets management examples**
-  - AWS Secrets Manager integration
-  - HashiCorp Vault integration
-  - Environment variable best practices
-
-- [ ] 🟡 **Add security hardening guide**
-  - Network security best practices
-  - IAM best practices
-  - Cluster security configurations
-
----
-
-## Performance & Optimization
-
-- [ ] 🟢 **Add cost optimization guide**
-  - Right-sizing recommendations
-  - Cost comparison between network types
-  - Reserved instance recommendations
-
-- [ ] 🟢 **Add performance tuning guide**
-  - Cluster sizing recommendations
-  - Network performance optimization
-  - VPC endpoint optimization
-
----
-
-## Features
-
-- [ ] 🟡 **Add support for ROSA Classic (non-HCP) clusters**
-  - Classic cluster module
-  - Migration guide from Classic to HCP
-
-- [ ] 🟢 **Add support for additional cloud providers**
-  - Multi-cloud support (if applicable)
-  - Provider-specific optimizations
-
-- [ ] 🟢 **Add Terraform Cloud/Enterprise integration examples**
-  - Remote state configuration
-  - Workspace setup
-  - Team collaboration patterns
-
-- [ ] 🟡 **Add support for GitOps workflows**
-  - ArgoCD integration examples
-  - Flux integration examples
-  - Cluster configuration management
-
----
-
-## Infrastructure as Code Improvements
-
-- [ ] 🟡 **Add Terraform workspaces support**
-  - Environment-specific configurations
-  - Workspace examples
-
-- [ ] 🟢 **Add support for Terraform Cloud/Enterprise**
-  - Remote state backends
-  - Team collaboration features
-
-- [ ] 🟢 **Add module versioning strategy**
-  - Semantic versioning for modules
-  - Module registry setup
-  - Version pinning examples
-
-- [ ] 🟡 **Explore exec plugin for OpenShift token authentication**
-  - Currently using `oc login` to obtain token and passing it as a variable
-  - Investigate using Kubernetes exec plugin pattern (similar to EKS) for automatic token refresh
-  - Example EKS pattern:
-    ```hcl
-    provider "kubernetes" {
-      host                   = var.cluster_endpoint
-      cluster_ca_certificate = base64decode(var.cluster_ca_cert)
-      exec {
-        api_version = "client.authentication.k8s.io/v1beta1"
-        args        = ["eks", "get-token", "--cluster-name", var.cluster_name]
-        command     = "aws"
-      }
+# TODO: Missing Features from Pfoster Example
+
+This document tracks features from the pfoster example (`reference/pfoster/rosa-hcp-dedicated-vpc/`) that are not yet implemented in this repository.
+
+## Day 2 Operations
+
+### 1. Secrets Manager IAM Integration ✅ [DONE]
+**Reference**: `terraform/3.secrets.tf`
+
+**Status**: Implemented
+
+**What Was Implemented**:
+- ✅ IAM policy for Secrets Manager access (restricted to explicit secret ARN list for security)
+- ✅ IAM role with OIDC trust policy for `openshift-gitops:vplugin` service account
+- ✅ Policy attachment to role
+- ✅ Support for multiple secrets via `additional_secrets` variable
+- ✅ Automatic inclusion of cluster credentials secret
+- ✅ Data source lookups for additional secrets to get exact ARNs
+- ✅ Variable `enable_secrets_manager_iam` added (default: `false`)
+- ✅ Variable `additional_secrets` added (optional list of secret names)
+- ✅ Outputs added to expose IAM role ARN
+
+**Security Recommendation**:
+⚠️ **CRITICAL**: The pfoster example uses `Resource = "*"` which grants access to ALL secrets in the account. This is a security risk.
+
+**Recommended Secure Implementation: Explicit Secret List with Exact ARNs**:
+For maximum security, use an explicit list of secret ARNs (obtained via data source lookups) and restrict the IAM policy to only those specific secrets.
+
+**Benefits**:
+- **Maximum Security**: Only explicitly listed secrets are accessible
+- **Principle of Least Privilege**: No access to secrets from other clusters or unrelated secrets
+- **Precise ARNs**: Using exact ARNs (via data sources) is more precise than wildcard patterns
+- **Audit Trail**: Clear visibility of which secrets are accessible
+- **Production Ready**: Best practice for production environments with strict security requirements
+
+**Trade-offs**:
+- Less flexible: Requires updating IAM policy when adding new secrets
+- Requires Terraform apply when secrets are added/removed
+- More explicit configuration needed
+- Requires data source lookups (adds dependency on secret existence)
+
+**Implementation Approach**:
+1. **Variable**: Accept a list of secret names that should be accessible
+   - Default: Include the cluster credentials secret (`${cluster_name}-credentials`)
+   - Optional: Support additional secrets via `additional_secrets` variable (list of secret names)
+
+2. **Data Sources**: Use `aws_secretsmanager_secret` data sources to lookup exact ARNs
+   - Lookup secrets by name to get exact ARNs
+   - Handle cases where secrets may not exist yet (use `count` or conditional lookups)
+   - Build policy resource list from exact ARNs
+
+3. **Secret Creation**: When creating additional secrets, automatically add them to the IAM policy
+   - Use `for_each` to create secrets from a map
+   - Use resource ARNs directly (no need for data sources if created in same module)
+
+4. **Policy Structure**: Include `ListSecrets` action (GitOps needs this)
+   - `ListSecrets` requires `Resource = "*"` but actual secret access is still restricted by explicit ARN list
+   - Document that `ListSecrets` grants broader access but `GetSecretValue` is restricted
+
+**Recommended Policy Structure**:
+```hcl
+# Using exact ARNs from data source lookups and created secrets
+locals {
+  # Default secret (created by this module)
+  default_secret_arn = var.enable_gitops_bootstrap && length(aws_secretsmanager_secret.cluster_credentials) > 0 ?
+    aws_secretsmanager_secret.cluster_credentials[0].arn : null
+
+  # Lookup additional secrets by name (if they exist)
+  additional_secret_arns = var.additional_secrets != null ? [
+    for secret_name in var.additional_secrets :
+    data.aws_secretsmanager_secret.additional[secret_name].arn
+  ] : []
+
+  # Combine all secret ARNs (filter out nulls)
+  all_secret_arns = compact(concat(
+    local.default_secret_arn != null ? [local.default_secret_arn] : [],
+    local.additional_secret_arns
+  ))
+}
+
+# Data sources for additional secrets (if provided)
+data "aws_secretsmanager_secret" "additional" {
+  for_each = var.additional_secrets != null ? toset(var.additional_secrets) : toset([])
+  name     = each.value
+}
+
+policy = jsonencode({
+  Version = "2012-10-17"
+  Statement = [
+    {
+      Effect = "Allow"
+      Action = [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+      ]
+      Resource = local.all_secret_arns
+    },
+    {
+      Effect = "Allow"
+      Action = [
+        "secretsmanager:ListSecrets"
+      ]
+      # ListSecrets requires * but actual secret access is restricted above
+      Resource = "*"
     }
-    ```
-  - Benefits:
-    - Automatic token refresh (no manual `oc login` required)
-    - No need to pass tokens as variables (improved security)
-    - Better integration with CI/CD pipelines
-    - Token refresh handled by provider automatically
-  - Considerations:
-    - OpenShift/ROSA equivalent of `aws eks get-token` (likely `oc` CLI)
-    - Exec plugin API version compatibility
-    - Support in both `kubernetes` and `openshift-operator` providers
-    - Fallback to current method if exec plugin not available
-  - Reference: [Kubernetes Exec Credential Provider](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins)
+  ]
+})
+```
+
+**Note**:
+- `ListSecrets` action requires `Resource = "*"` and cannot be restricted to specific secrets
+- This is acceptable for GitOps use case - the action allows listing but actual secret access is still restricted by the explicit ARN list in the first statement
+- The policy follows principle of least privilege for actual secret retrieval while allowing necessary listing functionality
+
+**Implementation Notes**:
+- Create IAM policy for Secrets Manager access (restricted to explicit list of exact secret ARNs)
+- Create IAM role with OIDC trust policy for `openshift-gitops:vplugin` service account
+- Attach policy to role
+- **Variable Design**:
+  - `enable_secrets_manager_iam` (bool, default: false) - Enable IAM role creation
+  - `additional_secrets` (list(string), optional) - Additional secret names to grant access to (e.g., `["secret-1", "secret-2"]`)
+- **Secret Management**:
+  - Default secret (`${cluster_name}-credentials`) is always included in policy (if GitOps bootstrap is enabled)
+  - Additional secrets are looked up by name using `aws_secretsmanager_secret` data sources
+  - Secrets can be created by this module OR referenced by name if created elsewhere
+  - All secrets should be tagged with `Cluster = var.cluster_name` for organization
+- **Policy Construction**:
+  - Use exact ARNs from:
+    1. Created secrets: `aws_secretsmanager_secret.cluster_credentials[0].arn` (if created in module)
+    2. Data source lookups: `data.aws_secretsmanager_secret.additional[secret_name].arn` (for additional secrets)
+  - Build ARN list by combining default and additional secret ARNs
+  - Include `ListSecrets` action with `Resource = "*"` (required for GitOps, actual access still restricted by explicit ARN list)
+- **Data Source Handling**:
+  - Use `for_each` with `toset()` to create data sources for each additional secret name
+  - Handle cases where secrets may not exist (data source will fail if secret doesn't exist - document this requirement)
+  - Consider adding validation to ensure secrets exist before creating IAM policy
+
+**Files Created/Modified**:
+- ✅ `modules/infrastructure/cluster/40-secrets-manager-iam.tf` (created)
+  - IAM policy with explicit secret ARN list
+  - IAM role with OIDC trust policy for `openshift-gitops:vplugin`
+  - Policy attachment
+  - Data sources for additional secrets lookup
+  - Locals for building secret ARN list
+- ✅ `modules/infrastructure/cluster/01-variables.tf` (added variables)
+  - `enable_secrets_manager_iam` variable (bool, default: false)
+  - `additional_secrets` variable (list(string), optional)
+- ✅ `modules/infrastructure/cluster/90-outputs.tf` (added output)
+  - `secrets_manager_role_arn` output
+- ✅ `terraform/01-variables.tf` (added variables)
+  - `enable_secrets_manager_iam` variable
+  - `additional_secrets` variable
+- ✅ `terraform/10-main.tf` (passed variables to cluster module)
+- ✅ `terraform/90-outputs.tf` (exposed secrets_manager_role_arn from cluster module)
+
+**Security Implementation**:
+- ✅ Uses explicit secret ARN list instead of wildcards (`Resource = "*"`)
+- ✅ `GetSecretValue` and `DescribeSecret` restricted to explicit ARN list
+- ✅ `ListSecrets` uses `Resource = "*"` (required by GitOps, but actual access is restricted)
+- ✅ Cluster credentials secret automatically included
+- ✅ Additional secrets looked up by name via data sources to get exact ARNs
 
 ---
 
-## Developer Experience
+### 2. CloudWatch Logging for OpenShift Logging Operator ✅ [DONE]
+**Reference**: `terraform/4.logging.tf`
 
-- [ ] 🟡 **Add development environment setup guide**
-  - Required tools and versions
-  - Local development setup
-  - Testing environment setup
+**Status**: Implemented
 
-- [ ] 🟢 **Add Makefile improvements**
-  - Add more utility targets
-  - Add validation targets
-  - Add cleanup targets
+**What Was Implemented**:
+- ✅ IAM policy for CloudWatch Logs access (CreateLogGroup, CreateLogStream, DescribeLogGroups, DescribeLogStreams, PutLogEvents, PutRetentionPolicy)
+- ✅ IAM role with OIDC trust policy for `openshift-logging:logging` service account (used by ClusterLogForwarder)
+- ✅ Policy attachment to role
+- ✅ Variable `enable_cloudwatch_logging` added (default: `false`)
+- ✅ Outputs added to expose IAM role ARN
+- ✅ Role name matches pfoster reference: `${cluster_name}-rosa-cloudwatch-role-iam`
 
-- [ ] 🟢 **Add VS Code/Cursor configuration**
-  - Terraform extension settings
-  - Recommended extensions
-  - Workspace settings
+**Files Created/Modified**:
+- ✅ `modules/infrastructure/cluster/21-cloudwatch-logging.tf` (created)
+- ✅ `modules/infrastructure/cluster/01-variables.tf` (added `enable_cloudwatch_logging` variable)
+- ✅ `modules/infrastructure/cluster/90-outputs.tf` (added `cloudwatch_logging_role_arn` output)
+- ✅ `terraform/01-variables.tf` (added `enable_cloudwatch_logging` variable)
+- ✅ `terraform/10-main.tf` (passed variable to cluster module)
+- ✅ `terraform/90-outputs.tf` (exposed cloudwatch_logging_role_arn from cluster module)
 
 ---
 
-## Completed
+### 3. Cert Manager IAM Roles ✅ [DONE]
+**Reference**: `terraform/6.cert-manager.tf`
 
-_Items will be moved here as they are completed_
+**Status**: Implemented
+
+**What Was Implemented**:
+- ✅ IAM policy for AWS Private CA access (`acm-pca:DescribeCertificateAuthority`, `acm-pca:GetCertificate`, `acm-pca:IssueCertificate`)
+- ✅ IAM role with OIDC trust policy for `cert-manager:cert-manager` service account
+- ✅ Policy attachment to role
+- ✅ Bootstrap script updated to use `CERT_MANAGER_ROLE_ARN` environment variable from Terraform output
+- ✅ Outputs added to expose IAM role ARN
+- ✅ Variable `enable_cert_manager_iam` added (default: `false`)
+
+**Files Created/Modified**:
+- ✅ `modules/infrastructure/cluster/50-cert-manager-iam.tf` (created)
+- ✅ `modules/infrastructure/cluster/01-variables.tf` (added `enable_cert_manager_iam` variable)
+- ✅ `modules/infrastructure/cluster/90-outputs.tf` (added `cert_manager_role_arn` output and included in bootstrap env vars)
+- ✅ `scripts/cluster/bootstrap-gitops.sh` (updated to use `CERT_MANAGER_ROLE_ARN` if provided)
+- ✅ `modules/infrastructure/cluster/README.md` (documented new variable and output)
+- ✅ `terraform/90-outputs.tf` (exposed cert_manager_role_arn from cluster module)
+
+---
+
+### 4. ETCD KMS Key ✅ [DONE]
+**Reference**: `terraform/1.main.tf` (lines 5-12)
+
+**Status**: Implemented
+
+**What Was Implemented**:
+- ✅ Created `aws_kms_key.etcd` resource in `11-storage.tf`
+- ✅ Created `aws_kms_alias.etcd` resource
+- ✅ KMS key is created when `enable_storage = true` and `etcd_encryption = true`
+- ✅ Cluster resource uses `etcd_kms_key_arn` field when `etcd_encryption = true`
+- ✅ Key persists through sleep operations (like EBS/EFS keys)
+- ✅ New outputs: `etcd_kms_key_id` and `etcd_kms_key_arn`
+
+**Files Created/Modified**:
+- ✅ `modules/infrastructure/cluster/11-storage.tf` (added etcd KMS key and alias)
+- ✅ `modules/infrastructure/cluster/10-main.tf` (added `etcd_kms_key_arn` to cluster resource)
+- ✅ `modules/infrastructure/cluster/90-outputs.tf` (added etcd KMS key outputs)
+- ✅ `terraform/90-outputs.tf` (exposed etcd KMS key outputs from cluster module)
+- ✅ `modules/infrastructure/cluster/README.md` (documented new outputs)
+
+---
+
+### 5. Ingress Controller Deployment with Route53 📋 [PLANNED]
+**Reference**: `terraform/11.ingress.tf` and `scripts/ingress.tftpl`
+
+**Status**: Implementation plan documented
+
+**Approach**: Use cert-manager and external-dns operators for automatic certificate and DNS management (GitOps-first approach)
+
+**Implementation Plan**: See [`docs/improvements/ingress.md`](improvements/ingress.md) for detailed implementation plan
+
+**What Will Be Implemented**:
+- Route53 private hosted zone creation (Terraform)
+- IAM role for external-dns to manage Route53 records (Terraform)
+- cert-manager and external-dns deployment via Helm/GitOps
+- Ingress controller deployment via Helm/GitOps
+- Automatic certificate creation via cert-manager
+- Automatic DNS record creation via external-dns
+
+**Key Design Decisions**:
+- Minimal Terraform: Only AWS infrastructure (Route53 zone, IAM roles)
+- GitOps-First: All Kubernetes resources deployed via Helm/GitOps
+- Operator-Based: cert-manager and external-dns handle automation
+- No Scripts: Eliminates need for shell scripts or Helm CLI calls from Terraform
+
+---
+
+### 6. Termination Protection ✅ [DONE]
+**Reference**: `terraform/13.termination-protection.tf` and `scripts/termination-protection.tftpl`
+
+**Status**: Implemented
+
+**What Was Implemented**:
+- ✅ Created `scripts/cluster/termination-protection.sh` script
+- ✅ Script uses ROSA CLI (`rosa edit cluster --enable-delete-protection`) to enable protection
+- ✅ Created `shell_script` resource in `modules/infrastructure/cluster/75-termination-protection.tf`
+- ✅ Added `enable_termination_protection` variable (default: `false`)
+- ✅ Script is idempotent and handles both enable/disable operations
+- ✅ Script uses existing ROSA login session (no token required)
+- ✅ Note: Disabling protection cannot be done via CLI (requires OCM console), script documents this
+
+**Files Created/Modified**:
+- ✅ `scripts/cluster/termination-protection.sh` (created)
+- ✅ `modules/infrastructure/cluster/75-termination-protection.tf` (created)
+- ✅ `modules/infrastructure/cluster/01-variables.tf` (added `enable_termination_protection` variable)
+- ✅ `modules/infrastructure/cluster/README.md` (documented new variable)
+- ✅ `CHANGELOG.md` (documented new feature)
+
+---
+
+## Infrastructure Features
+
+### 7. EFS Backup Configuration
+**Reference**: `terraform/7.storage.tf` (lines 256-336, commented out)
+
+**What's Missing**:
+- AWS Backup configuration for EFS
+- Backup vault, plan, and selection
+- Automated EFS backup scheduling
+
+**Implementation Notes**:
+- Create AWS Backup vault with KMS encryption
+- Create backup plan with schedule
+- Create backup selection targeting EFS file system
+- IAM role for AWS Backup service
+
+**Files to Create/Modify**:
+- `modules/infrastructure/cluster/12-efs-backup.tf` (new)
+- Update `modules/infrastructure/cluster/01-variables.tf` to add:
+  - `enable_efs_backup` variable
+  - `efs_backup_schedule` variable
+  - `efs_backup_retention_days` variable
+- Update `modules/infrastructure/cluster/90-outputs.tf` to expose backup plan/vault IDs
+
+---
+
+## Implementation Priority
+
+### High Priority (Core Day 2 Operations)
+1. **Cert Manager IAM Roles** - Required for AWS Private CA Issuer to work
+2. **CloudWatch Logging** - Common production requirement
+3. **ETCD KMS Key** - Security best practice for etcd encryption
+
+### Medium Priority (Useful Day 2 Operations)
+4. **Secrets Manager IAM Integration** ✅ - Useful for GitOps secrets management
+5. **Ingress Controller Deployment** - Common requirement for application access
+6. **Termination Protection** ✅ - Safety feature for production clusters
+
+### Low Priority (Specialized Features)
+7. **EFS Backup** - Nice-to-have for data protection
 
 ---
 
 ## Notes
 
-- This TODO list is maintained by the team
-- Feel free to add items or update priorities
-- Link to related issues or PRs when available
-- Update status as work progresses
+- All new features should follow existing patterns:
+  - Use `persists_through_sleep` variable for resource lifecycle
+  - Add `persists_through_sleep = "true"` tag to resources that should persist
+  - Use `shell_script` provider for scripts that interact with cluster
+  - Follow existing module structure and naming conventions
+  - Update CHANGELOG.md when implementing features
+  - Update PLAN.md if architecture changes
+
+- Reference implementations:
+  - Pfoster example: `reference/pfoster/rosa-hcp-dedicated-vpc/terraform/`
+  - Script templates: `reference/pfoster/rosa-hcp-dedicated-vpc/terraform/scripts/`
+
+- Testing considerations:
+  - Test with both public and private clusters
+  - Test with `persists_through_sleep = true` and `false`
+  - Verify idempotency of scripts
+  - Test cleanup/destroy operations

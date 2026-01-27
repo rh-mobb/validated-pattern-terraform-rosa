@@ -10,12 +10,7 @@
 # oidc_config_and_provider module, this is a known issue where the upstream module's time_sleep resource
 # sees the OIDC endpoint URL format change. This typically resolves on the next apply. The normalization
 # here only affects our IAM trust policy and does not modify the upstream module's behavior.
-locals {
-  # Strip https:// prefix from OIDC endpoint URL if present (as per Red Hat documentation)
-  # The OIDC endpoint URL should be in format: oidc.op1.openshiftapps.com/2nb1con7holccea7ogkfrm7ddjc8ih0q
-  # Using replace() is safe - it returns the original string if the pattern isn't found
-  oidc_endpoint_url_normalized = replace(var.oidc_endpoint_url, "https://", "")
-}
+# The oidc_endpoint_url_normalized local is defined in 10-main.tf
 
 # IAM Policy for CloudWatch Logging
 # Grants permissions to create log groups, log streams, and write log events to CloudWatch

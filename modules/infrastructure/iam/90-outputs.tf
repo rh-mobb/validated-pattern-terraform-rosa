@@ -13,8 +13,8 @@ output "oidc_endpoint_url" {
 output "oidc_provider_arn" {
   description = "ARN of the OIDC provider (constructed from OIDC endpoint URL)"
   # The module may not expose this directly, so we construct it from the endpoint URL
-  value       = try(module.oidc_config_and_provider.oidc_provider_arn, "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(module.oidc_config_and_provider.oidc_endpoint_url, "https://", "")}")
-  sensitive   = false
+  value     = try(module.oidc_config_and_provider.oidc_provider_arn, "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(module.oidc_config_and_provider.oidc_endpoint_url, "https://", "")}")
+  sensitive = false
 }
 
 output "installer_role_arn" {

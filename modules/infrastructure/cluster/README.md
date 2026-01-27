@@ -112,6 +112,8 @@ module "identity_admin" {
 | openshift_version | OpenShift version to pin. If not provided, automatically uses latest installable version | `string` | `null` |
 | wait_for_std_compute_nodes_complete | Wait for standard compute nodes to complete before considering cluster creation successful. Set to false if nodes may take longer (e.g., egress-zero clusters) | `bool` | `true` |
 | enable_audit_logging | Enable CloudWatch audit log forwarding. When enabled, creates IAM role and policy for CloudWatch logging | `bool` | `true` |
+| enable_cert_manager_iam | Enable IAM role and policy for cert-manager to use AWS Private CA. When enabled, creates IAM role for cert-manager service account | `bool` | `false` |
+| enable_termination_protection | Enable cluster termination protection. When enabled, prevents accidental cluster deletion via ROSA CLI. Note: Disabling protection requires manual action via OCM console | `bool` | `false` |
 | api_endpoint_allowed_cidrs | Optional list of IPv4 CIDR blocks allowed to access the ROSA HCP API endpoint. By default, the VPC endpoint security group only allows access from within the VPC. Useful for VPN ranges, bastion hosts, or other VPCs | `list(string)` | `[]` |
 | enable_persistent_dns_domain | Enable persistent DNS domain registration. When true, creates rhcs_dns_domain resource that persists between cluster creations (not gated by persists_through_sleep). When false, ROSA uses default DNS domain | `bool` | `false` |
 | tags | Tags to apply to the cluster | `map(string)` | `{}` |
@@ -143,6 +145,9 @@ module "identity_admin" {
 | cluster_admin_password | Cluster admin password (sensitive) |
 | state | State of the cluster |
 | cloudwatch_audit_logging_role_arn | ARN of the IAM role for CloudWatch audit log forwarding (null if disabled or persists_through_sleep is false) |
+| cert_manager_role_arn | ARN of the IAM role for cert-manager to use AWS Private CA (null if disabled or persists_through_sleep is false) |
+| etcd_kms_key_id | ID of the KMS key for etcd encryption (null if enable_storage is false or etcd_encryption is false) |
+| etcd_kms_key_arn | ARN of the KMS key for etcd encryption (null if enable_storage is false or etcd_encryption is false) |
 | default_machine_pools | Map of default machine pool IDs keyed by pool name |
 | additional_machine_pools | Map of additional machine pool IDs keyed by pool name |
 | all_machine_pools | Map of all machine pool IDs (default + additional) keyed by pool name |

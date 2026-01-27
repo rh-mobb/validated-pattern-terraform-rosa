@@ -141,6 +141,36 @@ output "efs_kms_key_arn" {
   sensitive   = false
 }
 
+output "etcd_kms_key_id" {
+  description = "ID of the KMS key for etcd encryption (persists through sleep, null if enable_storage is false or etcd_encryption is false)"
+  value       = module.cluster.etcd_kms_key_id
+  sensitive   = false
+}
+
+output "etcd_kms_key_arn" {
+  description = "ARN of the KMS key for etcd encryption (persists through sleep, null if enable_storage is false or etcd_encryption is false)"
+  value       = module.cluster.etcd_kms_key_arn
+  sensitive   = false
+}
+
+output "cert_manager_role_arn" {
+  description = "ARN of the IAM role for cert-manager to use AWS Private CA (null if enable_cert_manager_iam is false)"
+  value       = module.cluster.cert_manager_role_arn
+  sensitive   = false
+}
+
+output "cloudwatch_logging_role_arn" {
+  description = "ARN of the IAM role for CloudWatch logging via OpenShift Logging Operator (null if enable_cloudwatch_logging is false)"
+  value       = module.cluster.cloudwatch_logging_role_arn
+  sensitive   = false
+}
+
+output "secrets_manager_role_arn" {
+  description = "ARN of the IAM role for ArgoCD Vault Plugin to access AWS Secrets Manager (null if enable_secrets_manager_iam is false)"
+  value       = module.cluster.secrets_manager_role_arn
+  sensitive   = false
+}
+
 output "gitops_bootstrap_enabled" {
   description = "Whether GitOps bootstrap is enabled"
   value       = module.cluster.gitops_bootstrap_enabled

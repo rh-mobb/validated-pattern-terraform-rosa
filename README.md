@@ -10,7 +10,7 @@ This repository provides reusable Terraform modules and example configurations f
 
 The repository is organized around infrastructure modules:
 
-- **Infrastructure**: Foundational AWS and ROSA resources (VPC, IAM roles, cluster, GitOps bootstrap)
+- **Infrastructure**: Foundational AWS and ROSA resources (VPC, IAM roles, cluster, GitOps bootstrap script)
 
 
 ## Quick Start
@@ -78,7 +78,7 @@ make cluster.public.show-credentials
 **4. Bootstrap GitOps (after cluster is ready):**
 ```bash
 # Bootstrap GitOps operator on the cluster
-make cluster.public.bootstrap-cluster
+make cluster.public.bootstrap
 ```
 
 **5. Destroy the cluster:**
@@ -106,9 +106,8 @@ rosa-hcp-infrastructure/
 │       ├── network-private/    # Private VPC (PrivateLink API)
 │       ├── network-existing/   # Use existing VPC
 │       ├── iam/                # IAM roles and OIDC configuration
-│       ├── cluster/            # ROSA HCP Cluster module (includes GitOps bootstrap)
-│       ├── bastion/            # Bastion host for egress-zero cluster access
-│       └── identity-admin/     # Admin user creation (temporary bootstrap, uses OCM provider)
+│       ├── cluster/            # ROSA HCP Cluster module (includes identity provider, storage, GitOps bootstrap script)
+│       └── bastion/            # Bastion host for egress-zero cluster access
 └── clusters/                   # Cluster configurations
     ├── public/                 # Example public cluster (reference)
     │   └── terraform.tfvars   # Cluster-specific variables
@@ -122,9 +121,9 @@ rosa-hcp-infrastructure/
 - Creates foundational AWS and ROSA resources
 - Network (VPC, subnets, NAT gateways, VPC endpoints)
 - IAM roles and OIDC configuration
-- ROSA HCP cluster
-- GitOps bootstrap (integrated into cluster module)
-- Storage resources (KMS keys, EFS)
+- ROSA HCP cluster (includes identity provider, storage, GitOps bootstrap script)
+- Storage resources (KMS keys for EBS, EFS, ETCD)
+- IAM roles for operators (cert-manager, external-dns, CloudWatch logging, Secrets Manager)
 - Bastion host (optional, for access)
 
 ### Module Architecture
@@ -180,7 +179,7 @@ module "cluster" {
 }
 ```
 
-The cluster module includes GitOps bootstrap functionality, which automatically deploys the OpenShift GitOps operator and configures it to use your cluster-config Git repository.
+The cluster module provides GitOps bootstrap functionality via a script that deploys the OpenShift GitOps operator and configures it to use your cluster-config Git repository. The bootstrap script is run manually after cluster deployment using `make cluster.<name>.bootstrap`.
 
 ### Multi-Team Scenarios
 
@@ -467,11 +466,10 @@ make apply.my-cluster
   - Machine pool management
   - Automatic version detection
   - Machine type validation
-
-- **identity-admin**: Admin user creation
-  - Temporary bootstrap user
-  - HTPasswd identity provider
-  - Can be removed when external IDP is configured
+  - Identity provider (HTPasswd admin user) - integrated
+  - Storage resources (KMS keys, EFS) - integrated
+  - GitOps bootstrap script - provided (run manually via `make cluster.<name>.bootstrap`)
+  - IAM roles for operators (cert-manager, external-dns, CloudWatch, Secrets Manager) - integrated
 
 - **bastion**: Bastion host for egress-zero cluster access
   - SSM Session Manager support
@@ -524,7 +522,7 @@ make tunnel-start.egress-zero
 - `destroy-infrastructure.<cluster>` - Destroy infrastructure
 
 **GitOps:**
-- `bootstrap-cluster.<cluster>` - Bootstrap GitOps operator on cluster
+- `bootstrap.<cluster>` - Bootstrap GitOps operator on cluster
 
 **Cluster Access:**
 - `login.<cluster>` - Login to cluster using `oc`
@@ -581,22 +579,24 @@ See `modules/bastion/README.md` for detailed documentation.
 
 ## Admin User Management
 
-The `identity-admin` module creates a temporary admin user for initial cluster access:
+The cluster module includes identity provider functionality that creates a temporary admin user for initial cluster access. This is controlled by the `enable_identity_provider` variable (default: `true` when `persists_through_sleep = true`).
 
+**Configuration**:
 ```hcl
-module "identity_admin" {
-  source = "../../modules/identity-admin"
+module "cluster" {
+  # ... other configuration ...
 
-  cluster_id     = module.cluster.cluster_id
-  admin_password = var.admin_password  # Set via TF_VAR_admin_password
-  admin_username = "admin"             # Optional, defaults to "admin"
-  admin_group    = "cluster-admins"    # Optional, defaults to "cluster-admins"
+  # Identity provider configuration (integrated in cluster module)
+  enable_identity_provider = true
+  admin_username           = "admin"  # Optional, defaults to "admin"
+  admin_password_for_bootstrap = var.admin_password  # Set via TF_VAR_admin_password
+  admin_group              = "cluster-admins"  # Optional, defaults to "cluster-admins"
 }
 ```
 
-**Best Practice**: Remove this module once you've configured an external identity provider (LDAP, OIDC, etc.).
+**Best Practice**: Set `enable_identity_provider = false` once you've configured an external identity provider (LDAP, OIDC, etc.).
 
-See `modules/identity-admin/README.md` for detailed documentation.
+The admin password is stored in AWS Secrets Manager (`{cluster_name}-credentials` secret) and persists through sleep operations for easy cluster restart.
 
 ## State Management
 
@@ -772,6 +772,8 @@ This allows sleeping the cluster while preserving IAM roles and OIDC configurati
 
 - **[PLAN.md](PLAN.md)** - Detailed implementation plan and architecture decisions
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[docs/TODO.md](docs/TODO.md)** - Tracking of features from reference implementations
+- **[docs/improvements/ingress.md](docs/improvements/ingress.md)** - Ingress controller implementation plan
 - **Module READMEs** - See `modules/*/README.md` for module-specific documentation
 - **[.cursorrules](.cursorrules)** - Development guidelines and best practices
 
@@ -781,8 +783,7 @@ This allows sleeping the cluster while preserving IAM roles and OIDC configurati
 - ✅ **network-private**: Production-ready
 - ⚠️ **network-egress-zero**: Deprecated (use `network-private` with `enable_strict_egress = true`)
 - ✅ **iam**: Production-ready
-- ✅ **cluster**: Production-ready
-- ✅ **identity-admin**: Production-ready
+- ✅ **cluster**: Production-ready (includes identity provider, storage, GitOps bootstrap script, operator IAM roles)
 - ✅ **bastion**: Production-ready (dev/demo use only)
 
 ## Development Setup

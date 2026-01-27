@@ -20,9 +20,9 @@ check-cluster:
 	@$(SCRIPT_DIR)/utils/check-cluster.sh $(CLUSTER_NAME)
 
 .PHONY: help init plan apply destroy destroy_force sleep fmt validate clean
-.PHONY: show-endpoints show-credentials login
+.PHONY: show-endpoints show-credentials login verify
 .PHONY: tunnel-start tunnel-stop tunnel-status bastion-connect
-.PHONY: bootstrap-cluster
+.PHONY: bootstrap
 
 help: ## Show this help message
 	@$(SCRIPT_DIR)/utils/get-network-config.sh $(CLUSTER_DIR) >/dev/null 2>&1 || true; \
@@ -46,12 +46,13 @@ help: ## Show this help message
 	echo "  make cluster.$(CLUSTER_NAME).sleep             Sleep cluster (destroy with preserved resources)"; \
 	echo ""; \
 	echo "$(GREEN)GitOps:$(NC)"; \
-	echo "  make cluster.$(CLUSTER_NAME).bootstrap-cluster Bootstrap GitOps operator on cluster"; \
+	echo "  make cluster.$(CLUSTER_NAME).bootstrap Bootstrap GitOps operator on cluster"; \
 	echo ""; \
 	echo "$(GREEN)Cluster Access:$(NC)"; \
 	echo "  make cluster.$(CLUSTER_NAME).show-endpoints    Show API and console URLs"; \
 	echo "  make cluster.$(CLUSTER_NAME).show-credentials Show admin credentials and endpoints"; \
 	echo "  make cluster.$(CLUSTER_NAME).login             Login to cluster using oc CLI"; \
+	echo "  make cluster.$(CLUSTER_NAME).verify           Verify cluster deployment and GitOps"; \
 	echo ""; \
 	echo "$(GREEN)Bastion & Tunnel Management:$(NC)"; \
 	echo "  make cluster.$(CLUSTER_NAME).tunnel-start      Start sshuttle VPN tunnel via bastion"; \
@@ -98,7 +99,7 @@ sleep: check-cluster
 	@echo "$(GREEN)To wake the cluster, run: make cluster.$(CLUSTER_NAME).apply$(NC)"
 
 # GitOps operations
-bootstrap-cluster: check-cluster
+bootstrap: check-cluster
 	@echo "$(BLUE)Bootstrapping GitOps operator for $(CLUSTER_NAME)...$(NC)"
 	@cd $(TERRAFORM_DIR) && \
 		if ! terraform output -no-color gitops_bootstrap_enabled 2>/dev/null | grep -q "true"; then \
@@ -127,6 +128,13 @@ show-credentials: show-endpoints
 
 login: check-cluster
 	@$(SCRIPT_DIR)/info/login.sh $(CLUSTER_NAME)
+
+verify: check-cluster ## Verify cluster deployment, GitOps operator, and ApplicationSet
+	@if ! command -v python3 >/dev/null 2>&1; then \
+		echo "$(YELLOW)Error: python3 not found. Required for verify script.$(NC)"; \
+		exit 1; \
+	fi
+	@python3 $(SCRIPT_DIR)/verify_cluster.py $(CLUSTER_NAME) || exit 1
 
 # Tunnel operations
 tunnel-start: check-cluster

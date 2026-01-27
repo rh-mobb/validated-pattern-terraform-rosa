@@ -731,7 +731,8 @@ install_aws_privateca_issuer() {
     bad_exit "AWS_ACCOUNT_ID is required for AWS Private CA Issuer installation."
   fi
 
-  local cert_manager_role="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${CLUSTER_NAME}-rosa-cert-manager"
+  # Use CERT_MANAGER_ROLE_ARN from Terraform output if provided, otherwise construct from cluster name
+  local cert_manager_role="${CERT_MANAGER_ROLE_ARN:-arn:aws:iam::${AWS_ACCOUNT_ID}:role/${CLUSTER_NAME}-rosa-cert-manager}"
 
   echo "Installing/Upgrading ${chart_name} chart..."
   helm upgrade --install "${chart_name}" \

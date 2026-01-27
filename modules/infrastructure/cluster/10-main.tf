@@ -10,6 +10,21 @@ locals {
   # Cluster needs all subnets (private + public for public clusters, just private for private clusters)
   subnet_ids = concat(var.private_subnet_ids, var.public_subnet_ids)
 
+  # Strip https:// prefix from OIDC endpoint URL if present (as per Red Hat documentation)
+  # The OIDC endpoint URL should be in format: oidc.op1.openshiftapps.com/2nb1con7holccea7ogkfrm7ddjc8ih0q
+  # Using replace() is safe - it returns the original string if the pattern isn't found
+  # Used by IAM roles for CloudWatch audit logging and Cert Manager
+  oidc_endpoint_url_normalized = var.oidc_endpoint_url != null ? replace(var.oidc_endpoint_url, "https://", "") : ""
+
+  # Script paths relative to repository root
+  # path.root is the root module directory (terraform/)
+  # From there, scripts are at ../scripts/cluster/ relative to repo root
+  termination_protection_script_path = "${path.root}/../scripts/cluster/termination-protection.sh"
+  bootstrap_gitops_script_path       = "${path.root}/../scripts/cluster/bootstrap-gitops.sh"
+
+  # AWS account ID (available via data source)
+  aws_account_id = data.aws_caller_identity.current.account_id
+
   # Determine OpenShift version to use
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/04-cluster.tf
   # If openshift_version is provided, use it; otherwise use the latest installable version
@@ -58,7 +73,7 @@ locals {
 
   # Additional machine pools validation
   # Ensure no name conflicts with default pools
-  default_pool_names   = toset(local.hcp_machine_pools)
+  default_pool_names    = toset(local.hcp_machine_pools)
   additional_pool_names = keys(var.additional_machine_pools)
 }
 
@@ -119,7 +134,13 @@ resource "rhcs_cluster_rosa_hcp" "main" {
   etcd_encryption = var.etcd_encryption
 
   # Optional encryption - use created EBS KMS key if available, otherwise use provided kms_key_arn
+  # kms_key_arn is used for root volume encryption (EBS volumes)
   kms_key_arn = length(aws_kms_key.ebs) > 0 ? aws_kms_key.ebs[0].arn : var.kms_key_arn
+
+  # Etcd encryption KMS key - use created etcd KMS key if etcd_encryption is enabled
+  # Reference: https://registry.terraform.io/providers/terraform-redhat/rhcs/latest/docs/resources/cluster_rosa_hcp#etcd_kms_key_arn
+  # When etcd_encryption is true, etcd_kms_key_arn must be provided
+  etcd_kms_key_arn = var.etcd_encryption && length(aws_kms_key.etcd) > 0 ? aws_kms_key.etcd[0].arn : null
 
   # CloudWatch audit log forwarding
   # Note: audit_log_arn is not yet available in the official provider release
@@ -346,7 +367,7 @@ resource "rhcs_hcp_machine_pool" "additional" {
 
   # AWS Node Pool configuration
   aws_node_pool = {
-    instance_type                = each.value.instance_type
+    instance_type                 = each.value.instance_type
     additional_security_group_ids = length(each.value.additional_security_group_ids) > 0 ? each.value.additional_security_group_ids : null
     capacity_reservation_id       = each.value.capacity_reservation_id
     disk_size                     = each.value.disk_size
@@ -358,9 +379,9 @@ resource "rhcs_hcp_machine_pool" "additional" {
   # Only set labels/taints/tuning_configs if they have values (provider requires at least 1 element if provided)
   labels                       = length(each.value.labels) > 0 ? each.value.labels : null
   taints                       = length(each.value.taints) > 0 ? each.value.taints : null
-  kubelet_configs             = each.value.kubelet_configs
-  tuning_configs              = length(each.value.tuning_configs) > 0 ? each.value.tuning_configs : null
-  version                     = each.value.version
+  kubelet_configs              = each.value.kubelet_configs
+  tuning_configs               = length(each.value.tuning_configs) > 0 ? each.value.tuning_configs : null
+  version                      = each.value.version
   upgrade_acknowledgements_for = each.value.upgrade_acknowledgements_for
 
   # Lifecycle

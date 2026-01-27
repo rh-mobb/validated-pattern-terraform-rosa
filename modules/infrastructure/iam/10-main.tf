@@ -43,7 +43,7 @@ locals {
 # CRITICAL: Destroy order must be enforced via depends_on in the calling configuration
 # The calling configuration should create a null_resource that depends on the cluster
 # and then make this module depend on that null_resource to ensure cluster is destroyed first
-  # Gate with persists_through_sleep flag - allows preserving IAM roles for reuse across clusters
+# Gate with persists_through_sleep flag - allows preserving IAM roles for reuse across clusters
 module "account_roles" {
   count = local.persists_through_sleep ? 1 : 0
 

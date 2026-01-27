@@ -325,6 +325,41 @@ variable "enable_audit_logging" {
   nullable    = false
 }
 
+variable "enable_cloudwatch_logging" {
+  description = "Enable CloudWatch logging for OpenShift Logging Operator. When enabled, creates IAM role and policy for the OpenShift Logging Operator to send logs to CloudWatch. Uses service account: openshift-logging:cluster-logging. This is separate from audit logging (SIEM)."
+  type        = bool
+  nullable    = false
+  default     = false
+}
+
+variable "enable_cert_manager_iam" {
+  description = "Enable IAM role and policy for cert-manager to use AWS Private CA. When enabled, creates IAM role for cert-manager service account (system:serviceaccount:cert-manager:cert-manager)."
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
+variable "enable_termination_protection" {
+  description = "Enable cluster termination protection. When enabled, prevents accidental cluster deletion via ROSA CLI. Default: false. Note: Disabling protection requires manual action via OCM console."
+  type        = bool
+  nullable    = false
+  default     = false
+}
+
+variable "enable_secrets_manager_iam" {
+  description = "Enable IAM role and policy for ArgoCD Vault Plugin to access AWS Secrets Manager. When enabled, creates IAM role for openshift-gitops:vplugin service account. Secrets access is restricted to explicit ARN list for security."
+  type        = bool
+  nullable    = false
+  default     = false
+}
+
+variable "additional_secrets" {
+  description = "Optional list of additional secret names to grant access to via Secrets Manager IAM. Secrets are looked up by name to get exact ARNs. The cluster credentials secret is always included automatically. Example: [\"my-secret-1\", \"my-secret-2\"]"
+  type        = list(string)
+  default     = null
+  nullable    = true
+}
+
 variable "enable_persistent_dns_domain" {
   description = "Enable persistent DNS domain registration. When true, creates rhcs_dns_domain resource that persists between cluster creations. When false, ROSA uses default DNS domain."
   type        = bool
@@ -350,8 +385,8 @@ variable "additional_machine_pools" {
     auto_repair = optional(bool, true)
     labels      = optional(map(string), {})
     taints = optional(list(object({
-      key          = string
-      value        = string
+      key           = string
+      value         = string
       schedule_type = string # "NoSchedule", "PreferNoSchedule", "NoExecute"
     })), [])
 
@@ -365,8 +400,8 @@ variable "additional_machine_pools" {
     # Optional - OpenShift Configuration
     version                      = optional(string) # Pin OpenShift version for this pool
     upgrade_acknowledgements_for = optional(string)
-    kubelet_configs             = optional(string) # Name of kubelet config
-    tuning_configs              = optional(list(string), []) # List of tuning config names
+    kubelet_configs              = optional(string)           # Name of kubelet config
+    tuning_configs               = optional(list(string), []) # List of tuning config names
 
     # Optional - Lifecycle
     ignore_deletion_error = optional(bool, false)

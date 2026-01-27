@@ -4,7 +4,7 @@
 
 This document outlines the implementation plan for a production-grade Terraform repository for deploying Red Hat OpenShift Service on AWS (ROSA) with Hosted Control Planes (HCP). The architecture follows a **Directory-Per-Cluster** pattern to ensure state isolation and supports multiple network topologies (standard, private, egress zero).
 
-**Repository Strategy**: This is Repository 1 (Infrastructure) - a pure Terraform repository dedicated to provisioning AWS VPC, IAM roles, and the ROSA HCP cluster itself. Day 2 operations (Bootstrap, GitOps, IDP, Logging, Monitoring) will be handled in a separate Repository 2.
+**Repository Strategy**: This is Repository 1 (Infrastructure) - a Terraform repository dedicated to provisioning AWS VPC, IAM roles, and the ROSA HCP cluster itself. GitOps bootstrap is integrated into the cluster module. Additional Day 2 operations (cert-manager, external-dns, ingress controllers) are deployed via GitOps using Helm charts in the cluster-config repository.
 
 ---
 
@@ -16,32 +16,23 @@ This document outlines the implementation plan for a production-grade Terraform 
 ```
 rosa-hcp-infrastructure/
 ├── modules/
-│   ├── infrastructure/         # Infrastructure modules
-│   │   ├── network-public/     # Public VPC with NAT Gateways
-│   │   ├── network-private/     # Private VPC (PrivateLink API, supports egress-zero mode)
-│   │   ├── network-egress-zero/ # ⚠️ DEPRECATED - Use network-private with enable_strict_egress
-│   │   ├── iam/                # IAM & OIDC module
-│   │   ├── cluster/            # ROSA HCP Cluster module
-│   │   ├── bastion/            # Bastion host for private cluster access
-│   │   └── identity-admin/     # Admin user creation (temporary bootstrap, uses OCM provider)
-│   └── configuration/          # Configuration modules
-│       └── gitops/             # OpenShift GitOps operator
-├── terraform/
-│   ├── infrastructure/          # Unified infrastructure Terraform (shared across clusters)
-│   │   ├── 00-providers.tf
-│   │   ├── 01-variables.tf
-│   │   ├── 10-main.tf           # Conditionally uses network-public or network-private
-│   │   └── 90-outputs.tf
-│   └── configuration/          # Unified configuration Terraform (shared across clusters)
-│       ├── 00-providers.tf     # Receives infrastructure outputs as input variables
-│       ├── 01-variables.tf     # Input variables for infrastructure outputs
-│       ├── 10-main.tf          # GitOps operator deployment
-│       └── 90-outputs.tf
+│   └── infrastructure/         # Infrastructure modules
+│       ├── network-public/     # Public VPC with NAT Gateways
+│       ├── network-private/     # Private VPC (PrivateLink API, supports egress-zero mode)
+│       ├── network-existing/    # Use existing VPC
+│       ├── iam/                # IAM & OIDC module
+│       ├── cluster/            # ROSA HCP Cluster module (includes identity provider, storage, GitOps bootstrap)
+│       └── bastion/            # Bastion host for private cluster access
+├── terraform/                  # Unified Terraform configuration (shared across clusters)
+│   ├── 00-providers.tf
+│   ├── 01-variables.tf
+│   ├── 10-main.tf             # Conditionally uses network-public or network-private
+│   └── 90-outputs.tf
 └── clusters/
-    ├── public/                  # Example public cluster (reference)
-    │   └── terraform.tfvars    # Cluster-specific variables (network_type="public")
+    ├── public/                 # Example public cluster (reference)
+    │   └── terraform.tfvars   # Cluster-specific variables (network_type="public")
     └── egress-zero/            # Example egress-zero cluster (reference)
-        └── terraform.tfvars    # Cluster-specific variables (network_type="private", enable_strict_egress=true)
+        └── terraform.tfvars   # Cluster-specific variables (network_type="private", enable_strict_egress=true)
 ```
 
 ---
@@ -411,22 +402,7 @@ terraform {
 }
 ```
 
-**Note**: Configuration is now integrated into the infrastructure layer. GitOps bootstrap is handled by the cluster module.
-
-```hcl
-terraform {
-  # Backend configuration is provided via -backend-config flags or environment variables
-  # For local development: terraform init -backend-config="path=../../clusters/<name>/configuration.tfstate"
-  # For CI/CD with S3: terraform init -backend-config="bucket=..." -backend-config="key=..." etc.
-  backend "local" {
-    # path provided via -backend-config flag or environment variable
-  }
-  # ... providers
-}
-
-# Configuration receives infrastructure outputs as input variables (not terraform_remote_state)
-# See terraform/01-variables.tf for all input variables
-```
+**Note**: GitOps bootstrap is integrated into the cluster module. The bootstrap script is run manually after cluster deployment using `make cluster.<name>.bootstrap` or by sourcing Terraform outputs and running the script directly.
 
 **Infrastructure Variables** (`clusters/public/terraform.tfvars`):
 
@@ -843,12 +819,18 @@ locals {
 4. **IAM Roles**: Use prefixes to avoid conflicts across clusters
 5. **Secrets**: Never commit secrets to Git; use environment variables or Secrets Manager
 
-### Future: Repository 2 (Configuration & GitOps)
-- Bootstrap Module: Install OpenShift GitOps Operator
-- IDP Module: Configure identity providers (OIDC, GitHub)
-- Logging Module: Ship logs to CloudWatch/S3
-- Monitoring Module: Configure Prometheus/Alertmanager with SNS
-- Pattern: Terraform creates AWS resources, GitOps deploys cluster configuration
+### GitOps Integration
+
+GitOps bootstrap is integrated into the cluster module. After cluster deployment, run `make cluster.<name>.bootstrap` to deploy the OpenShift GitOps operator. Additional Day 2 operations are deployed via Helm charts in the cluster-config Git repository:
+
+- **cert-manager**: Deployed via `app-of-apps-infrastructure` chart
+- **external-dns**: Deployed via `app-of-apps-infrastructure` chart
+- **Ingress Controllers**: Deployed via Helm charts (see `docs/improvements/ingress.md`)
+- **Identity Providers**: Configured via GitOps (cluster-config repository)
+- **Logging**: CloudWatch logging IAM roles created in Terraform, ClusterLogForwarder deployed via GitOps
+- **Monitoring**: Deployed via GitOps (cluster-config repository)
+
+**Pattern**: Terraform creates AWS infrastructure (VPC, IAM roles, Route53 zones), GitOps deploys Kubernetes resources and cluster configuration.
 
 ---
 

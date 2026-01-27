@@ -39,7 +39,7 @@ output "sshuttle_command" {
   value = length(aws_instance.bastion) > 0 ? (
     var.bastion_public_ip ? (
       "sshuttle --remote ec2-user@${one(aws_instance.bastion[*].public_ip)} --dns ${var.vpc_cidr}"
-    ) : (
+      ) : (
       "sshuttle --ssh-cmd=\"ssh -o ProxyCommand='sh -c \\\"aws --region ${var.region} ssm start-session --target %h --document-name AWS-StartSSHSession --parameters portNumber=22\\\"'\" --remote ec2-user@${one(aws_instance.bastion[*].id)} --dns ${var.vpc_cidr}"
     )
   ) : null
@@ -51,7 +51,7 @@ output "ssh_tunnel_command" {
   value = length(aws_instance.bastion) > 0 ? (
     var.bastion_public_ip ? (
       "ssh -f -N -L 6443:<cluster-api-hostname>:443 ec2-user@${one(aws_instance.bastion[*].public_ip)}"
-    ) : (
+      ) : (
       "ssh -f -N -L 6443:<cluster-api-hostname>:443 -o ProxyCommand='aws --region ${var.region} ssm start-session --target ${one(aws_instance.bastion[*].id)} --document-name AWS-StartSSHSession --parameters portNumber=22' ec2-user@${one(aws_instance.bastion[*].id)}"
     )
   ) : null

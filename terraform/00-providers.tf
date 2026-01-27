@@ -62,7 +62,7 @@ provider "rhcs" {
 # This provider must be configured at the root level, not in modules,
 # to avoid making modules "legacy modules" that cannot use depends_on
 provider "shell" {
-  interpreter        = ["/bin/sh", "-c"]
-  enable_parallelism = false
+  interpreter           = ["/bin/sh", "-c"]
+  enable_parallelism    = false
   sensitive_environment = {}
 }

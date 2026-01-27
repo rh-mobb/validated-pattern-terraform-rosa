@@ -62,6 +62,24 @@ output "cloudwatch_audit_logging_role_arn" {
   sensitive   = false
 }
 
+output "cloudwatch_logging_role_arn" {
+  description = "ARN of the IAM role for CloudWatch logging via OpenShift Logging Operator (null if persists_through_sleep is false or enable_cloudwatch_logging is false)"
+  value       = local.persists_through_sleep && var.enable_cloudwatch_logging && length(aws_iam_role.cloudwatch_logging) > 0 ? aws_iam_role.cloudwatch_logging[0].arn : null
+  sensitive   = false
+}
+
+output "cert_manager_role_arn" {
+  description = "ARN of the IAM role for cert-manager to use AWS Private CA (null if persists_through_sleep is false or enable_cert_manager_iam is false)"
+  value       = local.persists_through_sleep && var.enable_cert_manager_iam && length(aws_iam_role.cert_manager) > 0 ? aws_iam_role.cert_manager[0].arn : null
+  sensitive   = false
+}
+
+output "secrets_manager_role_arn" {
+  description = "ARN of the IAM role for ArgoCD Vault Plugin to access AWS Secrets Manager (null if persists_through_sleep is false or enable_secrets_manager_iam is false)"
+  value       = local.persists_through_sleep && var.enable_secrets_manager_iam && length(aws_iam_role.secrets_manager) > 0 ? aws_iam_role.secrets_manager[0].arn : null
+  sensitive   = false
+}
+
 output "default_machine_pools" {
   description = "Map of default machine pool IDs keyed by pool name"
   value = local.persists_through_sleep ? {
@@ -98,14 +116,14 @@ output "gitops_bootstrap_enabled" {
 }
 
 output "cluster_credentials_secret_name" {
-  description = "Name of AWS Secrets Manager secret containing cluster credentials (for GitOps bootstrap, persists through sleep)"
-  value       = var.enable_gitops_bootstrap && length(aws_secretsmanager_secret.cluster_credentials) > 0 ? aws_secretsmanager_secret.cluster_credentials[0].name : null
+  description = "Name of AWS Secrets Manager secret containing cluster credentials (persists through sleep)"
+  value       = length(aws_secretsmanager_secret.cluster_credentials) > 0 ? aws_secretsmanager_secret.cluster_credentials[0].name : null
   sensitive   = false
 }
 
 output "cluster_credentials_secret_arn" {
-  description = "ARN of AWS Secrets Manager secret containing cluster credentials (for GitOps bootstrap, persists through sleep)"
-  value       = var.enable_gitops_bootstrap && length(aws_secretsmanager_secret.cluster_credentials) > 0 ? aws_secretsmanager_secret.cluster_credentials[0].arn : null
+  description = "ARN of AWS Secrets Manager secret containing cluster credentials (persists through sleep)"
+  value       = length(aws_secretsmanager_secret.cluster_credentials) > 0 ? aws_secretsmanager_secret.cluster_credentials[0].arn : null
   sensitive   = false
 }
 
@@ -115,18 +133,18 @@ output "gitops_bootstrap_env_vars" {
   description = "Environment variables for running the GitOps bootstrap script"
   value = var.enable_gitops_bootstrap ? {
     # Required variables
-    CLUSTER_NAME        = var.cluster_name
-    CREDENTIALS_SECRET  = length(aws_secretsmanager_secret.cluster_credentials) > 0 ? aws_secretsmanager_secret.cluster_credentials[0].name : null
-    AWS_REGION          = var.region
+    CLUSTER_NAME       = var.cluster_name
+    CREDENTIALS_SECRET = length(aws_secretsmanager_secret.cluster_credentials) > 0 ? aws_secretsmanager_secret.cluster_credentials[0].name : ""
+    AWS_REGION         = var.region
 
     # ACM configuration
     ACM_MODE = var.acm_mode
 
     # Helm chart configuration
-    HELM_REPO_NAME      = var.helm_repo_name
-    HELM_REPO_URL       = var.helm_repo_url
-    HELM_CHART          = var.helm_chart
-    HELM_CHART_VERSION  = var.helm_chart_version
+    HELM_REPO_NAME     = var.helm_repo_name
+    HELM_REPO_URL      = var.helm_repo_url
+    HELM_CHART         = var.helm_chart
+    HELM_CHART_VERSION = var.helm_chart_version
 
     # GitOps operator CSV
     GITOPS_CSV = var.gitops_csv
@@ -158,13 +176,13 @@ output "gitops_bootstrap_env_vars" {
     ACM_REGION             = var.acm_region
 
     # ACM Spoke Helm charts
-    HELM_CHART_ACM_SPOKE                = var.helm_chart_acm_spoke
-    HELM_CHART_ACM_SPOKE_VERSION        = var.helm_chart_acm_spoke_version
-    HELM_CHART_ACM_HUB_REGISTRATION     = var.helm_chart_acm_hub_registration
+    HELM_CHART_ACM_SPOKE                    = var.helm_chart_acm_spoke
+    HELM_CHART_ACM_SPOKE_VERSION            = var.helm_chart_acm_spoke_version
+    HELM_CHART_ACM_HUB_REGISTRATION         = var.helm_chart_acm_hub_registration
     HELM_CHART_ACM_HUB_REGISTRATION_VERSION = var.helm_chart_acm_hub_registration_version
 
     # AWS Private CA Helm chart
-    HELM_CHART_AWSPCA        = var.helm_chart_awspca
+    HELM_CHART_AWSPCA         = var.helm_chart_awspca
     HELM_CHART_AWSPCA_VERSION = var.helm_chart_awspca_version
 
     # Operation mode - set to true for bootstrap, false for cleanup
@@ -202,6 +220,7 @@ output "gitops_bootstrap_command" {
     var.awspca_csv != null ? "export AWSPCA_CSV='${var.awspca_csv}'" : "",
     var.awspca_issuer != null ? "export AWSPCA_ISSUER='${var.awspca_issuer}'" : "",
     var.zone_name != null ? "export ZONE_NAME='${var.zone_name}'" : "",
+    local.persists_through_sleep && var.enable_cert_manager_iam && length(aws_iam_role.cert_manager) > 0 ? "export CERT_MANAGER_ROLE_ARN='${aws_iam_role.cert_manager[0].arn}'" : "",
     var.hub_credentials_secret_name != null ? "export HUB_CREDENTIALS_SECRET='${var.hub_credentials_secret_name}'" : "",
     var.acm_region != null ? "export ACM_REGION='${var.acm_region}'" : "",
     var.helm_chart_acm_spoke != null ? "export HELM_CHART_ACM_SPOKE='${var.helm_chart_acm_spoke}'" : "",
@@ -217,7 +236,7 @@ output "gitops_bootstrap_command" {
 
 output "gitops_bootstrap_script_path" {
   description = "Path to the GitOps bootstrap script"
-  value       = var.enable_gitops_bootstrap ? local.script_path : null
+  value       = var.enable_gitops_bootstrap ? local.bootstrap_gitops_script_path : null
   sensitive   = false
 }
 
@@ -244,6 +263,18 @@ output "efs_kms_key_id" {
 output "efs_kms_key_arn" {
   description = "ARN of the KMS key for EFS encryption (persists through sleep, null if enable_storage is false or enable_efs is false)"
   value       = var.enable_storage && var.enable_efs && length(aws_kms_key.efs) > 0 ? aws_kms_key.efs[0].arn : null
+  sensitive   = false
+}
+
+output "etcd_kms_key_id" {
+  description = "ID of the KMS key for etcd encryption (persists through sleep, null if enable_storage is false or etcd_encryption is false)"
+  value       = var.enable_storage && var.etcd_encryption && length(aws_kms_key.etcd) > 0 ? aws_kms_key.etcd[0].id : null
+  sensitive   = false
+}
+
+output "etcd_kms_key_arn" {
+  description = "ARN of the KMS key for etcd encryption (persists through sleep, null if enable_storage is false or etcd_encryption is false)"
+  value       = var.enable_storage && var.etcd_encryption && length(aws_kms_key.etcd) > 0 ? aws_kms_key.etcd[0].arn : null
   sensitive   = false
 }
 

@@ -24,10 +24,11 @@ scripts/
 │   ├── get-infra-outputs.sh
 │   ├── check-cluster.sh
 │   └── get-network-config.sh
-└── info/                 # Information scripts
-    ├── show-endpoints.sh
-    ├── show-credentials.sh
-    └── login.sh
+├── info/                 # Information scripts
+│   ├── show-endpoints.sh
+│   ├── show-credentials.sh
+│   └── login.sh
+└── verify_cluster.py     # Python script to verify cluster deployment and GitOps
 ```
 
 ## Usage
@@ -103,7 +104,7 @@ $(terraform output -raw gitops_bootstrap_script_path)
 **Debug mode:**
 Set `DEBUG=true` to enable command tracing (`set -x`):
 ```bash
-DEBUG=true make cluster.<cluster-name>.bootstrap-cluster
+DEBUG=true make cluster.<cluster-name>.bootstrap
 ```
 
 **Output:**

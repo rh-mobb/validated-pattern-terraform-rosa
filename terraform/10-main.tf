@@ -15,8 +15,8 @@ module "network_public" {
   multi_az    = var.multi_az
   # subnet_cidr_size is automatically calculated based on VPC CIDR and number of subnets
 
-  tags                      = local.tags
-  persists_through_sleep     = var.persists_through_sleep
+  tags                           = local.tags
+  persists_through_sleep         = var.persists_through_sleep
   persists_through_sleep_network = var.persists_through_sleep_network
 }
 
@@ -31,13 +31,13 @@ module "network_private" {
 
   # For egress-zero: disable NAT Gateway and enable strict egress
   # For private: enable NAT Gateway (default) unless strict egress is enabled
-  enable_nat_gateway = !local.is_egress_zero
+  enable_nat_gateway   = !local.is_egress_zero
   enable_strict_egress = local.is_egress_zero
-  flow_log_s3_bucket = var.flow_log_s3_bucket
-  cluster_id = null  # Can be set after cluster creation
+  flow_log_s3_bucket   = var.flow_log_s3_bucket
+  cluster_id           = null # Can be set after cluster creation
 
-  tags                      = local.tags
-  persists_through_sleep     = var.persists_through_sleep
+  tags                           = local.tags
+  persists_through_sleep         = var.persists_through_sleep
   persists_through_sleep_network = var.persists_through_sleep_network
 }
 
@@ -66,11 +66,11 @@ locals {
 module "iam" {
   source = "../modules/infrastructure/iam"
 
-  cluster_name         = var.cluster_name
-  account_role_prefix  = var.cluster_name # No trailing dash - account-iam-resources module adds it
-  operator_role_prefix = var.cluster_name # No trailing dash - operator-roles module adds it
-  zero_egress          = local.is_egress_zero  # Enable zero egress mode for egress-zero clusters
-  tags                      = local.tags
+  cluster_name               = var.cluster_name
+  account_role_prefix        = var.cluster_name     # No trailing dash - account-iam-resources module adds it
+  operator_role_prefix       = var.cluster_name     # No trailing dash - operator-roles module adds it
+  zero_egress                = local.is_egress_zero # Enable zero egress mode for egress-zero clusters
+  tags                       = local.tags
   persists_through_sleep     = var.persists_through_sleep
   persists_through_sleep_iam = var.persists_through_sleep_iam
 }
@@ -78,10 +78,10 @@ module "iam" {
 module "cluster" {
   source = "../modules/infrastructure/cluster"
 
-  cluster_name       = var.cluster_name
-  region             = var.region
-  vpc_id             = local.network.vpc_id
-  vpc_cidr           = var.vpc_cidr
+  cluster_name = var.cluster_name
+  region       = var.region
+  vpc_id       = local.network.vpc_id
+  vpc_cidr     = var.vpc_cidr
 
   # Subnet selection - pass private and public separately, cluster module will concatenate
   # Public clusters use both private and public subnets
@@ -89,13 +89,13 @@ module "cluster" {
   private_subnet_ids = local.network.private_subnet_ids
   public_subnet_ids  = var.network_type == "public" ? local.network.public_subnet_ids : []
 
-  installer_role_arn = module.iam.installer_role_arn
-  support_role_arn   = module.iam.support_role_arn
-  worker_role_arn    = module.iam.worker_role_arn
-  oidc_config_id     = module.iam.oidc_config_id # OIDC is never gated
-  oidc_endpoint_url  = module.iam.oidc_endpoint_url # OIDC is never gated
-  enable_persistent_dns_domain = var.enable_persistent_dns_domain
-  persists_through_sleep        = var.persists_through_sleep
+  installer_role_arn             = module.iam.installer_role_arn
+  support_role_arn               = module.iam.support_role_arn
+  worker_role_arn                = module.iam.worker_role_arn
+  oidc_config_id                 = module.iam.oidc_config_id    # OIDC is never gated
+  oidc_endpoint_url              = module.iam.oidc_endpoint_url # OIDC is never gated
+  enable_persistent_dns_domain   = var.enable_persistent_dns_domain
+  persists_through_sleep         = var.persists_through_sleep
   persists_through_sleep_cluster = var.persists_through_sleep_cluster
 
   # Cluster configuration based on network type
@@ -105,13 +105,13 @@ module "cluster" {
   availability_zones = local.network.private_subnet_azs
 
   # Identity provider configuration
-  enable_identity_provider = var.persists_through_sleep
-  admin_username           = var.admin_username
+  enable_identity_provider     = var.persists_through_sleep
+  admin_username               = var.admin_username
   admin_password_for_bootstrap = var.admin_password_override != null ? var.admin_password_override : random_password.admin_password[0].result
 
   # Production features (for egress-zero and optionally private)
   # Cluster module will create its own KMS key if enable_storage is true
-  kms_key_arn        = var.kms_key_arn
+  kms_key_arn = var.kms_key_arn
 
   # Storage configuration - cluster module creates KMS keys and EFS
   enable_storage       = true
@@ -119,18 +119,25 @@ module "cluster" {
   private_subnet_cidrs = local.network.private_subnet_cidrs
 
   # GitOps bootstrap configuration
-  enable_gitops_bootstrap     = var.enable_gitops_bootstrap != null ? var.enable_gitops_bootstrap : false
+  enable_gitops_bootstrap = var.enable_gitops_bootstrap != null ? var.enable_gitops_bootstrap : false
   # admin_password_for_bootstrap is set above in identity provider configuration
   # Storage resources are automatically available from cluster module outputs
-  ebs_kms_key_arn             = null  # Will use cluster module's created KMS key
-  efs_file_system_id          = null  # Will use cluster module's created EFS
+  ebs_kms_key_arn    = null # Will use cluster module's created KMS key
+  efs_file_system_id = null # Will use cluster module's created EFS
   # GitOps repository configuration
-  git_path                    = var.gitops_git_path
-  gitops_git_repo_url         = var.gitops_git_repo_url
-  openshift_version  = var.openshift_version
-  service_cidr       = var.service_cidr
-  pod_cidr           = var.pod_cidr
-  host_prefix        = var.host_prefix
+  git_path            = var.gitops_git_path
+  gitops_git_repo_url = var.gitops_git_repo_url
+
+  # Cert Manager, Termination Protection, and CloudWatch Logging
+  enable_cert_manager_iam       = var.enable_cert_manager_iam
+  enable_termination_protection = var.enable_termination_protection
+  enable_cloudwatch_logging     = var.enable_cloudwatch_logging
+  enable_secrets_manager_iam    = var.enable_secrets_manager_iam
+  additional_secrets            = var.additional_secrets
+  openshift_version             = var.openshift_version
+  service_cidr                  = var.service_cidr
+  pod_cidr                      = var.pod_cidr
+  host_prefix                   = var.host_prefix
 
   # Machine pools - conditional based on network type
   # Public clusters have explicit machine_pools configuration
@@ -144,7 +151,7 @@ module "cluster" {
       multi_az            = var.multi_az
       autoscaling_enabled = true
     }
-  ] : []  # Empty for egress-zero (uses module defaults)
+  ] : [] # Empty for egress-zero (uses module defaults)
 
   # For egress-zero: use default_instance_type, default_min_replicas, default_max_replicas
   # These are only used when machine_pools is empty
@@ -155,15 +162,15 @@ module "cluster" {
   # Additional machine pools - resolved with actual subnet IDs
   additional_machine_pools = {
     for pool_name, pool_config in local.additional_machine_pools_resolved : pool_name => {
-      subnet_id                    = pool_config.subnet_id
-      instance_type                = pool_config.instance_type
-      autoscaling_enabled          = pool_config.autoscaling_enabled
-      min_replicas                 = pool_config.min_replicas
-      max_replicas                 = pool_config.max_replicas
-      replicas                     = pool_config.replicas
-      auto_repair                  = pool_config.auto_repair
-      labels                       = pool_config.labels
-      taints                       = pool_config.taints
+      subnet_id                     = pool_config.subnet_id
+      instance_type                 = pool_config.instance_type
+      autoscaling_enabled           = pool_config.autoscaling_enabled
+      min_replicas                  = pool_config.min_replicas
+      max_replicas                  = pool_config.max_replicas
+      replicas                      = pool_config.replicas
+      auto_repair                   = pool_config.auto_repair
+      labels                        = pool_config.labels
+      taints                        = pool_config.taints
       additional_security_group_ids = pool_config.additional_security_group_ids
       capacity_reservation_id       = pool_config.capacity_reservation_id
       disk_size                     = pool_config.disk_size
@@ -171,8 +178,8 @@ module "cluster" {
       tags                          = pool_config.tags
       version                       = pool_config.version
       upgrade_acknowledgements_for  = pool_config.upgrade_acknowledgements_for
-      kubelet_configs              = pool_config.kubelet_configs
-      tuning_configs               = pool_config.tuning_configs
+      kubelet_configs               = pool_config.kubelet_configs
+      tuning_configs                = pool_config.tuning_configs
       ignore_deletion_error         = pool_config.ignore_deletion_error
     }
   }
@@ -206,11 +213,11 @@ module "cluster" {
 resource "random_password" "admin_password" {
   count = var.admin_password_override == null ? 1 : 0
 
-  length  = 20
-  special = true
-  upper   = true
-  lower   = true
-  numeric = true
+  length           = 20
+  special          = true
+  upper            = true
+  lower            = true
+  numeric          = true
   override_special = "@#&*-_"
 
   # Ensure password meets ROSA requirements:
@@ -239,10 +246,10 @@ resource "aws_secretsmanager_secret" "admin_password" {
   recovery_window_in_days = 0
 
   tags = merge(local.tags, {
-    Name        = "rosa-hcp-${var.cluster_name}-admin-password"
-    Cluster     = var.cluster_name
-    ManagedBy   = "Terraform"
-    Purpose     = "ClusterAdminPassword"
+    Name                   = "rosa-hcp-${var.cluster_name}-admin-password"
+    Cluster                = var.cluster_name
+    ManagedBy              = "Terraform"
+    Purpose                = "ClusterAdminPassword"
     persists_through_sleep = "true"
   })
 }
@@ -252,7 +259,7 @@ resource "aws_secretsmanager_secret" "admin_password" {
 resource "aws_secretsmanager_secret_version" "admin_password" {
   count = var.persists_through_sleep ? 1 : 0
 
-  secret_id = aws_secretsmanager_secret.admin_password[0].id
+  secret_id     = aws_secretsmanager_secret.admin_password[0].id
   secret_string = var.admin_password_override != null ? var.admin_password_override : random_password.admin_password[0].result
 
   # Allow secret to be updated manually if password changes
@@ -284,7 +291,7 @@ module "bastion" {
   vpc_cidr               = var.vpc_cidr
   bastion_public_ip      = var.bastion_public_ip # Should be false for egress-zero
   bastion_public_ssh_key = var.bastion_public_ssh_key
-  persists_through_sleep  = var.persists_through_sleep
+  persists_through_sleep = var.persists_through_sleep
 
   tags = var.tags
 
