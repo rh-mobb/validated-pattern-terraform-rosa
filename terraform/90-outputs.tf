@@ -53,8 +53,8 @@ output "public_subnet_ids" {
 }
 
 output "security_group_id" {
-  description = "Security group ID for worker nodes (null for public/private clusters without strict egress)"
-  value       = var.network_type == "private" && var.enable_strict_egress ? local.network.security_group_id : null
+  description = "Security group ID for worker nodes (null for public/private clusters without zero egress)"
+  value       = var.network_type == "private" && var.zero_egress ? local.network.security_group_id : null
   sensitive   = false
 }
 

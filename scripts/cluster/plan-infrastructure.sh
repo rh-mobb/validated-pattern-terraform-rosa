@@ -30,9 +30,11 @@ cd "$TERRAFORM_INFRA_DIR"
 
 # Calculate relative path from terraform to cluster directory
 CLUSTER_TFVARS="$CLUSTER_DIR/terraform.tfvars"
+# Plan file goes in cluster directory (relative path from terraform/)
+PLAN_FILE="../clusters/$CLUSTER_NAME/terraform.tfplan"
 
 terraform plan \
     -var-file="$CLUSTER_TFVARS" \
-    -out=terraform.tfplan
+    -out="$PLAN_FILE"
 
-success "Infrastructure plan created: terraform.tfplan"
+success "Infrastructure plan created: $PLAN_FILE"

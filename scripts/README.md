@@ -118,7 +118,7 @@ DEBUG=true make cluster.<cluster-name>.bootstrap
 - **`get-k8s-token.sh`**: Extract Kubernetes token via `oc login` with retry logic
 - **`get-infra-outputs.sh`**: Extract infrastructure outputs and export as TF_VAR_* environment variables
 - **`check-cluster.sh`**: Validate cluster directory exists
-- **`get-network-config.sh`**: Extract network_type and enable_strict_egress from terraform.tfvars
+- **`get-network-config.sh`**: Extract network_type and zero_egress from terraform.tfvars
 
 ### Tunnel Scripts
 

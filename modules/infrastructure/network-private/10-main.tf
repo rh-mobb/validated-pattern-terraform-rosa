@@ -132,6 +132,7 @@ resource "aws_route_table" "private" {
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-private-rt-${local.azs[count.index]}"
   })
+
 }
 
 # Route table associations for private subnets
@@ -242,7 +243,7 @@ resource "aws_security_group" "vpc_endpoint" {
   count = local.persists_through_sleep ? 1 : 0
 
   name        = "${var.name_prefix}-vpc-endpoint-sg"
-  description = var.enable_strict_egress ? "Security group for VPC endpoints with strict egress control" : "Security group for VPC endpoints"
+  description = var.zero_egress ? "Security group for VPC endpoints with zero egress control" : "Security group for VPC endpoints"
   vpc_id      = one(aws_vpc.main[*].id)
 
   ingress {
@@ -253,9 +254,9 @@ resource "aws_security_group" "vpc_endpoint" {
     cidr_blocks = [var.vpc_cidr]
   }
 
-  # Egress: all if NAT Gateway enabled, none if strict egress
+  # Egress: all if NAT Gateway enabled, none if zero egress
   dynamic "egress" {
-    for_each = var.enable_strict_egress ? [] : [1]
+    for_each = var.zero_egress ? [] : [1]
     content {
       description = "All outbound"
       from_port   = 0
@@ -270,12 +271,12 @@ resource "aws_security_group" "vpc_endpoint" {
   })
 }
 
-# Security group for worker nodes with strict egress control (only if enable_strict_egress is true)
+# Security group for worker nodes with zero egress control (only if zero_egress is true)
 resource "aws_security_group" "worker_nodes" {
-  count = local.persists_through_sleep && var.enable_strict_egress ? 1 : 0
+  count = local.persists_through_sleep && var.zero_egress ? 1 : 0
 
   name        = "${var.name_prefix}-worker-nodes-sg"
-  description = "Security group for ROSA HCP worker nodes with strict egress control"
+  description = "Security group for ROSA HCP worker nodes with zero egress control"
   vpc_id      = one(aws_vpc.main[*].id)
 
   ingress {
@@ -411,31 +412,3 @@ data "aws_availability_zones" "available" {
   }
 }
 
-# Data source to look up ROSA-created VPC endpoint for API server access
-# ROSA HCP creates a VPC endpoint for worker nodes to connect to the hosted control plane API
-# This endpoint is tagged with:
-# - red-hat-managed=true
-# - red-hat-clustertype=rosa
-# - api.openshift.com/id=<cluster_id>
-# Note: VPC endpoints get IP addresses in the VPC CIDR, so the existing security group rules
-# (allowing HTTPS 443 TCP to VPC CIDR) already allow traffic to this endpoint.
-data "aws_vpc_endpoint" "rosa_api" {
-  count = local.persists_through_sleep && var.cluster_id != null ? 1 : 0
-
-  vpc_id = one(aws_vpc.main[*].id)
-
-  filter {
-    name   = "tag:red-hat-managed"
-    values = ["true"]
-  }
-
-  filter {
-    name   = "tag:red-hat-clustertype"
-    values = ["rosa"]
-  }
-
-  filter {
-    name   = "tag:api.openshift.com/id"
-    values = [var.cluster_id]
-  }
-}

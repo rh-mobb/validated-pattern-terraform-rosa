@@ -18,8 +18,8 @@ This module creates a VPC with private subnets only, VPC endpoints for AWS servi
   - CloudWatch Monitoring (Interface endpoint)
   - STS (Interface endpoint - required for IAM roles)
 - ROSA-required subnet tags
-- **ROSA VPC endpoint lookup** - Optional lookup of ROSA-created VPC endpoint for API server access
 - **Note**: SSM endpoints are created by the bastion module when a bastion is deployed
+- **Note**: ROSA API VPC endpoint security group configuration is handled by the cluster module (see cluster module documentation)
 
 ## Usage
 
@@ -63,9 +63,8 @@ module "network" {
   vpc_cidr          = "10.0.0.0/16"
   multi_az          = true
   enable_nat_gateway = false      # No NAT Gateway for zero egress
-  enable_strict_egress = true      # Enable strict egress control
+  zero_egress         = true       # Enable zero egress mode (matches ROSA API property name)
   flow_log_s3_bucket = "my-org-vpc-flow-logs"  # Optional: VPC Flow Logs for audit
-  cluster_id         = null        # Optional: Can be set after cluster creation
 
   tags = {
     Environment = "production"
@@ -74,27 +73,6 @@ module "network" {
   }
 }
 ```
-
-## Requirements
-
-| Name | Version |
-|------|---------|
-| terraform | >= 1.5.0 |
-| aws | ~> 5.0 |
-
-## Inputs
-
-| Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
-| name_prefix | Prefix for all resource names (typically cluster name). Ensures unique resource names across clusters | `string` | n/a | yes |
-| vpc_cidr | CIDR block for the VPC | `string` | n/a | yes |
-| multi_az | Create resources across multiple availability zones for high availability. Availability zones are automatically determined from AWS | `bool` | `true` | no |
-| subnet_cidr_size | CIDR size for each subnet (e.g., 20 for /20). If not provided, automatically calculated based on VPC CIDR and number of subnets. Must be larger than VPC CIDR size | `number` | `null` (auto-calculated) | no |
-| enable_nat_gateway | Enable Regional NAT Gateway for internet egress from private subnets. Requires an Internet Gateway but does not require public subnets | `bool` | `true` | no |
-| enable_strict_egress | Enable strict egress control (zero-egress mode). When true, creates worker node security group with limited egress rules and removes egress from VPC endpoint security group | `bool` | `false` | no |
-| flow_log_s3_bucket | S3 bucket name for VPC Flow Logs (optional, typically used with zero-egress mode for audit logging) | `string` | `null` | no |
-| cluster_id | Optional ROSA HCP cluster ID. If provided, will look up the ROSA-created VPC endpoint for API server access (used with zero-egress mode for validation) | `string` | `null` | no |
-| tags | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs
 
@@ -106,8 +84,7 @@ module "network" {
 | vpc_endpoint_ids | Map of VPC endpoint service names to endpoint IDs |
 | nat_gateway_id | ID of the Regional NAT Gateway (if enabled) |
 | internet_gateway_id | ID of the Internet Gateway (if NAT Gateway is enabled) |
-| security_group_id | ID of the security group for worker nodes with strict egress control (null if enable_strict_egress is false) |
-| rosa_api_vpc_endpoint_id | ID of the ROSA-created VPC endpoint for API server access (null if cluster_id not provided) |
+| security_group_id | ID of the security group for worker nodes with zero egress control (null if zero_egress is false) |
 | private_subnet_azs | List of availability zones used for private subnets |
 
 ## ROSA Requirements
@@ -125,16 +102,16 @@ This module automatically applies ROSA-required tags to private subnets:
   - Automatically expands across AZs based on workload presence
   - Suitable for environments needing internet access while keeping workloads in private subnets only
 - **Optional**: Set `enable_nat_gateway = false` to disable internet egress and use only VPC endpoints
-- **Zero-egress mode**: Set `enable_nat_gateway = false` and `enable_strict_egress = true` for maximum security
+- **Zero-egress mode**: Set `enable_nat_gateway = false` and `zero_egress = true` for maximum security
   - Creates worker node security group with strict egress rules (HTTPS 443, DNS 53 UDP/TCP to VPC CIDR only)
   - Removes egress rules from VPC endpoint security group
   - All external access must go through VPC endpoints
   - Suitable for high-security production environments requiring zero internet egress
 - Suitable for production environments requiring enhanced security
 
-## Zero-Egress Mode (Strict Egress Control)
+## Zero-Egress Mode
 
-When `enable_strict_egress = true`, the module creates:
+When `zero_egress = true`, the module creates:
 
 - **Worker Node Security Group**: Limited egress rules allowing only:
   - HTTPS (443 TCP) to VPC CIDR (for VPC endpoints)

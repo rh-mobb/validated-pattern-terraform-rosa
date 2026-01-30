@@ -236,22 +236,7 @@ variable "tags" {
 # Note: Admin user creation has been moved to a separate identity-admin module
 # Use modules/infrastructure/identity-admin/ for admin user creation to enable independent lifecycle management
 
-# Machine Pool Configuration
-variable "machine_pools" {
-  description = "List of machine pool configurations. If not provided, creates default pool"
-  type = list(object({
-    name                = string
-    instance_type       = string
-    min_replicas        = number
-    max_replicas        = number
-    multi_az            = bool
-    autoscaling_enabled = bool
-  }))
-  default  = []
-  nullable = false
-}
-
-# Default machine pool values (used if machine_pools is empty)
+# Default machine pool values (used for default pool configuration)
 variable "default_instance_type" {
   description = "Default instance type for machine pool (if machine_pools not provided)"
   type        = string
@@ -260,24 +245,33 @@ variable "default_instance_type" {
 }
 
 variable "default_min_replicas" {
-  description = "Default minimum replicas for machine pool (if machine_pools not provided)"
+  description = <<EOF
+  Default minimum replicas per machine pool. If null, defaults are calculated:
+  - Single-AZ: 2 per pool (minimum for HA)
+  - Multi-AZ: 1 per availability zone (each pool gets this value)
+
+  **Important**: For multi-AZ clusters, this value is per availability zone, not total.
+  For example, if you set min_replicas = 1 for a multi-AZ cluster, each of the 3 pools
+  (workers-0, workers-1, workers-2) will have 1 replica minimum (3 total minimum).
+  EOF
   type        = number
-  default     = 3
-  nullable    = false
+  default     = null
+  nullable    = true
 }
 
 variable "default_max_replicas" {
-  description = "Default maximum replicas for machine pool (if machine_pools not provided)"
-  type        = number
-  default     = 6
-  nullable    = false
-}
+  description = <<EOF
+  Default maximum replicas per machine pool. If null, defaults are calculated:
+  - Single-AZ: 4 per pool (double the minimum)
+  - Multi-AZ: 2 per availability zone (each pool gets this value)
 
-variable "default_multi_az" {
-  description = "Default multi-AZ setting for machine pool (if machine_pools not provided)"
-  type        = bool
-  default     = true
-  nullable    = false
+  **Important**: For multi-AZ clusters, this value is per availability zone, not total.
+  For example, if you set max_replicas = 2 for a multi-AZ cluster, each of the 3 pools
+  (workers-0, workers-1, workers-2) will have 2 replicas maximum (6 total maximum).
+  EOF
+  type        = number
+  default     = null
+  nullable    = true
 }
 
 variable "wait_for_std_compute_nodes_complete" {

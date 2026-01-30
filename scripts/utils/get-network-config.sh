@@ -1,6 +1,6 @@
 #!/bin/bash
 # scripts/utils/get-network-config.sh
-# Extract network_type and enable_strict_egress from terraform.tfvars
+# Extract network_type and zero_egress from terraform.tfvars
 # Usage: source get-network-config.sh <cluster_dir>
 #        or: eval $(get-network-config.sh <cluster_dir>)
 
@@ -39,20 +39,20 @@ else
     NETWORK_TYPE="unknown"
 fi
 
-# Extract enable_strict_egress
-LINE2=$(grep -E "^enable_strict_egress\s*=" "$TFVARS_FILE" 2>/dev/null | head -1)
+# Extract zero_egress
+LINE2=$(grep -E "^zero_egress\s*=" "$TFVARS_FILE" 2>/dev/null | head -1)
 if [ -n "$LINE2" ]; then
     if echo "$LINE2" | grep -q '".*"'; then
-        ENABLE_STRICT_EGRESS=$(echo "$LINE2" | sed -E 's/.*"([^"]+)".*/\1/')
+        ZERO_EGRESS=$(echo "$LINE2" | sed -E 's/.*"([^"]+)".*/\1/')
     else
-        ENABLE_STRICT_EGRESS=$(echo "$LINE2" | sed -E 's/.*=\s*([^"#]+).*/\1/' | sed 's/[[:space:]]*#.*//' | tr -d ' ')
+        ZERO_EGRESS=$(echo "$LINE2" | sed -E 's/.*=\s*([^"#]+).*/\1/' | sed 's/[[:space:]]*#.*//' | tr -d ' ')
     fi
 else
-    ENABLE_STRICT_EGRESS="false"
+    ZERO_EGRESS="false"
 fi
 
 # Determine mode
-if [ "$NETWORK_TYPE" = "private" ] && [ "$ENABLE_STRICT_EGRESS" = "true" ]; then
+if [ "$NETWORK_TYPE" = "private" ] && [ "$ZERO_EGRESS" = "true" ]; then
     MODE="egress-zero"
 else
     MODE="$NETWORK_TYPE"
@@ -60,12 +60,12 @@ fi
 
 # Export variables
 export NETWORK_TYPE
-export ENABLE_STRICT_EGRESS
+export ZERO_EGRESS
 export MODE
 
 # If not sourced, output export commands
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     echo "export NETWORK_TYPE=\"$NETWORK_TYPE\""
-    echo "export ENABLE_STRICT_EGRESS=\"$ENABLE_STRICT_EGRESS\""
+    echo "export ZERO_EGRESS=\"$ZERO_EGRESS\""
     echo "export MODE=\"$MODE\""
 fi

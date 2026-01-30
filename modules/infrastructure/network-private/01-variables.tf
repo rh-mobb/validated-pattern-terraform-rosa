@@ -48,8 +48,8 @@ variable "enable_nat_gateway" {
   nullable    = false
 }
 
-variable "enable_strict_egress" {
-  description = "Enable strict egress control (zero-egress mode). When true, creates worker node security group with limited egress rules and removes egress from VPC endpoint security group."
+variable "zero_egress" {
+  description = "Enable zero egress mode (no internet egress, only VPC endpoints). When true, creates worker node security group with limited egress rules and removes egress from VPC endpoint security group. Matches ROSA API property name."
   type        = bool
   default     = false
   nullable    = false
@@ -57,13 +57,6 @@ variable "enable_strict_egress" {
 
 variable "flow_log_s3_bucket" {
   description = "S3 bucket name for VPC Flow Logs (optional, typically used with zero-egress mode for audit logging)"
-  type        = string
-  default     = null
-  nullable    = true
-}
-
-variable "cluster_id" {
-  description = "Optional ROSA HCP cluster ID. If provided, will look up the ROSA-created VPC endpoint for API server access (used with zero-egress mode for validation)"
   type        = string
   default     = null
   nullable    = true

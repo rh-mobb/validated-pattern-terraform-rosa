@@ -32,7 +32,7 @@ rosa-hcp-infrastructure/
     ├── public/                 # Example public cluster (reference)
     │   └── terraform.tfvars   # Cluster-specific variables (network_type="public")
     └── egress-zero/            # Example egress-zero cluster (reference)
-        └── terraform.tfvars   # Cluster-specific variables (network_type="private", enable_strict_egress=true)
+        └── terraform.tfvars   # Cluster-specific variables (network_type="private", zero_egress=true)
 ```
 
 ---
@@ -105,14 +105,14 @@ rosa-hcp-infrastructure/
 - **NO Internet Gateway**
 - **NAT Gateway** (optional, controlled by `enable_nat_gateway`):
   - Default: Enabled for standard private clusters (allows internet egress via NAT)
-  - Disabled when `enable_strict_egress = true` (egress-zero mode)
+  - Disabled when `zero_egress = true` (zero-egress mode)
 - VPC endpoints for all AWS services (S3, ECR, CloudWatch, STS, etc.)
 - Route tables for private subnets only
 - PrivateLink endpoints configuration
-- **Egress-zero mode** (when `enable_strict_egress = true`):
+- **Zero-egress mode** (when `zero_egress = true`):
   - Additional security group with strict egress rules (HTTPS 443, DNS 53 only)
   - VPC Flow Logs support (optional, via `flow_log_s3_bucket`)
-  - ROSA API VPC endpoint lookup (optional, via `cluster_id`)
+  - **Note**: ROSA API VPC endpoint security group configuration is handled by the cluster module (see Cluster Module section)
 
 **Tags** (CRITICAL):
 - Private Subnets: `kubernetes.io/role/internal-elb = "1"`
@@ -124,9 +124,8 @@ rosa-hcp-infrastructure/
 - `multi_az` (default: true, boolean - creates resources across multiple AZs for HA)
 - `private_subnet_cidrs` (list - length should match number of AZs)
 - `enable_nat_gateway` (default: true, boolean - set to false for egress-zero mode)
-- `enable_strict_egress` (default: false, boolean - enables egress-zero mode when true)
+- `zero_egress` (default: false, boolean - enables zero-egress mode when true, matches ROSA API property name)
 - `flow_log_s3_bucket` (optional, string - enables VPC Flow Logs if provided)
-- `cluster_id` (optional, string - ROSA cluster ID for VPC endpoint lookup)
 - `tags`
 
 **Outputs**:
@@ -135,9 +134,8 @@ rosa-hcp-infrastructure/
 - `private_subnet_ids` (list)
 - `vpc_endpoint_ids` (map of service -> endpoint ID)
 - `security_group_id` (for egress-zero mode, null otherwise)
-- `rosa_api_vpc_endpoint_id` (if cluster_id provided and endpoint found, null otherwise)
 
-**Note**: This topology requires PrivateLink for API access and VPC endpoints for all AWS service access. When `enable_strict_egress = true`, the module operates in egress-zero mode with no internet egress allowed.
+**Note**: This topology requires PrivateLink for API access and VPC endpoints for all AWS service access. When `zero_egress = true`, the module operates in zero-egress mode with no internet egress allowed.
 
 ---
 
@@ -145,9 +143,9 @@ rosa-hcp-infrastructure/
 
 **⚠️ DEPRECATED**: The `network-egress-zero` module has been **consolidated into `network-private`**.
 
-**Migration**: Use `network-private` with `enable_nat_gateway = false` and `enable_strict_egress = true` to achieve egress-zero functionality.
+**Migration**: Use `network-private` with `enable_nat_gateway = false` and `zero_egress = true` to achieve zero-egress functionality.
 
-**Path**: `modules/infrastructure/network-private/` (with `enable_strict_egress = true`)
+**Path**: `modules/infrastructure/network-private/` (with `zero_egress = true`)
 
 **How to Use**:
 ```hcl
@@ -156,10 +154,9 @@ module "network" {
 
   # ... standard variables ...
 
-  enable_nat_gateway    = false  # No NAT Gateway for egress-zero
-  enable_strict_egress  = true   # Enable strict egress controls
-  flow_log_s3_bucket    = var.flow_log_s3_bucket  # Optional: VPC Flow Logs
-  cluster_id            = module.cluster.cluster_id  # Optional: For ROSA API endpoint lookup
+  enable_nat_gateway = false  # No NAT Gateway for zero-egress
+  zero_egress        = true    # Enable zero egress mode (matches ROSA API property name)
+  flow_log_s3_bucket = var.flow_log_s3_bucket  # Optional: VPC Flow Logs
 }
 ```
 
@@ -332,13 +329,13 @@ module "network_private" {
   count  = var.network_type == "private" ? 1 : 0
   source = "../../modules/infrastructure/network-private"
 
-  enable_nat_gateway   = !local.is_egress_zero  # Disable NAT for egress-zero
-  enable_strict_egress = local.is_egress_zero   # Enable strict egress for egress-zero
+  enable_nat_gateway = !local.is_egress_zero  # Disable NAT for zero-egress
+  zero_egress        = local.is_egress_zero   # Enable zero egress for zero-egress
   # ... other variables
 }
 
 locals {
-  is_egress_zero = var.network_type == "private" && var.enable_strict_egress
+  is_egress_zero = var.network_type == "private" && var.zero_egress
   network = var.network_type == "public" ? module.network_public[0] : module.network_private[0]
 }
 ```
@@ -408,7 +405,7 @@ terraform {
 
 ```hcl
 network_type = "public"
-enable_strict_egress = false  # Public clusters don't use strict egress
+zero_egress  = false  # Public clusters don't use zero egress
 region       = "us-east-1"
 vpc_cidr     = "10.10.0.0/16"
 multi_az     = false  # Single AZ for dev cost savings
@@ -514,12 +511,12 @@ instance_type     = "m5.large"
 
 **Main Configuration** (`terraform/10-main.tf`):
 
-The infrastructure layer uses a unified configuration. For egress-zero clusters, set `network_type = "private"` and `enable_strict_egress = true`:
+The infrastructure layer uses a unified configuration. For zero-egress clusters, set `network_type = "private"` and `zero_egress = true`:
 
 ```hcl
 # In clusters/egress-zero/terraform.tfvars:
 network_type = "private"
-enable_strict_egress = true
+zero_egress  = true
 flow_log_s3_bucket = var.flow_log_s3_bucket  # Optional: Audit logging
 ```
 
@@ -530,8 +527,8 @@ module "network_private" {
   count  = var.network_type == "private" ? 1 : 0
   source = "../../modules/infrastructure/network-private"
 
-  enable_nat_gateway   = !local.is_egress_zero  # false for egress-zero
-  enable_strict_egress = local.is_egress_zero   # true for egress-zero
+  enable_nat_gateway = !local.is_egress_zero  # false for zero-egress
+  zero_egress        = local.is_egress_zero   # true for zero-egress
   flow_log_s3_bucket   = var.flow_log_s3_bucket
   # ... other variables
 }
@@ -601,7 +598,7 @@ module "cluster" {
 
 ```hcl
 network_type = "private"
-enable_strict_egress = true  # Enables egress-zero mode
+zero_egress  = true  # Enables zero-egress mode (matches ROSA API property name)
 region       = "us-east-1"
 vpc_cidr     = "10.30.0.0/16"
 multi_az     = true
@@ -787,7 +784,7 @@ locals {
 |-------|------|--------|------|
 | 1 | Prepare | Fork/Clone `terraform-redhat/terraform-rhcs-rosa-hcp` as reference | Git |
 | 2 | Repo 1 | Build `network-public` module. Use Regional NAT Gateway (default) with zonal option. Ensure tags are correct | Terraform |
-| 3 | Repo 1 | Build `network-private` module with egress-zero support. Ensure VPC endpoints are configured and strict egress controls are available via `enable_strict_egress` | Terraform |
+| 3 | Repo 1 | Build `network-private` module with zero-egress support. Ensure VPC endpoints are configured and zero egress controls are available via `zero_egress` | Terraform |
 | 4 | Repo 1 | ~~Build `network-egress-zero` module~~ **CONSOLIDATED**: Egress-zero functionality is now part of `network-private` module | N/A |
 | 5 | Repo 1 | Build `iam` module. Use rhcs provider for account & operator roles | Terraform |
 | 6 | Repo 1 | Build `cluster` module. Reference hardened specs (Private, Encrypted) | Terraform |

@@ -85,7 +85,7 @@ make cluster.us-east-1-production.apply
 4. **Update `terraform.tfvars`**:
    - Set `cluster_name` (uncomment and set value)
    - Set `network_type` to `public` or `private`
-   - For egress-zero clusters: set `enable_strict_egress = true` (with `network_type = "private"`)
+   - For egress-zero clusters: set `zero_egress = true` (with `network_type = "private"`)
    - Set `region`, `vpc_cidr`, and other variables
    - Configure production variables if needed (KMS, version pinning, etc.)
 
@@ -101,7 +101,7 @@ make cluster.us-east-1-production.apply
 | Feature | Public | Private | Egress-Zero |
 |---------|--------|---------|-------------|
 | network_type | `public` | `private` | `private` |
-| enable_strict_egress | `false` | `false` | `true` |
+| zero_egress | `false` | `false` | `true` |
 | API Endpoint | Public | Private (PrivateLink) | Private (PrivateLink) |
 | Internet Egress | Yes (NAT Gateway) | Yes (NAT Gateway) | No (VPC endpoints only) |
 | Subnets | Public + Private | Private only | Private only |
@@ -119,7 +119,7 @@ make cluster.us-east-1-production.apply
 Contains cluster-specific variables:
 - `cluster_name`: Name of the cluster (must be set)
 - `network_type`: Network topology type (`public` or `private`)
-- `enable_strict_egress`: Enable strict egress control (egress-zero mode). Set to `true` with `network_type="private"` for egress-zero clusters
+- `zero_egress`: Enable zero egress mode (no internet egress, only VPC endpoints). Set to `true` with `network_type="private"` for egress-zero clusters. Matches ROSA API property name.
 - `region`: AWS region
 - `vpc_cidr`: VPC CIDR block
 - `multi_az`: Multi-AZ deployment (true/false)

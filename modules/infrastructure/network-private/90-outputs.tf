@@ -48,14 +48,8 @@ output "private_subnet_azs" {
 }
 
 output "security_group_id" {
-  description = "ID of the security group for worker nodes with strict egress control (null if enable_strict_egress is false or persists_through_sleep_network is false)"
+  description = "ID of the security group for worker nodes with zero egress control (null if zero_egress is false or persists_through_sleep_network is false)"
   value       = length(aws_security_group.worker_nodes) > 0 ? one(aws_security_group.worker_nodes[*].id) : null
-  sensitive   = false
-}
-
-output "rosa_api_vpc_endpoint_id" {
-  description = "ID of the ROSA-created VPC endpoint for API server access (if cluster_id was provided and endpoint found, null if persists_through_sleep_network is false)"
-  value       = length(data.aws_vpc_endpoint.rosa_api) > 0 ? data.aws_vpc_endpoint.rosa_api[0].id : null
   sensitive   = false
 }
 

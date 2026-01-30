@@ -278,9 +278,102 @@ policy = jsonencode({
 
 ---
 
+## Egress-Zero Cluster Features
+
+### 7. Git Repository Access for Egress-Zero Clusters 🔴 [CRITICAL]
+**Issue**: Egress-zero clusters have no internet egress, so they cannot access GitHub repositories directly.
+
+**Current Problem**:
+- GitOps bootstrap script tries to access GitHub (`gitops_git_repo_url`)
+- Helm repositories are hosted on GitHub Pages
+- ArgoCD needs to sync from Git repositories
+- Egress-zero clusters cannot reach external Git repositories
+
+**Solutions**:
+
+#### Option 1: AWS CodeCommit (Recommended for Egress-Zero) ⭐
+**Why**: Native AWS service, works with VPC endpoints, no internet egress required
+
+**Implementation**:
+- Create CodeCommit repository for cluster-config
+- Mirror GitHub repository to CodeCommit (via CI/CD or manual sync)
+- Update `gitops_git_repo_url` to use CodeCommit HTTPS URL
+- Configure VPC endpoint for CodeCommit (`com.amazonaws.<region>.codecommit`)
+- Use IAM authentication (no SSH keys needed)
+- ArgoCD can use IAM role for authentication via OIDC
+
+**Benefits**:
+- ✅ Native AWS service
+- ✅ Works with VPC endpoints (no internet egress)
+- ✅ IAM-based authentication (no SSH keys)
+- ✅ Git-compatible (standard Git protocol)
+- ✅ Can mirror GitHub repos automatically
+
+**Implementation Steps**:
+1. Create CodeCommit repository via Terraform
+2. Add VPC endpoint for CodeCommit to network module
+3. Create IAM role for ArgoCD to access CodeCommit
+4. Update bootstrap script to support CodeCommit URLs
+5. Document mirroring process from GitHub to CodeCommit
+
+#### Option 2: ArgoCD HTTP Proxy via Bastion
+**Why**: Allows ArgoCD to use bastion as HTTP proxy for Git operations
+
+**Implementation**:
+- Configure bastion as HTTP proxy (Squid or similar)
+- Configure ArgoCD to use HTTP proxy for Git operations
+- Update ArgoCD Application/Repository CRs with proxy settings
+- Requires proxy configuration in ArgoCD
+
+**Benefits**:
+- ✅ Can use existing GitHub repositories
+- ✅ No need to mirror repos
+- ✅ Works with existing Git workflows
+
+**Drawbacks**:
+- ⚠️ Requires proxy setup on bastion
+- ⚠️ More complex configuration
+- ⚠️ Proxy becomes single point of failure
+
+#### Option 3: Private Git Server (GitLab/Bitbucket)
+**Why**: Self-hosted Git server accessible via VPC
+
+**Implementation**:
+- Deploy GitLab/Bitbucket Server in VPC or accessible via VPN
+- Configure ArgoCD to use private Git server
+- Migrate repositories to private server
+
+**Benefits**:
+- ✅ Full control over Git infrastructure
+- ✅ Can be hosted in same VPC
+- ✅ No external dependencies
+
+**Drawbacks**:
+- ⚠️ Requires additional infrastructure
+- ⚠️ More complex setup
+- ⚠️ Maintenance overhead
+
+**Recommended Approach**: **AWS CodeCommit** for egress-zero clusters
+
+**Files to Create/Modify**:
+- `modules/infrastructure/cluster/13-codecommit.tf` (new) - CodeCommit repository creation
+- `modules/infrastructure/network-private/` - Add CodeCommit VPC endpoint
+- `modules/infrastructure/iam/60-codecommit-iam.tf` (new) - IAM role for ArgoCD CodeCommit access
+- `scripts/cluster/bootstrap-gitops.sh` - Support CodeCommit URLs
+- `docs/egress-zero-gitops.md` (new) - Documentation for egress-zero GitOps setup
+
+**Variables to Add**:
+- `gitops_git_repo_type` - `"github"` or `"codecommit"` (default: `"github"`)
+- `enable_codecommit` - Enable CodeCommit repository creation (default: `false`)
+- `codecommit_repo_name` - Name of CodeCommit repository (default: `${cluster_name}-cluster-config`)
+
+**Priority**: **HIGH** - Blocks GitOps deployment on egress-zero clusters
+
+---
+
 ## Infrastructure Features
 
-### 7. EFS Backup Configuration
+### 8. EFS Backup Configuration
 **Reference**: `terraform/7.storage.tf` (lines 256-336, commented out)
 
 **What's Missing**:
@@ -315,9 +408,38 @@ policy = jsonencode({
 4. **Secrets Manager IAM Integration** ✅ - Useful for GitOps secrets management
 5. **Ingress Controller Deployment** - Common requirement for application access
 6. **Termination Protection** ✅ - Safety feature for production clusters
+7. **Git Repository Access for Egress-Zero** 🔴 - **CRITICAL**: Blocks GitOps on egress-zero clusters
 
 ### Low Priority (Specialized Features)
-7. **EFS Backup** - Nice-to-have for data protection
+8. **EFS Backup** - Nice-to-have for data protection
+
+---
+
+## Code Refactoring
+
+### 9. Simplify Machine Pool Configuration ✅ [DONE]
+**Status**: Completed
+
+**What Was Implemented**:
+- ✅ Removed `machine_pools` variable (list) - eliminated redundant configuration
+- ✅ Simplified logic to always use `default_*` variables for default pool configuration
+- ✅ Updated all references in cluster module to use `default_*` variables directly
+- ✅ Cleaned up commented code in root module
+- ✅ Updated documentation to reflect new variable structure
+
+**Benefits Achieved**:
+- ✅ Eliminated dual-path logic (no more checking if `machine_pools` is empty)
+- ✅ Clearer intent: always use `default_*` variables for default pool
+- ✅ Simpler variable structure
+- ✅ Less confusion about which variables to use
+
+**Breaking Change**: Yes - any callers using `machine_pools` need to switch to `default_*` variables
+
+**Files Modified**:
+- ✅ `modules/infrastructure/cluster/01-variables.tf` - Removed `machine_pools` variable
+- ✅ `modules/infrastructure/cluster/10-main.tf` - Updated logic to use `default_*` variables
+- ✅ `terraform/10-main.tf` - Cleaned up commented `machine_pools` code
+- ✅ `modules/infrastructure/cluster/README.md` - Updated documentation
 
 ---
 

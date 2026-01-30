@@ -139,6 +139,300 @@ Reference: https://github.com/rh-mobb/mobb-rules/blob/main/content/languages/ter
 
 **Exception**: Simple, obvious fixes (typos, syntax errors, missing imports) can be fixed immediately without discussion, but still validate the fix works.
 
+### Terraform-Specific Debugging Techniques
+
+**CRITICAL**: When debugging Terraform issues, especially errors during `terraform apply` or unexpected resource behavior, follow this systematic approach:
+
+#### 1. Inspect the Plan File First
+
+**MANDATORY**: Before making code changes, **ALWAYS inspect the plan file** to see what Terraform is actually planning to do.
+
+**Plan File Location**:
+- Plan files are typically saved to `clusters/<cluster-name>/terraform.tfplan`
+- Check the plan script (`scripts/cluster/plan-infrastructure.sh`) to confirm the exact location
+- Plan files are binary, use `terraform show` to inspect them
+
+**Inspection Commands**:
+```bash
+# View the entire plan
+terraform show clusters/<cluster-name>/terraform.tfplan
+
+# Search for specific resources or variables
+terraform show -no-color clusters/<cluster-name>/terraform.tfplan | grep -E "multi_az|workers|rhcs_hcp_machine_pool"
+
+# View specific resource details
+terraform show -no-color clusters/<cluster-name>/terraform.tfplan | grep -A 20 "rhcs_hcp_machine_pool.default"
+
+# Check variable values in the plan
+terraform show -no-color clusters/<cluster-name>/terraform.tfplan | grep -E "^  # .*\.(multi_az|availability_zones)"
+```
+
+**Key Things to Check in Plan**:
+- Variable values: Are they what you expect?
+- Resource attributes: Are they being set correctly?
+- Resource count: Are the right number of resources being created?
+- Conditional logic: Are conditionals evaluating as expected?
+
+#### 2. Trace Variable Values Through Module Chain
+
+**MANDATORY**: When debugging module behavior, trace variables from root → child modules.
+
+**Debugging Workflow**:
+1. **Check root module inputs** (`terraform/10-main.tf`):
+   - What variables are being passed to child modules?
+   - Are there conditional assignments that might override expected values?
+   - Check `.tfvars` files for variable overrides
+
+2. **Check child module variables** (`modules/infrastructure/cluster/01-variables.tf`):
+   - What are the variable definitions?
+   - What are the default values?
+   - Are variables nullable or required?
+
+3. **Check local computations** (`modules/infrastructure/cluster/10-main.tf`):
+   - How are variables being transformed in `locals` blocks?
+   - Are conditionals evaluating correctly?
+   - Are there multiple conditionals that might conflict?
+
+4. **Check resource definitions**:
+   - How are locals/variables being used in resources?
+   - Are `count` or `for_each` expressions correct?
+
+**Example Trace**:
+```bash
+# 1. Check root module variable assignment
+grep -A 10 "module \"cluster\"" terraform/10-main.tf
+
+# 2. Check what's passed to the module
+grep -B 5 -A 15 "machine_pools\|multi_az\|availability_zones" terraform/10-main.tf
+
+# 3. Check child module variable definitions
+grep -A 10 "variable \"machine_pools\"" modules/infrastructure/cluster/01-variables.tf
+
+# 4. Check how variables are used in locals
+grep -B 5 -A 10 "hcp_machine_pools\|is_multi_az" modules/infrastructure/cluster/10-main.tf
+
+# 5. Check resource usage
+grep -B 5 -A 15 "rhcs_hcp_machine_pool" modules/infrastructure/cluster/10-main.tf
+```
+
+#### 3. Check for Conditional Overrides in Parent Modules
+
+**CRITICAL**: Parent modules may have conditional logic that overrides child module defaults.
+
+**Common Patterns to Check**:
+- Conditional variable assignments: `machine_pools = var.network_type == "public" ? [...] : []`
+- Conditional attribute overrides: `instance_type = var.network_type == "public" ? var.instance_type : null`
+- Environment-specific defaults that might conflict with child module logic
+
+**Example Issue**:
+```hcl
+# Root module (terraform/10-main.tf)
+module "cluster" {
+  machine_pools = var.network_type == "public" ? [
+    { name = "workers", ... }  # This overrides child module's multi-AZ logic!
+  ] : []
+  multi_az = var.multi_az  # true
+}
+
+# Child module (modules/infrastructure/cluster/10-main.tf)
+locals {
+  hcp_machine_pools = local.is_multi_az ?
+    ["workers-0", "workers-1", "workers-2"] :  # Never reached!
+    var.machine_pools  # Uses "workers" from parent instead
+}
+```
+
+**Solution**: Check parent module conditionals first, then ensure child module logic prioritizes correctly.
+
+#### 4. Use Terraform Console for Expression Testing
+
+**Best Practice**: Test complex expressions before implementing them.
+
+```bash
+# Start Terraform console
+cd terraform/
+terraform console
+
+# Test expressions
+> var.multi_az ? 3 : 1
+> length(var.machine_pools) > 0 ? var.machine_pools[0].name : "workers"
+> [for idx in range(3) : "workers-${idx}"]
+```
+
+#### 5. Verify Variable Precedence
+
+**MANDATORY**: Understand Terraform variable precedence when debugging variable values.
+
+**Variable Precedence** (highest to lowest):
+1. Command-line flags (`-var` and `-var-file`)
+2. `.tfvars` files (in order: `terraform.tfvars`, `*.auto.tfvars`)
+3. Environment variables (`TF_VAR_*`)
+4. Variable defaults in `variable` blocks
+
+**Key Points**:
+- `.tfvars` files take precedence over environment variables
+- Saved plan files bake in variable values - regenerate plans after code changes
+- Check for conflicting variable sources (e.g., both `.tfvars` and `TF_VAR_*`)
+
+**Debugging Variable Values**:
+```bash
+# Check what variables are set
+terraform console
+> var.multi_az
+> var.network_type
+
+# Check for environment variables
+env | grep TF_VAR_
+
+# Check .tfvars files
+cat clusters/<cluster-name>/terraform.tfvars | grep multi_az
+```
+
+#### 6. Regenerate Plans After Code Changes
+
+**CRITICAL**: Plan files are snapshots of variable values and resource definitions at plan time.
+
+**When to Regenerate**:
+- After changing variable defaults
+- After modifying conditional logic
+- After updating module inputs/outputs
+- After changing resource definitions
+
+**Regeneration Process**:
+```bash
+# Delete old plan
+rm clusters/<cluster-name>/terraform.tfplan
+
+# Generate new plan
+make cluster.<name>.plan
+
+# Verify new plan has correct values
+terraform show -no-color clusters/<cluster-name>/terraform.tfplan | grep -E "multi_az|workers"
+```
+
+#### 7. Check State File Location
+
+**MANDATORY**: Verify where Terraform state is stored.
+
+**State File Location**:
+- Check `terraform/00-providers.tf` for backend configuration
+- Check `scripts/cluster/init-infrastructure.sh` for backend config path
+- State files are typically in `clusters/<cluster-name>/infrastructure.tfstate`
+
+**Verification**:
+```bash
+# Check backend configuration
+grep -A 10 "backend" terraform/00-providers.tf
+
+# Check init script for state path
+grep "path\|key" scripts/cluster/init-infrastructure.sh
+
+# List resources in state
+cd terraform/
+terraform state list
+```
+
+#### 8. Systematic Debugging Checklist
+
+**MANDATORY**: Follow this checklist when debugging Terraform issues:
+
+1. **Read the error message carefully**:
+   - What resource is failing?
+   - What's the specific error?
+   - Is it a validation error or runtime error?
+
+2. **Inspect the plan file**:
+   - [ ] Run `terraform show` on the plan file
+   - [ ] Check variable values in the plan
+   - [ ] Verify resource attributes match expectations
+   - [ ] Check resource counts (`count` or `for_each`)
+
+3. **Trace variable flow**:
+   - [ ] Check `.tfvars` file values
+   - [ ] Check root module variable assignments
+   - [ ] Check child module variable definitions
+   - [ ] Check local computations
+   - [ ] Verify conditional logic evaluation
+
+4. **Check for overrides**:
+   - [ ] Are parent modules overriding child module defaults?
+   - [ ] Are conditionals in parent modules conflicting with child logic?
+   - [ ] Are explicit variable assignments overriding computed values?
+
+5. **Verify state**:
+   - [ ] Is state file in expected location?
+   - [ ] Are there existing resources that might conflict?
+   - [ ] Is state file locked or corrupted?
+
+6. **Test assumptions**:
+   - [ ] Use `terraform console` to test expressions
+   - [ ] Regenerate plan after code changes
+   - [ ] Compare expected vs actual values
+
+7. **Document findings**:
+   - [ ] Document root cause
+   - [ ] Document the fix
+   - [ ] Update `.cursorrules` if debugging process needs improvement
+
+#### 9. Common Terraform Debugging Pitfalls
+
+**Avoid These Mistakes**:
+
+1. **Assuming variable values without checking**:
+   - ❌ "multi_az must be false because..."
+   - ✅ Check plan file: `terraform show plan.tfplan | grep multi_az`
+
+2. **Not checking parent module overrides**:
+   - ❌ "The child module logic looks correct..."
+   - ✅ Check root module: `grep -A 10 "module \"cluster\"" terraform/10-main.tf`
+
+3. **Using stale plan files**:
+   - ❌ Applying old plan after code changes
+   - ✅ Regenerate plan: `make cluster.<name>.plan`
+
+4. **Not understanding conditional precedence**:
+   - ❌ "The first condition should match..."
+   - ✅ Trace through all conditionals, check evaluation order
+
+5. **Ignoring variable precedence**:
+   - ❌ "Environment variables override .tfvars"
+   - ✅ Remember: `.tfvars` > environment variables
+
+6. **Not checking resource counts**:
+   - ❌ "It should create 3 resources..."
+   - ✅ Check plan: `terraform show plan.tfplan | grep "will be created" | wc -l`
+
+#### 10. Example Debugging Session
+
+**Scenario**: Multi-AZ cluster creating single "workers" pool instead of "workers-0", "workers-1", "workers-2"
+
+**Debugging Steps**:
+```bash
+# Step 1: Check plan file
+terraform show -no-color clusters/egress-zero/terraform.tfplan | grep -E "multi_az|workers|rhcs_hcp_machine_pool"
+
+# Step 2: Check .tfvars
+cat clusters/egress-zero/terraform.tfvars | grep multi_az
+
+# Step 3: Check root module
+grep -B 5 -A 15 "machine_pools\|multi_az" terraform/10-main.tf
+
+# Step 4: Check child module variables
+grep -A 10 "variable \"machine_pools\"" modules/infrastructure/cluster/01-variables.tf
+
+# Step 5: Check child module logic
+grep -B 5 -A 10 "hcp_machine_pools\|is_multi_az" modules/infrastructure/cluster/10-main.tf
+
+# Step 6: Found issue - root module sets machine_pools=["workers"] for public networks
+# Step 7: Fix - prioritize multi_az check in child module before checking machine_pools input
+# Step 8: Regenerate plan
+rm clusters/egress-zero/terraform.tfplan
+make cluster.egress-zero.plan
+
+# Step 9: Verify fix
+terraform show -no-color clusters/egress-zero/terraform.tfplan | grep -E "workers"
+```
+
 ## Documentation Requirements
 
 ### Code Documentation
@@ -711,16 +1005,19 @@ Before committing code, ensure:
 3. [ ] **Root cause identified** - Understood underlying issue, not just symptoms
 4. [ ] **Issues discussed** - Errors, bugs, or multiple solution approaches discussed before implementing
 5. [ ] **Minimal changes made** - Fixed root cause with targeted changes, avoided workarounds
-6. [ ] Code follows PLAN.md specifications
-7. [ ] PLAN.md updated if architecture changed
-8. [ ] CHANGELOG.md updated with changes
-9. [ ] All documentation updated (README.md, module docs)
-10. [ ] Code passes linting/validation
-11. [ ] Security scanning completed (checkov)
-12. [ ] Variables and outputs documented
-13. [ ] Sensitive data properly handled
-14. [ ] Version numbers updated if needed
-15. [ ] Git commit message references PLAN.md if deviating
+6. [ ] **Plan file inspected** - Used `terraform show` to verify plan matches expectations (see Terraform-Specific Debugging Techniques)
+7. [ ] **Variable flow traced** - Verified variables from root → child modules (see Terraform-Specific Debugging Techniques)
+8. [ ] **Plan regenerated** - Deleted old plan and regenerated after code changes
+9. [ ] Code follows PLAN.md specifications
+10. [ ] PLAN.md updated if architecture changed
+11. [ ] CHANGELOG.md updated with changes
+12. [ ] All documentation updated (README.md, module docs)
+13. [ ] Code passes linting/validation
+14. [ ] Security scanning completed (checkov)
+15. [ ] Variables and outputs documented
+16. [ ] Sensitive data properly handled
+17. [ ] Version numbers updated if needed
+18. [ ] Git commit message references PLAN.md if deviating
 
 ## Reference Repositories
 

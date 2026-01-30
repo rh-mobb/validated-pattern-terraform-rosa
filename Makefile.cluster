@@ -22,13 +22,13 @@ check-cluster:
 .PHONY: help init plan apply destroy destroy_force sleep fmt validate clean
 .PHONY: show-endpoints show-credentials login verify
 .PHONY: tunnel-start tunnel-stop tunnel-status bastion-connect
-.PHONY: bootstrap
+.PHONY: bootstrap ensure-tunnel
 
 help: ## Show this help message
 	@$(SCRIPT_DIR)/utils/get-network-config.sh $(CLUSTER_DIR) >/dev/null 2>&1 || true; \
 	NETWORK_TYPE=$$(grep -E "^network_type\s*=" $(CLUSTER_DIR)/terraform.tfvars 2>/dev/null | sed -E 's/.*=\s*"([^"]+)"|.*=\s*([^"#\s]+).*/\1\2/' | tr -d ' ' || echo "unknown"); \
-	ENABLE_STRICT_EGRESS=$$(grep -E "^enable_strict_egress\s*=" $(CLUSTER_DIR)/terraform.tfvars 2>/dev/null | sed -E 's/.*=\s*"([^"]+)"|.*=\s*([^"#\s]+).*/\1\2/' | tr -d ' ' || echo "false"); \
-	if [ "$$NETWORK_TYPE" = "private" ] && [ "$$ENABLE_STRICT_EGRESS" = "true" ]; then \
+	ZERO_EGRESS=$$(grep -E "^zero_egress\s*=" $(CLUSTER_DIR)/terraform.tfvars 2>/dev/null | sed -E 's/.*=\s*"([^"]+)"|.*=\s*([^"#\s]+).*/\1\2/' | tr -d ' ' || echo "false"); \
+	if [ "$$NETWORK_TYPE" = "private" ] && [ "$$ZERO_EGRESS" = "true" ]; then \
 		MODE="egress-zero"; \
 	else \
 		MODE="$$NETWORK_TYPE"; \
@@ -99,7 +99,7 @@ sleep: check-cluster
 	@echo "$(GREEN)To wake the cluster, run: make cluster.$(CLUSTER_NAME).apply$(NC)"
 
 # GitOps operations
-bootstrap: check-cluster
+bootstrap: check-cluster ensure-tunnel
 	@echo "$(BLUE)Bootstrapping GitOps operator for $(CLUSTER_NAME)...$(NC)"
 	@cd $(TERRAFORM_DIR) && \
 		if ! terraform output -no-color gitops_bootstrap_enabled 2>/dev/null | grep -q "true"; then \
@@ -126,7 +126,7 @@ show-endpoints: check-cluster
 show-credentials: show-endpoints
 	@$(SCRIPT_DIR)/info/show-credentials.sh $(CLUSTER_NAME)
 
-login: check-cluster
+login: check-cluster ensure-tunnel
 	@$(SCRIPT_DIR)/info/login.sh $(CLUSTER_NAME)
 
 verify: check-cluster ## Verify cluster deployment, GitOps operator, and ApplicationSet
@@ -145,6 +145,14 @@ tunnel-stop: check-cluster
 
 tunnel-status: check-cluster
 	@$(SCRIPT_DIR)/tunnel/status.sh $(CLUSTER_NAME)
+
+# Ensure tunnel is started if bastion exists
+ensure-tunnel: check-cluster
+	@cd $(TERRAFORM_DIR) && \
+		BASTION_ID=$$(terraform output -no-color -raw bastion_instance_id 2>/dev/null | tr -d '\n\r' | sed 's/[[:space:]]*$$//') && \
+		if [ -n "$$BASTION_ID" ] && [ "$$BASTION_ID" != "null" ]; then \
+			cd - >/dev/null && $(SCRIPT_DIR)/tunnel/start.sh $(CLUSTER_NAME); \
+		fi
 
 # Bastion operations
 bastion-connect: check-cluster

@@ -442,11 +442,11 @@ make apply.my-cluster
   - Private subnets only
   - VPC endpoints for all AWS services
   - Optional Regional NAT Gateway for internet egress (default: enabled)
-  - **Egress-zero mode**: Set `enable_strict_egress = true` to disable NAT Gateway and enable strict egress controls
+  - **Zero-egress mode**: Set `zero_egress = true` to disable NAT Gateway and enable zero egress controls
   - VPC Flow Logs support (optional, via `flow_log_s3_bucket`)
   - ROSA-required subnet tags
 
-- **network-egress-zero**: ⚠️ **DEPRECATED** - Use `network-private` with `enable_strict_egress = true`
+- **network-egress-zero**: ⚠️ **DEPRECATED** - Use `network-private` with `zero_egress = true`
   - This module remains for backward compatibility but is deprecated
   - New deployments should use the consolidated `network-private` module
 
@@ -784,7 +784,7 @@ This allows sleeping the cluster while preserving IAM roles and OIDC configurati
 
 - ✅ **network-public**: Production-ready
 - ✅ **network-private**: Production-ready
-- ⚠️ **network-egress-zero**: Deprecated (use `network-private` with `enable_strict_egress = true`)
+- ⚠️ **network-egress-zero**: Deprecated (use `network-private` with `zero_egress = true`)
 - ✅ **iam**: Production-ready (includes KMS keys, IAM roles for operators)
 - ✅ **cluster**: Production-ready (includes identity provider, EFS storage, GitOps bootstrap script)
 - ✅ **bastion**: Production-ready (dev/demo use only)

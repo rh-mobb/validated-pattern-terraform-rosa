@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **BREAKING**: Renamed `enable_strict_egress` variable to `zero_egress` throughout the codebase
+  - Root module: `terraform/01-variables.tf` - variable renamed from `enable_strict_egress` to `zero_egress`
+  - Network-private module: variable renamed from `enable_strict_egress` to `zero_egress`
+  - All `.tfvars` files updated to use `zero_egress` instead of `enable_strict_egress`
+  - Scripts updated: `get-network-config.sh`, `Makefile.cluster`, tunnel scripts (`start.sh`, `stop.sh`, `status.sh`)
+  - Documentation updated: `README.md`, `PLAN.md`, `clusters/README.md`, module READMEs
+  - **Migration**: Update all `terraform.tfvars` files to replace `enable_strict_egress = true/false` with `zero_egress = true/false`
+  - **Rationale**: Matches ROSA API property name (`zero_egress`) for consistency across all modules and eliminates mapping layer
+- **IMPORTANT**: `zero_egress` is now independent of `network_type` - it's a cluster-level ROSA API property
+  - `zero_egress` is passed directly to cluster and IAM modules (independent of network configuration)
+  - Network infrastructure (NAT Gateway, security groups) is configured for zero egress when both `network_type="private"` AND `zero_egress=true`
+  - This allows `zero_egress` to be set independently, though it typically requires `network_type="private"` for PrivateLink API endpoint
+
 ### Added
 - **Termination Protection**: Added cluster termination protection feature
   - New variable `enable_termination_protection` (default: `false`) in cluster module
@@ -81,8 +95,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - **BREAKING**: Removed `modules/infrastructure/network-egress-zero/` module
   - Egress-zero functionality has been consolidated into `network-private` module
-  - Use `network-private` with `enable_strict_egress = true` and `enable_nat_gateway = false` for egress-zero mode
-  - Migration: Update module source from `network-egress-zero` to `network-private` and add `enable_strict_egress = true`
+  - Use `network-private` with `zero_egress = true` and `enable_nat_gateway = false` for zero-egress mode
+  - Migration: Update module source from `network-egress-zero` to `network-private` and add `zero_egress = true`
   - Updated all documentation and references to reflect consolidation
   - Updated `modules/infrastructure/bastion/` and `modules/infrastructure/network-existing/` READMEs
 - **BREAKING**: Removed `examples/private/` cluster example

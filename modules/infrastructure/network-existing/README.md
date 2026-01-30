@@ -116,7 +116,7 @@ module "network" {
 ## Related Modules
 
 - `network-public` - Creates a new public VPC with NAT gateways
-- `network-private` - Creates a new private VPC with VPC endpoints (supports egress-zero mode via `enable_strict_egress`)
+- `network-private` - Creates a new private VPC with VPC endpoints (supports zero-egress mode via `zero_egress`)
 
 ## References
 

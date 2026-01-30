@@ -18,8 +18,11 @@ fi
 CLUSTER_DIR=$(get_cluster_dir "$CLUSTER_NAME")
 TERRAFORM_INFRA_DIR=$(get_terraform_dir infrastructure)
 
+# Plan file is in cluster directory
+PLAN_FILE="$CLUSTER_DIR/terraform.tfplan"
+
 # Ensure plan exists
-if [ ! -f "$TERRAFORM_INFRA_DIR/terraform.tfplan" ]; then
+if [ ! -f "$PLAN_FILE" ]; then
     info "Plan not found, planning first..."
     "$SCRIPT_DIR/plan-infrastructure.sh" "$CLUSTER_NAME"
 fi
@@ -28,6 +31,7 @@ info "Applying infrastructure changes..."
 
 cd "$TERRAFORM_INFRA_DIR"
 
-terraform apply terraform.tfplan
+# Use relative path from terraform directory to cluster directory
+terraform apply "../clusters/$CLUSTER_NAME/terraform.tfplan"
 
 success "Infrastructure applied successfully"

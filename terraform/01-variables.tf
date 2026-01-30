@@ -5,7 +5,7 @@ variable "cluster_name" {
 }
 
 variable "network_type" {
-  description = "Network topology type: 'public' or 'private'. Egress-zero mode is inferred from enable_strict_egress and other settings."
+  description = "Network topology type: 'public' or 'private'. Zero egress mode (zero_egress) is a separate cluster-level property that can be set independently, though it typically requires 'private' network type for PrivateLink API endpoint."
   type        = string
   nullable    = false
 
@@ -15,10 +15,17 @@ variable "network_type" {
   }
 }
 
-variable "enable_strict_egress" {
-  description = "Enable strict egress control (no internet egress, only VPC endpoints). Only applicable when network_type is 'private'. When true, disables NAT Gateway and enables strict egress security group rules."
+variable "zero_egress" {
+  description = "Enable zero egress mode (no internet egress, only VPC endpoints). This is a cluster-level ROSA API property that can be set independently of network_type. However, zero egress typically requires network_type='private' (PrivateLink API endpoint) and the network module will configure infrastructure (disable NAT Gateway, enable strict egress security groups) when both conditions are met. Matches ROSA API property name."
   type        = bool
   default     = false
+  nullable    = false
+}
+
+variable "private" {
+  description = "Use PrivateLink API endpoint (private cluster). Independent of network_type - you can have a private cluster in a VPC with public subnets, or a public cluster in a VPC with only private subnets."
+  type        = bool
+  default     = true
   nullable    = false
 }
 
@@ -41,8 +48,8 @@ variable "multi_az" {
   nullable    = false
 }
 
-variable "instance_type" {
-  description = "EC2 instance type for worker nodes"
+variable "default_instance_type" {
+  description = "Default EC2 instance type for worker nodes (used for default machine pool)"
   type        = string
   default     = "m5.xlarge"
   nullable    = false

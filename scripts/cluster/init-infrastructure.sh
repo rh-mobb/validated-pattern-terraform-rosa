@@ -44,12 +44,13 @@ if check_backend_config; then
 else
     # Local backend
     # Use -migrate-state if .terraform exists, otherwise -reconfigure
+    # Use absolute path with PROJECT_ROOT
     if [ -d ".terraform" ]; then
         terraform init -migrate-state -input=false \
-            -backend-config="path=../../${CLUSTER_DIR}/infrastructure.tfstate"
+            -backend-config="path=${PROJECT_ROOT}/clusters/${CLUSTER_NAME}/infrastructure.tfstate"
     else
         terraform init -reconfigure -input=false \
-            -backend-config="path=../../${CLUSTER_DIR}/infrastructure.tfstate"
+            -backend-config="path=${PROJECT_ROOT}/clusters/${CLUSTER_NAME}/infrastructure.tfstate"
     fi
 fi
 

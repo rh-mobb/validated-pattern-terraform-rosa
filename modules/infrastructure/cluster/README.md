@@ -51,17 +51,10 @@ module "cluster" {
   private         = true   # Organizational default
   etcd_encryption = false  # Organizational default (requires etcd_kms_key_arn from IAM module)
 
-  # Optional: Custom machine pools
-  machine_pools = [
-    {
-      name                = "worker"
-      instance_type       = "m5.xlarge"
-      min_replicas        = 3
-      max_replicas        = 6
-      multi_az            = true
-      autoscaling_enabled = true
-    }
-  ]
+  # Optional: Default machine pool configuration
+  default_instance_type = "m5.xlarge"
+  default_min_replicas   = 3
+  default_max_replicas   = 6
 
   # Optional: Allow API endpoint access from additional CIDR blocks
   # By default, only VPC CIDR can access the API endpoint
@@ -135,17 +128,15 @@ module "cluster" {
 | api_endpoint_allowed_cidrs | Optional list of IPv4 CIDR blocks allowed to access the ROSA HCP API endpoint. By default, the VPC endpoint security group only allows access from within the VPC. Useful for VPN ranges, bastion hosts, or other VPCs | `list(string)` | `[]` |
 | enable_persistent_dns_domain | Enable persistent DNS domain registration. When true, creates rhcs_dns_domain resource that persists between cluster creations (not gated by persists_through_sleep). When false, ROSA uses default DNS domain | `bool` | `false` |
 | tags | Tags to apply to the cluster | `map(string)` | `{}` |
-| machine_pools | List of machine pool configurations for default pools | `list(object)` | `[]` |
 | additional_machine_pools | Map of additional custom machine pools beyond default pools. Supports advanced features: taints, labels, kubelet configs, tuning configs, version pinning, capacity reservations | `map(object)` | `{}` |
 
-### Machine Pool Defaults (if machine_pools not provided)
+### Machine Pool Defaults
 
 | Name | Description | Type | Default |
 |------|-------------|------|---------|
 | default_instance_type | Default instance type | `string` | `"m5.xlarge"` |
 | default_min_replicas | Default minimum replicas | `number` | `3` |
 | default_max_replicas | Default maximum replicas | `number` | `6` |
-| default_multi_az | Default multi-AZ setting | `bool` | `true` |
 
 ### Identity Provider
 
@@ -198,38 +189,29 @@ The module automatically validates that specified instance types are available f
 
 ### Default Pool
 
-If `machine_pools` is not provided, the module creates a default pool:
+The module always creates a default machine pool using the `default_*` variables:
 
-- Name: `worker`
-- Instance type: `m5.xlarge` (configurable via `default_instance_type`, validated against available ROSA machine types)
-- Min replicas: `3` (configurable via `default_min_replicas`)
-- Max replicas: `6` (configurable via `default_max_replicas`)
-- Multi-AZ: `true` (configurable via `default_multi_az`)
-- Autoscaling: `true`
+- **Name**: For multi-AZ clusters: `workers-0`, `workers-1`, `workers-2` (one per availability zone). For single-AZ clusters: `workers`
+- **Instance type**: Configurable via `default_instance_type` (default: `m5.xlarge`, validated against available ROSA machine types)
+- **Min replicas**: Configurable via `default_min_replicas`:
+  - Single-AZ: Default `2` per pool (minimum for HA)
+  - Multi-AZ: Default `1` per availability zone (each pool gets this value)
+- **Max replicas**: Configurable via `default_max_replicas`:
+  - Single-AZ: Default `4` per pool
+  - Multi-AZ: Default `2` per availability zone (each pool gets this value)
+- **Multi-AZ**: Controlled by `multi_az` variable (default: `true`)
+- **Autoscaling**: Always enabled (`true`)
 
-### Custom Pools
+**Important**: For multi-AZ clusters, replica values (`default_min_replicas` and `default_max_replicas`) are **per availability zone**, not total. For example:
+- Setting `default_min_replicas = 1` for a multi-AZ cluster means each of the 3 pools (workers-0, workers-1, workers-2) will have 1 replica minimum (3 total minimum across all pools)
+- Setting `default_max_replicas = 2` means each pool will have 2 replicas maximum (6 total maximum across all pools)
 
-Provide a list of machine pool configurations:
-
+**Example**:
 ```hcl
-machine_pools = [
-  {
-    name                = "worker"
-    instance_type       = "m5.xlarge"
-    min_replicas        = 3
-    max_replicas        = 6
-    multi_az            = true
-    autoscaling_enabled = true
-  },
-  {
-    name                = "compute"
-    instance_type       = "m5.2xlarge"
-    min_replicas        = 2
-    max_replicas        = 10
-    multi_az            = true
-    autoscaling_enabled = true
-  }
-]
+default_instance_type = "m5.xlarge"
+default_min_replicas  = 1  # Per AZ for multi-AZ (1 per pool = 3 total)
+default_max_replicas  = 2  # Per AZ for multi-AZ (2 per pool = 6 total)
+multi_az              = true
 ```
 
 ### Additional Machine Pools

@@ -8,7 +8,7 @@ locals {
 
   # Concatenate private and public subnet IDs for cluster resource
   # Cluster needs all subnets (private + public for public clusters, just private for private clusters)
-  subnet_ids = concat(var.private_subnet_ids, var.public_subnet_ids)
+  subnet_ids = var.private ? var.private_subnet_ids : concat(var.private_subnet_ids, var.public_subnet_ids)
 
   # Strip https:// prefix from OIDC endpoint URL if present (as per Red Hat documentation)
   # The OIDC endpoint URL should be in format: oidc.op1.openshiftapps.com/2nb1con7holccea7ogkfrm7ddjc8ih0q
@@ -35,24 +35,38 @@ locals {
 
   # Determine replicas and autoscaling settings
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/04-cluster.tf
-  # HCP: if unspecified and multi-az, use 1 per subnet (total = 1 * number of subnets); if unspecified and single-az, use 2
-  # NOTE: hcp_replicas is the TOTAL number of replicas across all subnets, not per subnet
-  autoscaling_enabled = length(var.machine_pools) > 0 ? var.machine_pools[0].autoscaling_enabled : true
-  hcp_replicas = length(var.machine_pools) > 0 ? var.machine_pools[0].min_replicas : (
-    var.multi_az && length(local.subnet_ids) > 0 ? (1 * length(local.subnet_ids)) : 2
-  )
+  # HCP: if unspecified and multi-az, use 1 per availability zone (total = 1 * number of AZs); if unspecified and single-az, use 2
+  # NOTE: hcp_replicas is the TOTAL number of replicas across all availability zones, not per AZ
+  # For ROSA HCP: multi_az=true means 3 AZs, multi_az=false means 1 AZ
+  is_multi_az = var.multi_az
+  num_availability_zones = var.multi_az ? 3 : 1
+  autoscaling_enabled = true # Default pool always uses autoscaling
 
-  # Determine machine pool names - HCP creates one pool per subnet if multi-AZ
+  # Calculate default min/max replicas per pool if not provided
+  # Single-AZ: min = 2 (minimum for HA), max = 4 (double min) per pool
+  # Multi-AZ: min = 1 (per AZ), max = 2 (per AZ)
+  # Note: For multi-AZ clusters, replica values are per availability zone (not total)
+  calculated_min_replicas_per_pool = local.is_multi_az ? 1 : 2
+  calculated_max_replicas_per_pool = local.is_multi_az ? 2 : 4
+
+  # Use user-provided values directly (they are per-AZ for multi-AZ, per-pool for single-AZ)
+  default_min_replicas_per_pool = var.default_min_replicas != null ? var.default_min_replicas : local.calculated_min_replicas_per_pool
+  default_max_replicas_per_pool = var.default_max_replicas != null ? var.default_max_replicas : local.calculated_max_replicas_per_pool
+
+  # hcp_replicas is the total number of replicas across all machine pools (used at cluster level)
+  # For single-AZ: 1 pool with hcp_replicas replicas
+  # For multi-AZ: 3 pools, total = min_replicas_per_pool * 3
+  hcp_replicas = local.is_multi_az ? (local.default_min_replicas_per_pool * local.num_availability_zones) : local.default_min_replicas_per_pool
+
+  # Determine machine pool names - HCP creates one pool per availability zone if multi-AZ
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/04-cluster.tf
   # NOTE: ROSA creates "workers" (plural) for single-AZ
-  # For multi-AZ, ROSA creates "workers-0", "workers-1", "workers-2" (one per subnet)
+  # For multi-AZ, ROSA creates "workers-0", "workers-1", "workers-2" (one per availability zone)
   # Use a list (not set) to match reference implementation for count-based iteration
   # Conditionally set machine pools based on destroy flag
-  machine_pools_to_create = local.persists_through_sleep ? var.machine_pools : []
+  # For multi-AZ clusters, always generate numbered pool names
   hcp_machine_pools = local.persists_through_sleep ? (
-    length(var.machine_pools) > 0 ? [for pool in var.machine_pools : pool.name] : (
-      var.multi_az && length(local.subnet_ids) > 0 ? [for idx in range(length(local.subnet_ids)) : "workers-${idx}"] : ["workers"]
-    )
+    local.is_multi_az ? [for idx in range(local.num_availability_zones) : "workers-${idx}"] : ["workers"]
   ) : []
 
   # Common tags
@@ -165,7 +179,7 @@ resource "rhcs_cluster_rosa_hcp" "main" {
   channel_group = var.channel_group
 
   # Compute machine type (used for default machine pool)
-  compute_machine_type = length(var.machine_pools) > 0 ? var.machine_pools[0].instance_type : var.default_instance_type
+  compute_machine_type = var.default_instance_type
 
   # Replicas for default machine pool
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/04-cluster.tf
@@ -205,16 +219,16 @@ resource "rhcs_cluster_rosa_hcp" "main" {
     precondition {
       condition = contains(
         [for mt in data.rhcs_machine_types.available.items : mt.id],
-        length(var.machine_pools) > 0 ? var.machine_pools[0].instance_type : var.default_instance_type
+        var.default_instance_type
       )
-      error_message = "Instance type '${length(var.machine_pools) > 0 ? var.machine_pools[0].instance_type : var.default_instance_type}' is not available for ROSA in region '${var.region}'. Use 'terraform console' and run 'data.rhcs_machine_types.available.items' to see available machine types."
+      error_message = "Instance type '${var.default_instance_type}' is not available for ROSA in region '${var.region}'. Use 'terraform console' and run 'data.rhcs_machine_types.available.items' to see available machine types."
     }
 
-    # Validate replicas is a multiple of number of subnets for multi-AZ clusters
-    # Only validate when destroy is enabled (resource will be created) and subnet_ids is provided
+    # Validate replicas is a multiple of number of availability zones for multi-AZ clusters
+    # Only validate when destroy is enabled (resource will be created) and multi-AZ is enabled
     precondition {
-      condition     = local.persists_through_sleep && var.multi_az && length(local.subnet_ids) > 0 ? (local.hcp_replicas % length(local.subnet_ids) == 0) : true
-      error_message = "For multi-AZ clusters, replicas (${local.hcp_replicas}) must be a multiple of the number of subnets (${length(local.subnet_ids)}). For ${length(local.subnet_ids)} subnets, use replicas like ${length(local.subnet_ids)}, ${length(local.subnet_ids) * 2}, ${length(local.subnet_ids) * 3}, etc."
+      condition     = local.persists_through_sleep && local.is_multi_az ? (local.hcp_replicas % local.num_availability_zones == 0) : true
+      error_message = "For multi-AZ clusters, replicas (${local.hcp_replicas}) must be a multiple of the number of availability zones (${local.num_availability_zones}). For ${local.num_availability_zones} AZs, use replicas like ${local.num_availability_zones}, ${local.num_availability_zones * 2}, ${local.num_availability_zones * 3}, etc."
     }
 
     # Validate no name conflicts between default and additional pools
@@ -262,12 +276,13 @@ resource "rhcs_hcp_machine_pool" "default" {
   cluster = one(rhcs_cluster_rosa_hcp.main[*].id)
 
   # Handle null subnet_id - derive from count.index if data source returns null
-  # Since hcp_machine_pools list matches subnet order, use count.index to map to subnet_ids
-  # For multi-AZ: count.index 0 -> subnet_ids[0], count.index 1 -> subnet_ids[1], etc.
-  # For single-AZ: count.index 0 -> subnet_ids[0]
+  # Since hcp_machine_pools list matches AZ order, use count.index to map to private_subnet_ids
+  # Worker nodes only go in private subnets, never public subnets
+  # For multi-AZ: count.index 0 -> private_subnet_ids[0], count.index 1 -> private_subnet_ids[1], etc.
+  # For single-AZ: count.index 0 -> private_subnet_ids[0]
   subnet_id = try(data.rhcs_hcp_machine_pool.default[count.index].subnet_id, null) != null ? (
     data.rhcs_hcp_machine_pool.default[count.index].subnet_id
-  ) : local.subnet_ids[count.index % length(local.subnet_ids)]
+  ) : var.private_subnet_ids[count.index % length(var.private_subnet_ids)]
 
   # Handle null auto_repair - default to true (standard ROSA default)
   auto_repair = try(data.rhcs_hcp_machine_pool.default[count.index].auto_repair, null) != null ? (
@@ -284,29 +299,35 @@ resource "rhcs_hcp_machine_pool" "default" {
   )
 
   # Autoscaling configuration - required attribute (not block)
+  # Use per-pool values directly (already calculated above)
   autoscaling = {
     enabled      = local.autoscaling_enabled
-    min_replicas = local.autoscaling_enabled ? local.hcp_replicas : null
-    max_replicas = local.autoscaling_enabled ? (
-      length(var.machine_pools) > 0 ? var.machine_pools[0].max_replicas : var.default_max_replicas
-    ) : null
+    min_replicas = local.autoscaling_enabled ? local.default_min_replicas_per_pool : null
+    max_replicas = local.autoscaling_enabled ? local.default_max_replicas_per_pool : null
   }
 
   # AWS node pool configuration - required attribute (not block)
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/04-cluster.tf
-  # Preserve instance type from data source, but allow override via machine_pools variable
+  # Preserve instance type from data source if available, otherwise use default_instance_type
   # Handle null aws_node_pool gracefully (may be null on initial creation or subsequent applies)
   aws_node_pool = {
-    instance_type = length(var.machine_pools) > 0 ? var.machine_pools[0].instance_type : (
-      try(data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.instance_type, null) != null ?
-      data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.instance_type :
-      var.default_instance_type
-    )
+    instance_type = try(data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.instance_type, null) != null ? (
+      data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.instance_type
+    ) : var.default_instance_type
     ec2_metadata_http_tokens = try(data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.ec2_metadata_http_tokens, null) != null ? (
       data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.ec2_metadata_http_tokens
     ) : "required" # Default to "required" to match cluster-level setting
     tags = local.common_tags
   }
+
+  # CRITICAL: Default machine pools are managed by Terraform for configuration (autoscaling, instance type, etc.)
+  # but should NOT be deleted by Terraform during destroy. ROSA automatically deletes default machine pools
+  # when the cluster is destroyed. Attempting to delete them manually causes errors because ROSA requires
+  # at least 2 replicas. Setting ignore_deletion_error = true allows Terraform to gracefully handle deletion
+  # failures by removing the resource from state without error, allowing cluster destruction to proceed.
+  # Reference: https://registry.terraform.io/providers/terraform-redhat/rhcs/latest/docs/resources/hcp_machine_pool#ignore_deletion_error
+  # Reference: ./reference/terraform-provider-rhcs/docs/guides/deleting-clusters-with-removed-initial-worker-pools.md
+  ignore_deletion_error = true
 
   lifecycle {
     # Magic import: When using data.rhcs_hcp_machine_pool, Terraform should automatically import
@@ -314,16 +335,18 @@ resource "rhcs_hcp_machine_pool" "default" {
     # we may need to manually import it first using: terraform import <resource_address> <cluster_id>,<machine_pool_id>
     # The machine_pool_id can be found in the data source's id attribute after refresh.
 
+    # Validate minimum replicas for single-AZ (must be at least 2)
     precondition {
       condition     = var.multi_az ? true : (local.hcp_replicas >= 2)
       error_message = "must have a minimum of 2 'replicas' for single az use cases."
     }
 
+    # Validate max_replicas >= min_replicas (per pool/AZ)
     precondition {
       condition = local.autoscaling_enabled ? (
-        (length(var.machine_pools) > 0 ? var.machine_pools[0].max_replicas : var.default_max_replicas) >= local.hcp_replicas
+        local.default_max_replicas_per_pool >= local.default_min_replicas_per_pool
       ) : true
-      error_message = "'max_replicas' must be greater than or equal to 'min_replicas'."
+      error_message = "'max_replicas' (${local.default_max_replicas_per_pool} per ${local.is_multi_az ? "AZ" : "pool"}) must be greater than or equal to 'min_replicas' (${local.default_min_replicas_per_pool} per ${local.is_multi_az ? "AZ" : "pool"})."
     }
 
     # Validate instance type is available for ROSA in the specified region
@@ -331,13 +354,11 @@ resource "rhcs_hcp_machine_pool" "default" {
     precondition {
       condition = contains(
         [for mt in data.rhcs_machine_types.available.items : mt.id],
-        length(var.machine_pools) > 0 ? var.machine_pools[0].instance_type : (
-          try(data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.instance_type, null) != null ?
-          data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.instance_type :
-          var.default_instance_type
-        )
+        try(data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.instance_type, null) != null ? (
+          data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.instance_type
+        ) : var.default_instance_type
       )
-      error_message = "Instance type '${length(var.machine_pools) > 0 ? var.machine_pools[0].instance_type : (try(data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.instance_type, null) != null ? data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.instance_type : var.default_instance_type)}' is not available for ROSA in region '${var.region}'. Use 'terraform console' and run 'data.rhcs_machine_types.available.items' to see available machine types."
+      error_message = "Instance type '${try(data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.instance_type, null) != null ? data.rhcs_hcp_machine_pool.default[count.index].aws_node_pool.instance_type : var.default_instance_type}' is not available for ROSA in region '${var.region}'. Use 'terraform console' and run 'data.rhcs_machine_types.available.items' to see available machine types."
     }
   }
 }
@@ -397,10 +418,10 @@ resource "rhcs_hcp_machine_pool" "additional" {
       error_message = "Instance type '${each.value.instance_type}' for machine pool '${each.key}' is not available for ROSA in region '${var.region}'. Use 'terraform console' and run 'data.rhcs_machine_types.available.items' to see available machine types."
     }
 
-    # Validate subnet_id is in the provided subnet_ids list
+    # Validate subnet_id is in the private subnet_ids list (worker nodes only go in private subnets)
     precondition {
-      condition     = contains(local.subnet_ids, each.value.subnet_id)
-      error_message = "Subnet ID '${each.value.subnet_id}' for machine pool '${each.key}' must be one of the cluster's subnet IDs: ${join(", ", local.subnet_ids)}"
+      condition     = contains(var.private_subnet_ids, each.value.subnet_id)
+      error_message = "Subnet ID '${each.value.subnet_id}' for machine pool '${each.key}' must be one of the cluster's private subnet IDs: ${join(", ", var.private_subnet_ids)}"
     }
 
     # Validate autoscaling configuration
@@ -427,14 +448,30 @@ resource "rhcs_hcp_machine_pool" "additional" {
 # This configuration allows adding additional IPv4 CIDR blocks to access the API endpoint.
 # Reference: https://github.com/redhat-rosa/rosa-hcp-dedicated-vpc/blob/main/terraform/2.expose-api.tf
 
-# Data source to find the VPC endpoint security group created by ROSA
-# ROSA tags the security group with: Name = "${cluster_id}-vpce-private-router"
-data "aws_security_groups" "vpc_endpoint_default" {
+# Data source to look up ROSA-created VPC endpoint for API server access
+# ROSA HCP creates a VPC endpoint for worker nodes to connect to the hosted control plane API
+# This endpoint is tagged with:
+# - red-hat-managed=true
+# - red-hat-clustertype=rosa
+# - api.openshift.com/id=<cluster_id>
+data "aws_vpc_endpoint" "rosa_api" {
   count = local.persists_through_sleep && length(var.api_endpoint_allowed_cidrs) > 0 ? 1 : 0
 
+  vpc_id = var.vpc_id
+
   filter {
-    name   = "tag:Name"
-    values = ["${one(rhcs_cluster_rosa_hcp.main[*].id)}-vpce-private-router"]
+    name   = "tag:red-hat-managed"
+    values = ["true"]
+  }
+
+  filter {
+    name   = "tag:red-hat-clustertype"
+    values = ["rosa"]
+  }
+
+  filter {
+    name   = "tag:api.openshift.com/id"
+    values = [one(rhcs_cluster_rosa_hcp.main[*].id)]
   }
 
   depends_on = [
@@ -442,18 +479,34 @@ data "aws_security_groups" "vpc_endpoint_default" {
   ]
 }
 
-# Create ingress rules for each allowed CIDR block
-# Use for_each instead of count for better resource stability
-resource "aws_vpc_security_group_ingress_rule" "api_endpoint_access" {
-  for_each = local.persists_through_sleep && length(var.api_endpoint_allowed_cidrs) > 0 ? toset(var.api_endpoint_allowed_cidrs) : toset([])
+# Create ingress rules for each allowed CIDR block on each security group attached to the VPC endpoint
+# ROSA may attach multiple security groups to the VPC endpoint
+# Use for_each with a set of tuples (security_group_id, cidr) for better resource stability
+locals {
+  # Create a set of tuples: each security group ID paired with each CIDR block
+  api_endpoint_security_group_rules = local.persists_through_sleep && length(var.api_endpoint_allowed_cidrs) > 0 && length(data.aws_vpc_endpoint.rosa_api) > 0 ? {
+    for pair in flatten([
+      for sg_id in data.aws_vpc_endpoint.rosa_api[0].security_group_ids : [
+        for cidr in var.api_endpoint_allowed_cidrs : {
+          key = "${sg_id}_${replace(cidr, "/", "_")}"
+          security_group_id = sg_id
+          cidr = cidr
+        }
+      ]
+    ]) : pair.key => pair
+  } : {}
+}
 
-  security_group_id = data.aws_security_groups.vpc_endpoint_default[0].ids[0]
-  cidr_ipv4         = each.value
+resource "aws_vpc_security_group_ingress_rule" "api_endpoint_access" {
+  for_each = local.api_endpoint_security_group_rules
+
+  security_group_id = each.value.security_group_id
+  cidr_ipv4         = each.value.cidr
   from_port         = 443
   ip_protocol       = "tcp"
   to_port           = 443
 
-  description = "Allow HTTPS access to ROSA HCP API endpoint from ${each.value}"
+  description = "Allow HTTPS access to ROSA HCP API endpoint from ${each.value.cidr}"
 
   lifecycle {
     # Ignore changes to security_group_id as it's managed by ROSA
@@ -464,6 +517,6 @@ resource "aws_vpc_security_group_ingress_rule" "api_endpoint_access" {
 
   depends_on = [
     rhcs_cluster_rosa_hcp.main,
-    data.aws_security_groups.vpc_endpoint_default
+    data.aws_vpc_endpoint.rosa_api
   ]
 }

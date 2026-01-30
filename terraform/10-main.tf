@@ -1,8 +1,5 @@
-# Infer egress-zero mode: private network with strict egress enabled
-locals {
-  # Egress-zero mode: private network with strict egress enabled
-  is_egress_zero = var.network_type == "private" && var.enable_strict_egress
-}
+# Note: zero_egress is a cluster-level ROSA API property (independent of network_type)
+# The network module receives zero_egress directly and configures infrastructure accordingly
 
 # Network Module - conditionally select public or private based on network_type
 # Note: Terraform requires the source to be a literal string, so we use separate module blocks with count
@@ -29,12 +26,12 @@ module "network_private" {
   multi_az    = var.multi_az
   # subnet_cidr_size is automatically calculated based on VPC CIDR and number of subnets
 
-  # For egress-zero: disable NAT Gateway and enable strict egress
-  # For private: enable NAT Gateway (default) unless strict egress is enabled
-  enable_nat_gateway   = !local.is_egress_zero
-  enable_strict_egress = local.is_egress_zero
-  flow_log_s3_bucket   = var.flow_log_s3_bucket
-  cluster_id           = null # Can be set after cluster creation
+  # Network infrastructure configuration for zero egress
+  # When zero_egress is true, NAT Gateway is disabled and strict security groups are enabled
+  # Note: zero_egress is independent of network_type - passed directly from root variable
+  enable_nat_gateway = !var.zero_egress
+  zero_egress        = var.zero_egress
+  flow_log_s3_bucket = var.flow_log_s3_bucket
 
   tags                           = local.tags
   persists_through_sleep         = var.persists_through_sleep
@@ -69,7 +66,7 @@ module "iam" {
   cluster_name               = var.cluster_name
   account_role_prefix        = var.cluster_name     # No trailing dash - account-iam-resources module adds it
   operator_role_prefix       = var.cluster_name     # No trailing dash - operator-roles module adds it
-  zero_egress                = local.is_egress_zero # Enable zero egress mode for egress-zero clusters
+  zero_egress                = var.zero_egress     # Pass directly - IAM needs ECR policy when zero_egress is enabled (independent of network_type)
   tags                       = local.tags
   persists_through_sleep     = var.persists_through_sleep
   persists_through_sleep_iam = var.persists_through_sleep_iam
@@ -104,8 +101,7 @@ module "cluster" {
   # Public clusters use both private and public subnets
   # Private and egress-zero clusters use only private subnets
   private_subnet_ids = local.network.private_subnet_ids
-  public_subnet_ids  = var.network_type == "public" ? local.network.public_subnet_ids : []
-
+  public_subnet_ids = coalesce(local.network.public_subnet_ids, [])
   installer_role_arn             = module.iam.installer_role_arn
   support_role_arn               = module.iam.support_role_arn
   worker_role_arn                = module.iam.worker_role_arn
@@ -115,11 +111,14 @@ module "cluster" {
   persists_through_sleep         = var.persists_through_sleep
   persists_through_sleep_cluster = var.persists_through_sleep_cluster
 
-  # Cluster configuration based on network type
-  private            = var.network_type != "public"
-  zero_egress        = local.is_egress_zero
-  multi_az           = var.multi_az
+  # Cluster configuration
+  # Note: zero_egress is a cluster-level ROSA API property, independent of network_type
+  # However, zero egress typically requires private network (PrivateLink API endpoint)
+  private     = var.private
+  zero_egress = var.zero_egress  # Pass directly - cluster-level property, not tied to network
+  multi_az    = var.multi_az
   availability_zones = local.network.private_subnet_azs
+  fips               = var.fips
 
   # Identity provider configuration
   enable_identity_provider     = var.persists_through_sleep
@@ -160,25 +159,13 @@ module "cluster" {
   pod_cidr              = var.pod_cidr
   host_prefix           = var.host_prefix
 
-  # Machine pools - conditional based on network type
-  # Public clusters have explicit machine_pools configuration
-  # Egress-zero clusters use module defaults (empty array, uses default_instance_type, etc.)
-  machine_pools = var.network_type == "public" ? [
-    {
-      name                = "workers" # Must match ROSA's default pool name
-      instance_type       = var.instance_type
-      min_replicas        = var.multi_az ? 3 : 2 # 3 for multi-AZ, 2 for single AZ
-      max_replicas        = var.multi_az ? 6 : 4 # Double min replicas
-      multi_az            = var.multi_az
-      autoscaling_enabled = true
-    }
-  ] : [] # Empty for egress-zero (uses module defaults)
-
-  # For egress-zero: use default_instance_type, default_min_replicas, default_max_replicas
-  # These are only used when machine_pools is empty
-  default_instance_type = local.is_egress_zero ? var.instance_type : null
-  default_min_replicas  = local.is_egress_zero ? 1 : null # Minimum for HA (multi-AZ: 1 per subnet)
-  default_max_replicas  = local.is_egress_zero ? 3 : null # Double min replicas
+  # Default machine pool configuration
+  # If not set, module will calculate defaults:
+  # - Single-AZ: min = 2, max = 4
+  # - Multi-AZ: min = 3, max = 6
+  default_instance_type = var.default_instance_type
+  default_min_replicas  = null # Use module defaults (calculated based on single-AZ vs multi-AZ)
+  default_max_replicas  = null # Use module defaults (calculated based on single-AZ vs multi-AZ)
 
   # Additional machine pools - resolved with actual subnet IDs
   additional_machine_pools = {
@@ -205,10 +192,11 @@ module "cluster" {
     }
   }
 
-  # Egress-zero specific settings
-  # Egress-zero clusters may take longer for nodes to start due to network connectivity
+  # Zero-egress specific settings
+  # Zero-egress clusters may take longer for nodes to start due to network connectivity
   # Set to false to allow cluster creation to complete even if nodes are still starting
-  wait_for_std_compute_nodes_complete = local.is_egress_zero ? false : true
+  # Note: Based on zero_egress property directly, independent of network_type
+  wait_for_std_compute_nodes_complete = var.zero_egress ? false : true
 
   # Optional: Allow API endpoint access from additional IPv4 CIDR blocks
   # By default, the VPC endpoint security group only allows access from within the VPC
