@@ -57,7 +57,7 @@ bad_exit() {
 }
 
 # --- Trap Handler for Errors ---
-# shellcheck disable=SC2329
+# shellcheck disable=SC2329,SC2317
 handle_error() {
 	local last_command="$BASH_COMMAND"
 	local line_number="${BASH_LINENO[0]}"
@@ -620,7 +620,7 @@ install_gitops_spoke() {
 			--create-namespace \
 			--namespace "${CLUSTER_NAME}" \
 			--set "clusterName=${CLUSTER_NAME}" \
-			$([[ -n "${git_environment}" ]] && echo "--set" "environment=${git_environment}" || true)
+			$(if [[ -n "${git_environment}" ]]; then echo "--set" "environment=${git_environment}"; fi)
 
 		echo "Waiting for ACM to create import secrets for cluster ${CLUSTER_NAME}..."
 		sleep 45
@@ -748,9 +748,9 @@ install_aws_privateca_issuer() {
 		--create-namespace \
 		--namespace "${namespace}" \
 		--set "aws_region=${AWS_REGION}" \
-		$([[ -n "${ECR_ACCOUNT:-}" ]] && echo "--set" "ecr_account=${ECR_ACCOUNT}" || true) \
-		$([[ -n "${ECR_ACCOUNT:-}" ]] && echo "--set" "helper-installplan-approver.ecr_account=${ECR_ACCOUNT}" || true) \
-		$([[ -n "${AWS_REGION:-}" ]] && echo "--set" "helper-installplan-approver.aws_region=${AWS_REGION}" || true)
+		$(if [[ -n "${ECR_ACCOUNT:-}" ]]; then echo "--set" "ecr_account=${ECR_ACCOUNT}"; fi) \
+		$(if [[ -n "${ECR_ACCOUNT:-}" ]]; then echo "--set" "helper-installplan-approver.ecr_account=${ECR_ACCOUNT}"; fi) \
+		$(if [[ -n "${AWS_REGION:-}" ]]; then echo "--set" "helper-installplan-approver.aws_region=${AWS_REGION}"; fi)
 
 	# Verify installation
 	if ! helm list -n "${namespace}" 2>/dev/null |
