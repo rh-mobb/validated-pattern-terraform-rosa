@@ -344,36 +344,58 @@ variable "control_plane_log_forwarding_role_arn" {
   nullable    = true
 }
 
-variable "control_plane_log_groups" {
-  description = "List of log groups to forward. Valid values: api, authentication, controller manager, scheduler (case-insensitive input, converted to lowercase). Note: 'Other' group is not supported by ROSA CLI despite documentation. Default: [\"api\"] for backward compatibility with audit logging."
+variable "control_plane_log_cloudwatch_groups" {
+  description = "List of log groups to forward to CloudWatch. Valid values: api, authentication, controller manager, scheduler (case-insensitive). Only used when control_plane_log_cloudwatch_enabled is true."
   type        = list(string)
-  default     = ["api"]
+  default     = ["api", "authentication", "controller manager", "scheduler"]
   nullable    = false
 
   validation {
-    # Accept both capitalized (for backward compatibility) and lowercase versions
-    # Convert to lowercase for comparison
     condition = alltrue([
-      for group in var.control_plane_log_groups : contains([
+      for group in var.control_plane_log_cloudwatch_groups : contains([
         "api", "authentication", "controller manager", "scheduler",
         "API", "Authentication", "Controller Manager", "Scheduler"
       ], group)
     ])
-    error_message = "Log groups must be one of: api, authentication, controller manager, scheduler (case-insensitive). Note: 'Other' group is not supported by ROSA CLI."
+    error_message = "Log groups must be one of: api, authentication, controller manager, scheduler (case-insensitive)."
   }
 }
 
-variable "control_plane_log_applications" {
-  description = "Optional list of specific applications to forward. If empty, forwards all applications for the selected log groups. See ROSA documentation for available applications per log group."
+variable "control_plane_log_cloudwatch_applications" {
+  description = "Optional list of specific applications to forward to CloudWatch. If empty, forwards all applications for the selected log groups. Only used when control_plane_log_cloudwatch_enabled is true."
   type        = list(string)
-  default     = []
+  default     = ["certified-operators-catalog", "cluster-api", "community-operators-catalog", "etcd", "private-router", "redhat-marketplace-catalog", "redhat-operators-catalog"]
+  nullable    = false
+}
+
+variable "control_plane_log_s3_groups" {
+  description = "List of log groups to forward to S3. Valid values: api, authentication, controller manager, scheduler (case-insensitive). Only used when control_plane_log_s3_enabled is true."
+  type        = list(string)
+  default     = ["api", "authentication", "controller manager", "scheduler"]
+  nullable    = false
+
+  validation {
+    condition = alltrue([
+      for group in var.control_plane_log_s3_groups : contains([
+        "api", "authentication", "controller manager", "scheduler",
+        "API", "Authentication", "Controller Manager", "Scheduler"
+      ], group)
+    ])
+    error_message = "Log groups must be one of: api, authentication, controller manager, scheduler (case-insensitive)."
+  }
+}
+
+variable "control_plane_log_s3_applications" {
+  description = "Optional list of specific applications to forward to S3. If empty, forwards all applications for the selected log groups. Only used when control_plane_log_s3_enabled is true."
+  type        = list(string)
+  default     = ["certified-operators-catalog", "cluster-api", "community-operators-catalog", "etcd", "private-router", "redhat-marketplace-catalog", "redhat-operators-catalog"]
   nullable    = false
 }
 
 variable "control_plane_log_cloudwatch_enabled" {
-  description = "Enable CloudWatch destination for control plane log forwarding."
+  description = "Enable CloudWatch destination for control plane log forwarding. Default disabled for cost; S3 is more cost-effective."
   type        = bool
-  default     = true
+  default     = false
   nullable    = false
 }
 
@@ -385,9 +407,9 @@ variable "control_plane_log_cloudwatch_log_group_name" {
 }
 
 variable "control_plane_log_s3_enabled" {
-  description = "Enable S3 destination for control plane log forwarding."
+  description = "Enable S3 destination for control plane log forwarding. Default enabled as more cost-effective than CloudWatch."
   type        = bool
-  default     = false
+  default     = true
   nullable    = false
 }
 
@@ -403,6 +425,18 @@ variable "control_plane_log_s3_bucket_prefix" {
   type        = string
   default     = null
   nullable    = true
+}
+
+variable "control_plane_log_s3_retention_days" {
+  description = "Number of days to retain control plane logs in S3 before automatic deletion. Default 30 days for cost-effectiveness. Set to null to retain indefinitely (no lifecycle rule)."
+  type        = number
+  default     = 30
+  nullable    = true
+
+  validation {
+    condition     = var.control_plane_log_s3_retention_days == null || var.control_plane_log_s3_retention_days >= 1
+    error_message = "Retention days must be at least 1 when set, or null to retain indefinitely."
+  }
 }
 
 variable "resource_suffix" {

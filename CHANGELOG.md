@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Control Plane Log Forwarding**: Migrated from ROSA CLI shell workaround to native `rhcs_log_forwarder` Terraform resource
+  - Updated RHCS provider from `~> 1.7` to `~> 1.7.4` (adds `rhcs_log_forwarder` support)
+  - Replaced `null_resource` + `local_file` + `rosa create/edit/delete log-forwarder` with `rhcs_log_forwarder` resource
+  - Removed `local` provider dependency from cluster module (was only used for log forwarder YAML file)
+  - **Separate resources per destination**: Two `rhcs_log_forwarder` resources (CloudWatch and S3) allow different log groups and applications per destination
+  - New variables: `control_plane_log_cloudwatch_groups`, `control_plane_log_cloudwatch_applications`, `control_plane_log_s3_groups`, `control_plane_log_s3_applications` (replaced shared `control_plane_log_groups` and `control_plane_log_applications`)
+  - Configuration now managed declaratively by Terraform; no ROSA CLI or jq required
+  - Reference: https://registry.terraform.io/providers/terraform-redhat/rhcs/latest/docs/guides/log-forwarders
+
 ### Added
 - **GitHub Actions CI/CD Workflows**: Added automated Terraform and shell script validation and quality checks
   - `terraform-pr-checks.yml`: Runs on pull requests to validate Terraform code and shell scripts

@@ -33,7 +33,7 @@ resource "aws_iam_role" "control_plane_log_forwarding" {
     Name                   = "${var.cluster_name}-CustomerLogDistribution-RH"
     Purpose                = "ControlPlaneLogForwarding"
     ManagedBy              = "Terraform"
-    persists_through_sleep  = "true"
+    persists_through_sleep = "true"
   })
 }
 
