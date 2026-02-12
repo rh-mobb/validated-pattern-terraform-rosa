@@ -154,7 +154,7 @@ jobs:
       - name: Initialize ${{ matrix.name }}
         working-directory: ${{ matrix.path }}
         run: |
-          echo "Initializing ${{ matrix.name}..."
+          echo "Initializing ${{ matrix.name }}..."
           terraform init -backend=false -input=false -upgrade
           echo "✓ ${{ matrix.name }} initialized successfully"
 
