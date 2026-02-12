@@ -41,7 +41,7 @@ module "iam" {
 
   # IAM feature flags
   enable_control_plane_log_forwarding        = true  # New ROSA managed log forwarder
-  control_plane_log_cloudwatch_enabled       = true
+  control_plane_log_cloudwatch_enabled       = false  # Default: S3 is more cost-effective
   control_plane_log_cloudwatch_log_group_name = null  # Optional: uses default pattern if null
   enable_audit_logging        = false  # Legacy, deprecated - use control_plane_log_forwarding instead
   enable_cloudwatch_logging   = true
@@ -84,7 +84,7 @@ module "iam" {
 | etcd_encryption | Enable etcd encryption (requires etcd KMS key) | `bool` | `false` | no |
 | kms_key_deletion_window | KMS key deletion window in days | `number` | `10` | no |
 | enable_control_plane_log_forwarding | Enable control plane log forwarding IAM resources (new ROSA managed log forwarder). Replaces legacy audit logging | `bool` | `false` | no |
-| control_plane_log_cloudwatch_enabled | Enable CloudWatch destination for control plane log forwarding | `bool` | `true` | no |
+| control_plane_log_cloudwatch_enabled | Enable CloudWatch destination for control plane log forwarding. Default disabled for cost; S3 is more cost-effective | `bool` | `false` | no |
 | control_plane_log_cloudwatch_log_group_name | CloudWatch log group name. If null, uses default pattern: ${cluster_name}-control-plane-logs. Must match name used in cluster module | `string` | `null` | no |
 | enable_audit_logging | [DEPRECATED] Enable CloudWatch audit logging IAM resources (legacy implementation). Use enable_control_plane_log_forwarding instead | `bool` | `false` | no |
 | enable_cloudwatch_logging | Enable CloudWatch logging IAM resources | `bool` | `false` | no |

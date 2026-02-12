@@ -133,9 +133,9 @@ variable "enable_control_plane_log_forwarding" {
 }
 
 variable "control_plane_log_cloudwatch_enabled" {
-  description = "Enable CloudWatch destination for control plane log forwarding. Requires control_plane_log_cloudwatch_log_group_name to be set or uses default pattern."
+  description = "Enable CloudWatch destination for control plane log forwarding. Default disabled for cost; S3 is more cost-effective. Requires control_plane_log_cloudwatch_log_group_name to be set or uses default pattern."
   type        = bool
-  default     = true
+  default     = false
   nullable    = false
 }
 

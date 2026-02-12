@@ -59,8 +59,15 @@ resource "aws_s3_bucket_versioning" "control_plane_logs" {
   }
 }
 
-# S3 Bucket Server-Side Encryption
+# S3 Bucket Server-Side Encryption (AES256 / SSE-S3)
 # Persists through sleep operation (not gated by persists_through_sleep)
+#
+# We use AWS-managed SSE-S3 (AES256) rather than customer-managed KMS (SSE-KMS) because:
+# - ROSA's central log distribution role (arn:aws:iam::859037107838:role/ROSA-CentralLogDistributionRole-*)
+#   writes to this bucket from a different AWS account. Using KMS would require granting that cross-account
+#   role kms:Decrypt and kms:GenerateDataKey permissions on our key.
+# - Granting decrypt access to an external account's IAM role is a security trade-off we choose to avoid.
+# - SSE-S3 provides encryption at rest without exposing key access to ROSA's account. AWS manages the keys.
 resource "aws_s3_bucket_server_side_encryption_configuration" "control_plane_logs" {
   count = var.enable_control_plane_log_forwarding && var.control_plane_log_s3_enabled ? 1 : 0
 
@@ -71,6 +78,31 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "control_plane_log
       sse_algorithm = "AES256"
     }
   }
+}
+
+# S3 Bucket Lifecycle - expire objects after retention period for cost control
+# Persists through sleep operation (not gated by persists_through_sleep)
+# When control_plane_log_s3_retention_days is null, no lifecycle rule (retain indefinitely)
+resource "aws_s3_bucket_lifecycle_configuration" "control_plane_logs" {
+  count = var.enable_control_plane_log_forwarding && var.control_plane_log_s3_enabled && var.control_plane_log_s3_retention_days != null ? 1 : 0
+
+  bucket = aws_s3_bucket.control_plane_logs[0].id
+
+  rule {
+    id     = "expire-control-plane-logs"
+    status = "Enabled"
+
+    expiration {
+      days = var.control_plane_log_s3_retention_days
+    }
+
+    # Expire noncurrent versions (from versioning) after same period
+    noncurrent_version_expiration {
+      noncurrent_days = var.control_plane_log_s3_retention_days
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.control_plane_logs]
 }
 
 # S3 Bucket Policy
@@ -90,7 +122,7 @@ resource "aws_s3_bucket_policy" "control_plane_logs" {
         Principal = {
           AWS = "arn:aws:iam::859037107838:role/ROSA-CentralLogDistributionRole-241c1a86"
         }
-        Action = "s3:PutObject"
+        Action   = "s3:PutObject"
         Resource = "${aws_s3_bucket.control_plane_logs[0].arn}/*"
         Condition = {
           StringEquals = {

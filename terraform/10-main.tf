@@ -48,7 +48,7 @@ locals {
 # Persists through sleep operation (not gated by persists_through_sleep)
 # Created unconditionally so it's available for any module that needs unique resource names
 resource "random_id" "resource_suffix" {
-  byte_length = 4  # 8 hex characters for uniqueness
+  byte_length = 4 # 8 hex characters for uniqueness
 
   keepers = {
     cluster_name = var.cluster_name
@@ -104,8 +104,8 @@ module "iam" {
   additional_secrets         = var.additional_secrets
 
   # Control plane log forwarding (new ROSA managed log forwarder)
-  enable_control_plane_log_forwarding        = var.enable_control_plane_log_forwarding
-  control_plane_log_cloudwatch_enabled       = var.control_plane_log_cloudwatch_enabled
+  enable_control_plane_log_forwarding         = var.enable_control_plane_log_forwarding
+  control_plane_log_cloudwatch_enabled        = var.control_plane_log_cloudwatch_enabled
   control_plane_log_cloudwatch_log_group_name = var.control_plane_log_cloudwatch_log_group_name
 
   # Note: cluster_credentials_secret_arn is no longer passed as a variable
@@ -162,16 +162,19 @@ module "cluster" {
   cloudwatch_audit_logging_role_arn = module.iam.cloudwatch_audit_logging_role_arn
 
   # Control plane log forwarding (new ROSA managed log forwarder)
-  enable_control_plane_log_forwarding        = var.enable_control_plane_log_forwarding
-  control_plane_log_forwarding_role_arn      = module.iam.control_plane_log_forwarding_role_arn
-  control_plane_log_groups                   = var.control_plane_log_groups
-  control_plane_log_applications              = var.control_plane_log_applications
-  control_plane_log_cloudwatch_enabled       = var.control_plane_log_cloudwatch_enabled
+  enable_control_plane_log_forwarding         = var.enable_control_plane_log_forwarding
+  control_plane_log_forwarding_role_arn       = module.iam.control_plane_log_forwarding_role_arn
+  control_plane_log_cloudwatch_groups         = var.control_plane_log_cloudwatch_groups
+  control_plane_log_cloudwatch_applications   = var.control_plane_log_cloudwatch_applications
+  control_plane_log_s3_groups                 = var.control_plane_log_s3_groups
+  control_plane_log_s3_applications           = var.control_plane_log_s3_applications
+  control_plane_log_cloudwatch_enabled        = var.control_plane_log_cloudwatch_enabled
   control_plane_log_cloudwatch_log_group_name = var.control_plane_log_cloudwatch_log_group_name
-  control_plane_log_s3_enabled               = var.control_plane_log_s3_enabled
-  control_plane_log_s3_bucket_name           = var.control_plane_log_s3_bucket_name
-  control_plane_log_s3_bucket_prefix        = var.control_plane_log_s3_bucket_prefix
-  resource_suffix                            = random_id.resource_suffix.hex
+  control_plane_log_s3_enabled                = var.control_plane_log_s3_enabled
+  control_plane_log_s3_bucket_name            = var.control_plane_log_s3_bucket_name
+  control_plane_log_s3_bucket_prefix          = var.control_plane_log_s3_bucket_prefix
+  control_plane_log_s3_retention_days         = var.control_plane_log_s3_retention_days
+  resource_suffix                             = random_id.resource_suffix.hex
 
   # GitOps bootstrap configuration
   enable_gitops_bootstrap = var.enable_gitops_bootstrap != null ? var.enable_gitops_bootstrap : false
