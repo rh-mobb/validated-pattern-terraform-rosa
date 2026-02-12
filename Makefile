@@ -253,7 +253,7 @@ lint-fix: tf-fmt sh-fmt ## Fix auto-fixable linting issues (Terraform and shell 
 	@echo "$(GREEN)✓ Auto-fixable issues resolved$(NC)"
 	@echo "$(YELLOW)Note: Review ShellCheck warnings manually with 'make sh-lint-fix'$(NC)"
 
-test: tf-fmt-check sh-fmt-check tf-validate sh-lint ## Run all tests (format check, validation, and linting)
+test: tf-fmt-check tf-validate sh-lint sh-fmt-check  ## Run all tests (format check, validation, and linting)
 	@echo "$(GREEN)✓ All tests passed$(NC)"
 
 # Install OpenShift Provider

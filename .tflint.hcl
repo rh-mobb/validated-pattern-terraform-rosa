@@ -1,6 +1,7 @@
 config {
-  # Enable module inspection
-  module = true
+  # Enable module inspection (updated syntax for TFLint v0.54.0+)
+  # call_module_type can be "local", "all", or "none"
+  call_module_type = "all"
   # Force required variables to be set
   force = false
 }
