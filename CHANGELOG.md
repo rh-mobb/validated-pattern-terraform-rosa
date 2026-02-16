@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **BYO VPC Support** (`network_type = "existing"`): Deploy clusters into an existing VPC without running any network module
+  - New variables: `existing_vpc_id`, `existing_private_subnet_ids`, `existing_public_subnet_ids`
+  - Root module uses data sources to look up subnets and constructs synthetic `local.network` object
+  - No network module invocation—user creates VPC, subnets, VPC endpoints, and NAT gateways before Terraform
+  - Documentation references `rosa create network` (ROSA CLI v1.2.48+) as a quick way to create compliant networking
+  - New example: `clusters/byo-vpc/terraform.tfvars` with prerequisite documentation
+
+### Deprecated
+- **network-existing module**: Deprecated in favor of `network_type = "existing"`. The root module now handles BYO VPC directly via variables and data sources. The module will be removed in a future release.
 - **GitHub Actions CI/CD Workflows**: Added automated Terraform and shell script validation and quality checks
   - `terraform-pr-checks.yml`: Runs on pull requests to validate Terraform code and shell scripts
   - `terraform-master-checks.yml`: Runs on pushes to main/master branches
