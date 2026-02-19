@@ -1,5 +1,14 @@
-# CloudWatch Audit Log Forwarding Configuration
+# CloudWatch Audit Log Forwarding Configuration (DEPRECATED)
 # Reference: https://access.redhat.com/solutions/7002219
+#
+# ⚠️  DEPRECATED: This legacy audit logging implementation is deprecated.
+# Use the new control plane log forwarding mechanism instead (21-control-plane-log-forwarding.tf).
+#
+# Migration: Set enable_control_plane_log_forwarding = true and enable_audit_logging = false
+# The new mechanism supports forwarding multiple log groups (api, authentication, controller manager,
+# scheduler) to CloudWatch and/or S3 using ROSA's managed log forwarder service.
+# Note: 'Other' group is not supported by ROSA CLI despite documentation.
+#
 # This configuration configures the cluster to forward audit logs to CloudWatch.
 # The IAM role and policy are created in the IAM module.
 #
@@ -37,7 +46,13 @@ resource "null_resource" "configure_audit_logging" {
       if ! rosa whoami &> /dev/null; then
         echo "Not logged in to ROSA. Attempting to login..."
         # Login to ROSA if token is available via environment variable
-        if [ -n "$${OCM_TOKEN}" ]; then
+        # RHCS_TOKEN, OCM_TOKEN, ROSA_TOKEN all work (set before make - see README RHCS Authentication)
+        if [ -n "$${RHCS_TOKEN}" ]; then
+          rosa login --token="$${RHCS_TOKEN}" || {
+            echo "ERROR: Failed to login with RHCS_TOKEN"
+            exit 1
+          }
+        elif [ -n "$${OCM_TOKEN}" ]; then
           rosa login --token="$${OCM_TOKEN}" || {
             echo "ERROR: Failed to login with OCM_TOKEN"
             exit 1
@@ -48,7 +63,7 @@ resource "null_resource" "configure_audit_logging" {
             exit 1
           }
         else
-          echo "ERROR: Not logged in and no token provided. Set OCM_TOKEN or ROSA_TOKEN environment variable."
+          echo "ERROR: Not logged in and no token provided. Set RHCS_TOKEN, OCM_TOKEN, or ROSA_TOKEN environment variable."
           exit 1
         fi
       else
