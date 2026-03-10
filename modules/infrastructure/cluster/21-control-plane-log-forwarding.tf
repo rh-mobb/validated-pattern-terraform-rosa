@@ -26,7 +26,8 @@ locals {
 
 # CloudWatch log forwarder - created when CloudWatch destination is enabled
 resource "rhcs_log_forwarder" "cloudwatch" {
-  count = local.persists_through_sleep && var.enable_control_plane_log_forwarding && var.control_plane_log_cloudwatch_enabled && var.control_plane_log_forwarding_role_arn != null ? 1 : 0
+  count = local.persists_through_sleep && var.enable_control_plane_log_forwarding && var.control_plane_log_cloudwatch_enabled ? 1 : 0
+  #count = local.persists_through_sleep && var.enable_control_plane_log_forwarding && var.control_plane_log_cloudwatch_enabled && var.control_plane_log_forwarding_role_arn != null ? 1 : 0
 
   cluster      = one(rhcs_cluster_rosa_hcp.main[*].id)
   applications = length(var.control_plane_log_cloudwatch_applications) > 0 ? var.control_plane_log_cloudwatch_applications : null

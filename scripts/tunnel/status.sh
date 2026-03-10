@@ -23,8 +23,8 @@ TERRAFORM_INFRA_DIR=$(get_terraform_dir infrastructure)
 # Check if tunnel is needed
 source "$PROJECT_ROOT/scripts/utils/get-network-config.sh" "$CLUSTER_DIR"
 
-if [ "$NETWORK_TYPE" != "private" ] || [ "$ZERO_EGRESS" != "true" ]; then
-	warn "Tunnel not needed for $NETWORK_TYPE clusters"
+if [ "$PRIVATE" != "true" ]; then
+	warn "Tunnel not needed for public clusters (public API endpoint)"
 	exit 0
 fi
 

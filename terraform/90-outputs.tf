@@ -251,3 +251,64 @@ output "cluster_creation_timing" {
   value       = var.enable_timing ? module.cluster_timing.timing_summary : null
   sensitive   = false
 }
+
+#------------------------------------------------------------------------------
+# BGP Outputs (when enable_bgp = true)
+#------------------------------------------------------------------------------
+
+output "bgp_enabled" {
+  description = "Whether BGP infrastructure is enabled"
+  value       = module.bgp.enabled
+  sensitive   = false
+}
+
+output "bgp_route_server_asn" {
+  description = "BGP AS number for AWS VPC Route Server"
+  value       = module.bgp.route_server_asn
+  sensitive   = false
+}
+
+output "bgp_rosa_asn" {
+  description = "BGP AS number for ROSA cluster (FRR/MetalLB config)"
+  value       = module.bgp.rosa_asn
+  sensitive   = false
+}
+
+output "bgp_route_server_endpoint_ips" {
+  description = "Route server endpoint IPs for BGP peering configuration"
+  value       = module.bgp.route_server_endpoint_ips
+  sensitive   = false
+}
+
+output "bgp_router_ips" {
+  description = "BGP router node IPs"
+  value       = module.bgp.router_ips
+  sensitive   = false
+}
+
+output "bgp_ext_vpc_id" {
+  description = "External VPC ID for BGP testing"
+  value       = module.bgp.ext_vpc_id
+  sensitive   = false
+}
+
+output "bgp_ext_vpc_cidr" {
+  description = "External VPC CIDR block"
+  value       = module.bgp.ext_vpc_cidr
+  sensitive   = false
+}
+
+output "bgp_tgw_id" {
+  description = "Transit Gateway ID"
+  value       = module.bgp.tgw_id
+  sensitive   = false
+}
+
+output "bgp_security_group_ids" {
+  description = "Security group IDs for BGP router nodes"
+  value = {
+    rfc1918   = module.bgp_security_groups.rfc1918_security_group_id
+    allow_all = module.bgp_security_groups.allow_all_security_group_id
+  }
+  sensitive = false
+}

@@ -94,6 +94,23 @@ resource "random_id" "resource_suffix" {
   }
 }
 
+#------------------------------------------------------------------------------
+# BGP Security Groups (created BEFORE cluster)
+#------------------------------------------------------------------------------
+# Security groups must be created before the cluster so they can be attached
+# to BGP router machine pools during cluster creation.
+
+module "bgp_security_groups" {
+  source = "../modules/infrastructure/bgp-security-groups"
+
+  enabled      = var.enable_bgp
+  cluster_name = var.cluster_name
+  vpc_id       = local.network.vpc_id
+  owner_tag    = var.bgp_owner_tag
+  project_tag  = var.bgp_project_tag
+  tags         = local.tags
+}
+
 # Additional machine pools - resolve subnet_index to actual subnet IDs
 locals {
   # Resolve subnet_index to actual subnet IDs from network module
@@ -109,6 +126,22 @@ locals {
       }
     )
   } : {}
+
+  # BGP security group injection: Takes resolved pools and adds BGP security groups
+  # to pools with bgp_router=true label
+  additional_machine_pools_with_bgp = {
+    for pool_name, pool_config in local.additional_machine_pools_resolved : pool_name => merge(
+      pool_config,
+      {
+        additional_security_group_ids = try(
+          var.additional_machine_pools[pool_name].labels["bgp_router"], "false"
+        ) == "true" ? concat(
+          coalesce(pool_config.additional_security_group_ids, []),
+          module.bgp_security_groups.security_group_ids
+        ) : coalesce(pool_config.additional_security_group_ids, [])
+      }
+    )
+  }
 }
 
 module "iam" {
@@ -239,8 +272,9 @@ module "cluster" {
   default_max_replicas  = null # Use module defaults (calculated based on single-AZ vs multi-AZ)
 
   # Additional machine pools - resolved with actual subnet IDs
+  # Uses BGP wrapper (from BGP_security_groups.tf) to inject security groups for bgp_router pools
   additional_machine_pools = {
-    for pool_name, pool_config in local.additional_machine_pools_resolved : pool_name => {
+    for pool_name, pool_config in local.additional_machine_pools_with_bgp : pool_name => {
       subnet_id                     = pool_config.subnet_id
       instance_type                 = pool_config.instance_type
       autoscaling_enabled           = pool_config.autoscaling_enabled
@@ -419,4 +453,45 @@ module "client_vpn" {
   service_cidr               = var.service_cidr
 
   tags = local.tags
+}
+
+#------------------------------------------------------------------------------
+# BGP Infrastructure (Route Server, Transit Gateway, External VPC)
+#------------------------------------------------------------------------------
+# Creates BGP peering infrastructure for advertising pod/UDN networks from
+# ROSA cluster to the AWS VPC via AWS VPC Route Server.
+# Reference: ../modules/infrastructure/bgp/
+
+module "bgp" {
+  source = "../modules/infrastructure/bgp"
+
+  enabled            = var.enable_bgp
+  cluster_name       = var.cluster_name
+  region             = var.region
+  vpc_id             = local.network.vpc_id
+  rosa_vpc_cidr      = var.vpc_cidr
+  private_subnet_ids = local.network.private_subnet_ids
+  public_subnet_ids  = coalesce(local.network.public_subnet_ids, [])
+  availability_zones = local.network.private_subnet_azs
+
+  # BGP configuration
+  rosa_asn         = var.bgp_rosa_asn
+  route_server_asn = var.bgp_route_server_asn
+  cudn_cidrs       = var.bgp_cudn_cidrs
+
+  # External VPC for testing
+  ext_vpc_cidr           = var.bgp_ext_vpc_cidr
+  bastion_public_ssh_key = var.bastion_public_ssh_key
+
+  # Tags
+  owner_tag   = var.bgp_owner_tag
+  project_tag = var.bgp_project_tag
+  tags        = local.tags
+
+  # Destroy protection
+  persists_through_sleep         = var.persists_through_sleep
+  persists_through_sleep_network = var.persists_through_sleep_network
+
+  # Note: BGP peer creation waits for router nodes via data.external.wait_for_router*
+  # No explicit depends_on needed - it causes data source deferral and resource churn
 }

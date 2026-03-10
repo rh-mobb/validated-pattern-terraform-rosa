@@ -23,6 +23,7 @@ check-cluster:
 .PHONY: show-endpoints show-credentials show-timing login verify
 .PHONY: tunnel-start tunnel-stop tunnel-status bastion-connect
 .PHONY: vpn-config vpn-start vpn-stop vpn-status bootstrap ensure-tunnel
+.PHONY: bgp-frr bgp-cudn bgp-status
 
 help: ## Show this help message
 	@$(SCRIPT_DIR)/utils/get-network-config.sh $(CLUSTER_DIR) >/dev/null 2>&1 || true; \
@@ -66,6 +67,11 @@ help: ## Show this help message
 	echo "  make cluster.$(CLUSTER_NAME).vpn-start       Start OpenVPN tunnel"; \
 	echo "  make cluster.$(CLUSTER_NAME).vpn-stop        Stop OpenVPN tunnel"; \
 	echo "  make cluster.$(CLUSTER_NAME).vpn-status      Check if OpenVPN tunnel is running"; \
+	echo ""; \
+	echo "$(GREEN)BGP (Route Advertisement):$(NC)"; \
+	echo "  make cluster.$(CLUSTER_NAME).bgp-frr          Apply FRRConfiguration for BGP peering"; \
+	echo "  make cluster.$(CLUSTER_NAME).bgp-cudn         Apply CUDN resources and test VMs"; \
+	echo "  make cluster.$(CLUSTER_NAME).bgp-status       Show BGP peering status"; \
 	echo ""; \
 	echo "$(BLUE)Network Type:$(NC) $$NETWORK_TYPE (mode: $$MODE)"; \
 	echo "$(BLUE)Available clusters:$(NC)"; \
@@ -244,3 +250,38 @@ clean:
 	@find . -type d -name ".terraform" -exec rm -rf {} + 2>/dev/null || true
 	@find . -name ".terraform.lock.hcl" -delete 2>/dev/null || true
 	@find . -name "terraform.tfplan" -delete 2>/dev/null || true
+
+#------------------------------------------------------------------------------
+# BGP Operations
+#------------------------------------------------------------------------------
+
+# Apply FRRConfiguration for BGP peering with AWS Route Server
+bgp-frr: check-cluster ensure-tunnel
+	@echo "$(BLUE)Applying FRRConfiguration for BGP peering...$(NC)"
+	@$(SCRIPT_DIR)/bgp/apply-frr-config.sh
+	@echo "$(GREEN)FRRConfiguration applied for $(CLUSTER_NAME)$(NC)"
+
+# Apply CUDN resources (ClusterUserDefinedNetworks, RouteAdvertisements, test VMs)
+bgp-cudn: check-cluster ensure-tunnel
+	@echo "$(BLUE)Applying CUDN and BGP test resources...$(NC)"
+	@$(SCRIPT_DIR)/bgp/apply-cudn-resources.sh
+	@echo "$(GREEN)CUDN resources applied for $(CLUSTER_NAME)$(NC)"
+
+# Show BGP peering status
+bgp-status: check-cluster ensure-tunnel
+	@echo "$(BLUE)BGP Status for $(CLUSTER_NAME):$(NC)"
+	@echo ""
+	@echo "$(GREEN)FRR Configuration:$(NC)"
+	@oc get frrconfiguration -n openshift-frr-k8s 2>/dev/null || echo "  No FRRConfiguration found"
+	@echo ""
+	@echo "$(GREEN)FRR Pods:$(NC)"
+	@oc get pods -n openshift-frr-k8s -l app=frr-k8s 2>/dev/null || echo "  No FRR pods found"
+	@echo ""
+	@echo "$(GREEN)ClusterUserDefinedNetworks:$(NC)"
+	@oc get clusteruserdefinednetworks 2>/dev/null || echo "  No CUDNs found"
+	@echo ""
+	@echo "$(GREEN)RouteAdvertisements:$(NC)"
+	@oc get routeadvertisements 2>/dev/null || echo "  No RouteAdvertisements found"
+	@echo ""
+	@echo "$(GREEN)Test VMs:$(NC)"
+	@oc get vm -A 2>/dev/null | grep -E "^NAMESPACE|cudn" || echo "  No test VMs found"

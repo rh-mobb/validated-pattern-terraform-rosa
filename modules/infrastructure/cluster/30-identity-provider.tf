@@ -22,6 +22,14 @@ resource "rhcs_identity_provider" "admin" {
   ]
 }
 
+# Add delay between identity provider and group membership to avoid RHCS API rate limiting (429 errors)
+resource "time_sleep" "wait_for_identity_provider" {
+  count = var.enable_identity_provider && local.persists_through_sleep ? 1 : 0
+
+  depends_on      = [rhcs_identity_provider.admin]
+  create_duration = "30s"
+}
+
 # Add Admin User to Cluster Admins Group
 # Note: Using group membership resource is deprecated, but still functional
 # Consider migrating to group membership via OCM API or console when available
@@ -32,7 +40,7 @@ resource "rhcs_group_membership" "admin" {
   group   = var.admin_group
   cluster = length(rhcs_cluster_rosa_hcp.main) > 0 ? one(rhcs_cluster_rosa_hcp.main[*].id) : null
 
-  depends_on = [rhcs_identity_provider.admin]
+  depends_on = [time_sleep.wait_for_identity_provider]
 }
 
 # Cluster credentials secret

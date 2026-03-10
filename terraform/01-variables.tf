@@ -551,3 +551,57 @@ variable "enable_timing" {
   default     = false
   nullable    = false
 }
+
+#------------------------------------------------------------------------------
+# BGP Configuration
+# These variables control the AWS VPC Route Server and BGP peering setup
+# for advertising pod/UDN networks from ROSA cluster to the VPC
+#------------------------------------------------------------------------------
+
+variable "enable_bgp" {
+  description = "Enable BGP infrastructure (Route Server, Transit Gateway, external VPC)"
+  type        = bool
+  default     = false
+}
+
+variable "bgp_rosa_asn" {
+  description = "BGP AS number for ROSA cluster (used for FRR/MetalLB config on router nodes)"
+  type        = string
+  default     = "65001"
+}
+
+variable "bgp_route_server_asn" {
+  description = "BGP AS number for AWS VPC Route Server (Amazon side)"
+  type        = string
+  default     = "65000"
+}
+
+variable "bgp_ext_vpc_cidr" {
+  description = "CIDR block for the external VPC (used for testing BGP connectivity)"
+  type        = string
+  default     = "192.168.0.0/16"
+}
+
+variable "bgp_cudn_cidrs" {
+  description = "CIDR blocks for Cluster User Defined Networks (advertised via BGP)"
+  type        = list(string)
+  default     = ["10.100.0.0/16", "10.200.0.0/16", "10.150.0.0/16"]
+}
+
+variable "bgp_router_instance_type" {
+  description = "EC2 instance type for BGP router nodes (must be metal for virtualization)"
+  type        = string
+  default     = "c5.metal"
+}
+
+variable "bgp_owner_tag" {
+  description = "Owner tag value for BGP-related AWS resources"
+  type        = string
+  default     = "rosa-bgp"
+}
+
+variable "bgp_project_tag" {
+  description = "Project tag value for BGP-related AWS resources"
+  type        = string
+  default     = "ROSA-Virt BGP"
+}
