@@ -1,0 +1,383 @@
+---
+# BGP Test Resources
+# - Namespaces with CUDN labels
+# - ClusterUserDefinedNetworks (Layer2 and Layer3)
+# - RouteAdvertisements for BGP
+# - Test VMs
+
+#------------------------------------------------------------------------------
+# Namespaces
+#------------------------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cudn1
+  labels:
+    cluster-udn: prod
+    k8s.ovn.org/primary-user-defined-network: ""
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cudn2
+  labels:
+    cluster-udn: dev
+    k8s.ovn.org/primary-user-defined-network: ""
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cudn3
+  labels:
+    cluster-udn: layer3
+    k8s.ovn.org/primary-user-defined-network: ""
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cudn4
+  labels:
+    cluster-udn: layer3
+    k8s.ovn.org/primary-user-defined-network: ""
+
+#------------------------------------------------------------------------------
+# Layer2 ClusterUserDefinedNetworks
+#------------------------------------------------------------------------------
+---
+apiVersion: k8s.ovn.org/v1
+kind: ClusterUserDefinedNetwork
+metadata:
+  name: cluster-udn-layer2-prod
+  labels:
+    advertise: "true"
+spec:
+  namespaceSelector:
+    matchLabels:
+      cluster-udn: prod
+  network:
+    topology: Layer2
+    layer2:
+      role: Primary
+      subnets:
+        - "10.100.0.0/16"
+      ipam:
+        lifecycle: Persistent
+---
+apiVersion: k8s.ovn.org/v1
+kind: ClusterUserDefinedNetwork
+metadata:
+  name: cluster-udn-layer2-dev
+  labels:
+    advertise: "true"
+spec:
+  namespaceSelector:
+    matchLabels:
+      cluster-udn: dev
+  network:
+    topology: Layer2
+    layer2:
+      role: Primary
+      subnets:
+        - "10.200.0.0/16"
+      ipam:
+        lifecycle: Persistent
+
+#------------------------------------------------------------------------------
+# Layer3 ClusterUserDefinedNetwork (shared by cudn3 and cudn4)
+#------------------------------------------------------------------------------
+---
+apiVersion: k8s.ovn.org/v1
+kind: ClusterUserDefinedNetwork
+metadata:
+  name: cluster-udn-layer3
+  labels:
+    advertise: "true"
+spec:
+  namespaceSelector:
+    matchLabels:
+      cluster-udn: layer3
+  network:
+    topology: Layer3
+    layer3:
+      role: Primary
+      subnets:
+        - cidr: "10.150.0.0/16"
+          hostSubnet: 24
+
+#------------------------------------------------------------------------------
+# RouteAdvertisements - advertise CUDN networks via BGP
+#------------------------------------------------------------------------------
+---
+apiVersion: k8s.ovn.org/v1
+kind: RouteAdvertisements
+metadata:
+  name: default
+spec:
+  advertisements:
+    - advertisementType: PodNetwork
+  networkSelector:
+    matchLabels:
+      advertise: "true"
+  nodeSelector:
+    matchLabels:
+      bgp_router: "true"
+
+#------------------------------------------------------------------------------
+# Layer2 VMs
+#------------------------------------------------------------------------------
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: l2-vm1
+  namespace: cudn1
+spec:
+  running: true
+  template:
+    spec:
+      nodeSelector:
+        bgp_router: "true"
+      domain:
+        devices:
+          disks:
+            - name: containerdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: primary
+              bridge: {}
+        resources:
+          requests:
+            memory: 1Gi
+      networks:
+        - name: primary
+          pod: {}
+      volumes:
+        - name: containerdisk
+          containerDisk:
+            image: quay.io/containerdisks/fedora:40
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              password: redhat
+              chpasswd:
+                expire: false
+              ssh_pwauth: true
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: l2-vm2
+  namespace: cudn2
+spec:
+  running: true
+  template:
+    spec:
+      nodeSelector:
+        bgp_router: "true"
+      domain:
+        devices:
+          disks:
+            - name: containerdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: primary
+              bridge: {}
+        resources:
+          requests:
+            memory: 1Gi
+      networks:
+        - name: primary
+          pod: {}
+      volumes:
+        - name: containerdisk
+          containerDisk:
+            image: quay.io/containerdisks/fedora:40
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              password: redhat
+              chpasswd:
+                expire: false
+              ssh_pwauth: true
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: l2-vm3
+  namespace: cudn2
+spec:
+  running: true
+  template:
+    spec:
+      nodeSelector:
+        bgp_router: "true"
+      domain:
+        devices:
+          disks:
+            - name: containerdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: primary
+              bridge: {}
+        resources:
+          requests:
+            memory: 1Gi
+      networks:
+        - name: primary
+          pod: {}
+      volumes:
+        - name: containerdisk
+          containerDisk:
+            image: quay.io/containerdisks/fedora:40
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              password: redhat
+              chpasswd:
+                expire: false
+              ssh_pwauth: true
+
+#------------------------------------------------------------------------------
+# Layer3 VMs
+#------------------------------------------------------------------------------
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: l3-vm1
+  namespace: cudn3
+spec:
+  running: true
+  template:
+    spec:
+      nodeSelector:
+        bgp_router: "true"
+      domain:
+        devices:
+          disks:
+            - name: containerdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: primary
+              bridge: {}
+        resources:
+          requests:
+            memory: 1Gi
+      networks:
+        - name: primary
+          pod: {}
+      volumes:
+        - name: containerdisk
+          containerDisk:
+            image: quay.io/containerdisks/fedora:40
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              password: redhat
+              chpasswd:
+                expire: false
+              ssh_pwauth: true
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: l3-vm2
+  namespace: cudn3
+spec:
+  running: true
+  template:
+    spec:
+      nodeSelector:
+        bgp_router: "true"
+      domain:
+        devices:
+          disks:
+            - name: containerdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: primary
+              bridge: {}
+        resources:
+          requests:
+            memory: 1Gi
+      networks:
+        - name: primary
+          pod: {}
+      volumes:
+        - name: containerdisk
+          containerDisk:
+            image: quay.io/containerdisks/fedora:40
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              password: redhat
+              chpasswd:
+                expire: false
+              ssh_pwauth: true
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: l3-vm3
+  namespace: cudn4
+spec:
+  running: true
+  template:
+    spec:
+      nodeSelector:
+        bgp_router: "true"
+      domain:
+        devices:
+          disks:
+            - name: containerdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: primary
+              bridge: {}
+        resources:
+          requests:
+            memory: 1Gi
+      networks:
+        - name: primary
+          pod: {}
+      volumes:
+        - name: containerdisk
+          containerDisk:
+            image: quay.io/containerdisks/fedora:40
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              password: redhat
+              chpasswd:
+                expire: false
+              ssh_pwauth: true
