@@ -20,7 +20,12 @@ variable "vpc_cidr" {
   }
 }
 
-# Note: availability_zones are automatically determined from AWS data source based on multi_az setting
+variable "availability_zones" {
+  description = "Explicit list of availability zones to use. If not provided, will be automatically determined from AWS data source based on multi_az setting."
+  type        = list(string)
+  default     = null
+  nullable    = true
+}
 
 variable "multi_az" {
   description = "Create resources across multiple availability zones for high availability"

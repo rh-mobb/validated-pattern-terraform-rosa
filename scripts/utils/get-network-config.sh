@@ -51,6 +51,18 @@ else
 	ZERO_EGRESS="false"
 fi
 
+# Extract private (PrivateLink API endpoint)
+LINE3=$(grep -E "^private\s*=" "$TFVARS_FILE" 2>/dev/null | head -1)
+if [ -n "$LINE3" ]; then
+	if echo "$LINE3" | grep -q '".*"'; then
+		PRIVATE=$(echo "$LINE3" | sed -E 's/.*"([^"]+)".*/\1/')
+	else
+		PRIVATE=$(echo "$LINE3" | sed -E 's/.*=\s*([^"#]+).*/\1/' | sed 's/[[:space:]]*#.*//' | tr -d ' ')
+	fi
+else
+	PRIVATE="false"
+fi
+
 # Determine mode
 if [ "$NETWORK_TYPE" = "private" ] && [ "$ZERO_EGRESS" = "true" ]; then
 	MODE="egress-zero"
@@ -61,11 +73,13 @@ fi
 # Export variables
 export NETWORK_TYPE
 export ZERO_EGRESS
+export PRIVATE
 export MODE
 
 # If not sourced, output export commands
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
 	echo "export NETWORK_TYPE=\"$NETWORK_TYPE\""
 	echo "export ZERO_EGRESS=\"$ZERO_EGRESS\""
+	echo "export PRIVATE=\"$PRIVATE\""
 	echo "export MODE=\"$MODE\""
 fi

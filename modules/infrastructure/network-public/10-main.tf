@@ -160,6 +160,11 @@ resource "aws_route_table" "public" {
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-public-rt"
   })
+
+  # Allow other modules (e.g., BGP) to add routes without causing drift
+  lifecycle {
+    ignore_changes = [route]
+  }
 }
 
 # Route table associations for public subnets
@@ -184,6 +189,11 @@ resource "aws_route_table" "private" {
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-private-rt-${local.azs[count.index]}"
   })
+
+  # Allow other modules (e.g., BGP) to add routes without causing drift
+  lifecycle {
+    ignore_changes = [route]
+  }
 }
 
 # Route table associations for private subnets

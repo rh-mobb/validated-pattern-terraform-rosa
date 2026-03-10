@@ -101,12 +101,15 @@ resource "aws_security_group" "bastion" {
 
   # SSH access - only needed if bastion_public_ip is true
   # When using SSM Session Manager, this ingress rule is not required
-  ingress {
-    description = "SSH from anywhere (only used if bastion_public_ip is true)"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = var.bastion_public_ip ? ["0.0.0.0/0"] : []
+  dynamic "ingress" {
+    for_each = var.bastion_public_ip ? [1] : []
+    content {
+      description = "SSH from anywhere (only used if bastion_public_ip is true)"
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
   }
 
   egress {
