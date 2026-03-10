@@ -25,7 +25,6 @@ module "ext_vpc" {
   name_prefix        = "${var.cluster_name}-bgp-ext"
   vpc_cidr           = var.ext_vpc_cidr
   multi_az           = true
-  availability_zones = var.availability_zones # Pin AZs to match ROSA VPC
 
   # Network infrastructure configuration
   enable_nat_gateway = true

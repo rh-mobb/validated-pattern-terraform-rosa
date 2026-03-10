@@ -5,9 +5,8 @@ locals {
   # Determine number of AZs based on multi_az
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/modules/terraform-rosa-networking/data.tf
   az_count = var.multi_az ? 3 : 1
-  # Use explicit availability_zones if provided, otherwise use data source
-  azs = var.availability_zones != null ? var.availability_zones : slice(data.aws_availability_zones.available.names, 0, local.az_count)
-
+  azs      = slice(data.aws_availability_zones.available.names, 0, local.az_count)
+  
   # Extract VPC CIDR components
   vpc_cidr_parts = split("/", var.vpc_cidr)
   vpc_network    = local.vpc_cidr_parts[0]
