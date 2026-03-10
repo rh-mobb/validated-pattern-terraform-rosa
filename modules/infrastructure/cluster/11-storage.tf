@@ -19,21 +19,26 @@ resource "aws_efs_file_system" "main" {
     Name                   = "${var.cluster_name}-rosa-efs"
     persists_through_sleep = "true"
   })
+
+  depends_on = [rhcs_cluster_rosa_hcp.main]
 }
 
-# Get the default security group for the cluster
-# The security group is tagged with the cluster ID by ROSA
-data "aws_security_groups" "cluster_default" {
+# Security group for EFS mount targets
+# Create our own security group instead of relying on ROSA's internal security groups
+# This is more reliable as ROSA's security group naming conventions may change
+resource "aws_security_group" "efs" {
   count = var.enable_efs && local.persists_through_sleep ? 1 : 0
 
-  filter {
-    name   = "tag:Name"
-    values = ["${one(rhcs_cluster_rosa_hcp.main[*].id)}-default-sg"]
-  }
+  name        = "${var.cluster_name}-efs-sg"
+  description = "Security group for EFS mount targets - allows NFS access from private subnets"
+  vpc_id      = var.vpc_id
 
-  depends_on = [
-    rhcs_cluster_rosa_hcp.main
-  ]
+  tags = merge(local.common_tags, {
+    Name                   = "${var.cluster_name}-efs-sg"
+    persists_through_sleep = "true"
+  })
+
+  depends_on = [rhcs_cluster_rosa_hcp.main]
 }
 
 # Security group ingress rules for EFS (port 2049)
@@ -42,22 +47,17 @@ data "aws_security_groups" "cluster_default" {
 resource "aws_vpc_security_group_ingress_rule" "efs" {
   count = var.enable_efs && local.persists_through_sleep && length(var.private_subnet_cidrs) > 0 ? length(var.private_subnet_cidrs) : 0
 
-  security_group_id = data.aws_security_groups.cluster_default[0].ids[0]
+  security_group_id = aws_security_group.efs[0].id
   cidr_ipv4         = var.private_subnet_cidrs[count.index]
   from_port         = 2049
   to_port           = 2049
   ip_protocol       = "tcp"
   description       = "Allow EFS access from ${var.private_subnet_cidrs[count.index]}"
 
-  lifecycle {
-    ignore_changes = [
-      security_group_id
-    ]
-  }
-
   depends_on = [
+    rhcs_cluster_rosa_hcp.main,
     aws_efs_file_system.main,
-    data.aws_security_groups.cluster_default
+    aws_security_group.efs
   ]
 }
 
@@ -70,16 +70,12 @@ resource "aws_efs_mount_target" "main" {
 
   file_system_id  = aws_efs_file_system.main[0].id
   subnet_id       = var.private_subnet_ids[count.index]
-  security_groups = [data.aws_security_groups.cluster_default[0].ids[0]]
-
-  lifecycle {
-    ignore_changes = [
-      security_groups
-    ]
-  }
+  security_groups = [aws_security_group.efs[0].id]
 
   depends_on = [
+    rhcs_cluster_rosa_hcp.main,
     aws_efs_file_system.main,
-    data.aws_security_groups.cluster_default
+    aws_security_group.efs,
+    aws_vpc_security_group_ingress_rule.efs
   ]
 }

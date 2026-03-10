@@ -113,14 +113,19 @@ kind: RouteAdvertisements
 metadata:
   name: default
 spec:
-  advertisements:
-    - advertisementType: PodNetwork
-  networkSelector:
-    matchLabels:
-      advertise: "true"
   nodeSelector:
-    matchLabels:
-      bgp_router: "true"
+    labelSelector:
+      matchLabels:
+        bgp_router: "true"
+  frrConfigurationSelector: {}
+  networkSelectors:
+    - networkSelectionType: ClusterUserDefinedNetworks
+      clusterUserDefinedNetworkSelector:
+        networkSelector:
+          matchLabels:
+            advertise: "true"
+  advertisements:
+    - "PodNetwork"
 
 #------------------------------------------------------------------------------
 # Layer2 VMs
