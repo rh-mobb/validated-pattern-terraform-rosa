@@ -45,6 +45,15 @@ host_prefix  = 23              # Host prefix for subnet allocation
 # Compliance
 fips = false # Set to true for FIPS 140-2 compliance (requires FIPS-compliant instance types)
 
+# Proxy Configuration (optional)
+# Configure cluster-wide proxy settings for ROSA HCP nodes.
+# proxy = {
+#   http_proxy              = "http://proxy.example.com:3128"
+#   https_proxy             = "https://proxy.example.com:3128"
+#   no_proxy                = ".cluster.local,.svc,10.128.0.0/14,172.30.0.0/16,169.254.169.254"
+#   additional_trust_bundle = file("path/to/ca-bundle.pem")
+# }
+
 # Audit logging
 # flow_log_s3_bucket = "my-org-vpc-flow-logs"
 

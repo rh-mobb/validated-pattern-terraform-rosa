@@ -126,6 +126,18 @@ variable "fips" {
   nullable    = false
 }
 
+variable "proxy" {
+  description = "Cluster-wide proxy configuration for ROSA HCP (http_proxy, https_proxy, no_proxy, additional_trust_bundle). Set to null for no proxy."
+  type = object({
+    http_proxy              = optional(string)
+    https_proxy             = optional(string)
+    no_proxy                = optional(string)
+    additional_trust_bundle = optional(string)
+  })
+  default  = null
+  nullable = true
+}
+
 variable "zero_egress" {
   description = "Enable zero egress mode (egress-zero cluster). Sets zero_egress property to 'true' in cluster properties"
   type        = bool
