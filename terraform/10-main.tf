@@ -248,6 +248,7 @@ module "cluster" {
   service_cidr          = var.service_cidr
   pod_cidr              = var.pod_cidr
   host_prefix           = var.host_prefix
+  proxy                 = var.proxy
 
   # Default machine pool configuration
   # If not set, module will calculate defaults:

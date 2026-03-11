@@ -145,6 +145,7 @@ module "cluster" {
 | service_cidr | CIDR block for services | `string` | `"172.30.0.0/16"` |
 | pod_cidr | CIDR block for pods | `string` | `"10.128.0.0/14"` |
 | host_prefix | Host prefix for subnet allocation | `number` | `23` |
+| proxy | Cluster-wide proxy configuration (http_proxy, https_proxy, no_proxy, additional_trust_bundle). Set to null for no proxy | `object` | `null` |
 | channel_group | Channel group for OpenShift version | `string` | `"stable"` |
 | openshift_version | OpenShift version to pin. If not provided, automatically uses latest installable version | `string` | `null` |
 | wait_for_std_compute_nodes_complete | Wait for standard compute nodes to complete before considering cluster creation successful. Set to false if nodes may take longer (e.g., egress-zero clusters) | `bool` | `true` |

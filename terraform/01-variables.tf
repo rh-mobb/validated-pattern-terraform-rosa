@@ -1,7 +1,17 @@
 variable "cluster_name" {
-  description = "Name of the ROSA HCP cluster"
+  description = "Name of the ROSA HCP cluster. Max 8 characters due to AWS IAM role name length limits (64 chars) — ROSA operator roles append up to 60-char suffixes."
   type        = string
   nullable    = false
+
+  validation {
+    condition     = can(regex("^[a-z0-9-]+$", var.cluster_name))
+    error_message = "Cluster name must contain only lowercase letters, numbers, and hyphens."
+  }
+
+  validation {
+    condition     = length(var.cluster_name) <= 8
+    error_message = "Cluster name must be 8 characters or fewer. ROSA operator roles append long suffixes (up to 60 chars) and AWS IAM role names are limited to 64 characters."
+  }
 }
 
 variable "cluster_config_dir" {
@@ -259,6 +269,18 @@ variable "fips" {
   type        = bool
   default     = false
   nullable    = false
+}
+
+variable "proxy" {
+  description = "Cluster-wide proxy configuration for ROSA HCP (http_proxy, https_proxy, no_proxy, additional_trust_bundle). Set to null for no proxy."
+  type = object({
+    http_proxy              = optional(string)
+    https_proxy             = optional(string)
+    no_proxy                = optional(string)
+    additional_trust_bundle = optional(string)
+  })
+  default  = null
+  nullable = true
 }
 
 variable "flow_log_s3_bucket" {

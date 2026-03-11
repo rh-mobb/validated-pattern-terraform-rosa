@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reference: https://registry.terraform.io/providers/terraform-redhat/rhcs/latest/docs/guides/log-forwarders
 
 ### Added
+- **Proxy support** for ROSA HCP clusters: new `proxy` variable (object with `http_proxy`, `https_proxy`, `no_proxy`, `additional_trust_bundle`) for cluster-wide proxy configuration. Defaults to `null` (no proxy). Commented example added to `clusters/egress-zero/terraform.tfvars`.
 - **AWS Client VPN** (`enable_client_vpn`): Terraform module for robust private cluster access
   - Creates AWS Client VPN endpoint in VPC with mutual TLS authentication
   - Generates `.ovpn` config for OpenVPN, AWS VPN Client, or Tunnelblick
