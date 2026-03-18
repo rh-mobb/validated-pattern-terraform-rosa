@@ -149,29 +149,6 @@ log_into_cluster() {
 
 	echo "Retrieving cluster credentials from AWS Secrets Manager (region: ${region})..."
 
-	# Check if already logged in to the same cluster
-	local current_context
-	current_context=$(oc config current-context 2>/dev/null || echo "")
-	if [[ -n "${current_context}" ]]; then
-		echo "Already logged in to cluster context: ${current_context}"
-		# Verify we can still access the cluster
-		if oc get nodes &>/dev/null; then
-			echo "Cluster access verified, skipping login."
-			# Still need to extract and set CLUSTER_DOMAIN from current context
-			local api_url
-			api_url=$(oc whoami --show-server 2>/dev/null || echo "")
-			if [[ -n "${api_url}" ]]; then
-				local domain
-				domain=$(echo "${api_url}" | awk -F'.' '{print $2"."$3"."$4"."$5"."$6}' | awk -F':' '{print $1}')
-				export CLUSTER_DOMAIN="${domain}"
-				echo "Extracted cluster domain from current context: ${CLUSTER_DOMAIN}"
-			fi
-			return 0
-		else
-			echo "Cluster access lost, re-authenticating..."
-		fi
-	fi
-
 	# Use jq to directly extract values
 	local secret_string
 	secret_string=$(aws secretsmanager get-secret-value \
@@ -289,6 +266,7 @@ install_gitops_hub() {
 	local chart_name="${HELM_CHART:-cluster-bootstrap}"
 	local chart_version="${HELM_CHART_VERSION:-0.5.4}"
 	local namespace="${HELM_NAMESPACE:-openshift-operators}"
+	local helm_timeout="${HELM_TIMEOUT:-15m}"
 
 	echo "=== Installing GitOps for hub/standalone cluster ==="
 
@@ -299,6 +277,7 @@ install_gitops_hub() {
 		"--version" "${chart_version}"
 		"--insecure-skip-tls-verify"
 		"--namespace" "${namespace}"
+		"--timeout" "${helm_timeout}"
 		"--wait"
 		"--wait-for-jobs"
 		"--values" "${BOOTSTRAP_VALUES_FILE}"
@@ -409,6 +388,8 @@ install_gitops_spoke() {
 	# STEP 1: Deploy spoke cluster components first (ArgoCD, storage, etc.)
 	echo "=== STEP 1: Deploying spoke cluster components ==="
 
+	local helm_timeout="${HELM_TIMEOUT:-15m}"
+
 	# Values file from Terraform output (gitops_bootstrap_hub_values or gitops_bootstrap_spoke_values)
 	local helm_args=(
 		"upgrade" "--install" "${chart_name}"
@@ -417,6 +398,7 @@ install_gitops_spoke() {
 		"--insecure-skip-tls-verify"
 		"--create-namespace"
 		"--namespace" "${namespace}"
+		"--timeout" "${helm_timeout}"
 		"--wait"
 		"--wait-for-jobs"
 		"--values" "${BOOTSTRAP_VALUES_FILE}"
@@ -684,13 +666,23 @@ cleanup_acm_spoke() {
 
 	echo "Cleaning up ACM resources for spoke cluster ${CLUSTER_NAME} on hub..."
 
-	# Delete GitOpsCluster (idempotent - ignore if not found)
-	echo "Deleting GitOpsCluster ${CLUSTER_NAME}-gitops..."
+	# Delete GitOpsCluster in openshift-gitops (idempotent - ignore if not found)
+	echo "Deleting GitOpsCluster ${CLUSTER_NAME}-gitops in openshift-gitops..."
 	oc delete gitopscluster "${CLUSTER_NAME}-gitops" -n openshift-gitops --ignore-not-found=true || true
 
-	# Delete ArgoCD cluster secret (idempotent)
-	echo "Deleting ArgoCD cluster secret for ${CLUSTER_NAME}..."
+	# Delete GitOpsCluster in application-gitops (idempotent - ignore if not found)
+	echo "Deleting GitOpsCluster ${CLUSTER_NAME}-app-gitops in application-gitops..."
+	oc delete gitopscluster "${CLUSTER_NAME}-app-gitops" -n application-gitops --ignore-not-found=true || true
+
+	# Delete ArgoCD cluster secret in openshift-gitops (idempotent)
+	echo "Deleting ArgoCD cluster secret for ${CLUSTER_NAME} in openshift-gitops..."
 	oc delete secret -n openshift-gitops \
+		-l argocd.argoproj.io/secret-type=cluster \
+		--ignore-not-found=true 2>/dev/null | grep "${CLUSTER_NAME}" || true
+
+	# Delete ArgoCD cluster secret in application-gitops (idempotent)
+	echo "Deleting ArgoCD cluster secret for ${CLUSTER_NAME} in application-gitops..."
+	oc delete secret -n application-gitops \
 		-l argocd.argoproj.io/secret-type=cluster \
 		--ignore-not-found=true 2>/dev/null | grep "${CLUSTER_NAME}" || true
 
