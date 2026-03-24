@@ -597,7 +597,7 @@ variable "helm_chart_version" {
 variable "gitops_csv" {
   description = "Cluster Service Version (CSV) for the GitOps operator"
   type        = string
-  default     = "openshift-gitops-operator.v1.16.0-0.1746014725.p"
+  default     = "openshift-gitops-operator.v1.19.2"
   nullable    = false
 }
 

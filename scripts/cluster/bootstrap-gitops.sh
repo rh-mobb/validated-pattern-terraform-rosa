@@ -674,21 +674,47 @@ cleanup_acm_spoke() {
 	echo "Deleting GitOpsCluster ${CLUSTER_NAME}-app-gitops in application-gitops..."
 	oc delete gitopscluster "${CLUSTER_NAME}-app-gitops" -n application-gitops --ignore-not-found=true || true
 
-	# Delete ArgoCD cluster secret in openshift-gitops (idempotent)
+	# Delete ArgoCD cluster secret in openshift-gitops (targeted - only this cluster's secret)
 	echo "Deleting ArgoCD cluster secret for ${CLUSTER_NAME} in openshift-gitops..."
-	oc delete secret -n openshift-gitops \
+	oc get secret -n openshift-gitops \
 		-l argocd.argoproj.io/secret-type=cluster \
-		--ignore-not-found=true 2>/dev/null | grep "${CLUSTER_NAME}" || true
+		-o name 2>/dev/null | while read -r secret; do
+		if oc get "$secret" -n openshift-gitops -o jsonpath='{.data.name}' 2>/dev/null | base64 -d 2>/dev/null | grep -q "${CLUSTER_NAME}"; then
+			echo "  Deleting $secret..."
+			oc delete "$secret" -n openshift-gitops --ignore-not-found=true || true
+		fi
+	done
 
-	# Delete ArgoCD cluster secret in application-gitops (idempotent)
+	# Delete ArgoCD cluster secret in application-gitops (targeted - only this cluster's secret)
 	echo "Deleting ArgoCD cluster secret for ${CLUSTER_NAME} in application-gitops..."
-	oc delete secret -n application-gitops \
+	oc get secret -n application-gitops \
 		-l argocd.argoproj.io/secret-type=cluster \
-		--ignore-not-found=true 2>/dev/null | grep "${CLUSTER_NAME}" || true
+		-o name 2>/dev/null | while read -r secret; do
+		if oc get "$secret" -n application-gitops -o jsonpath='{.data.name}' 2>/dev/null | base64 -d 2>/dev/null | grep -q "${CLUSTER_NAME}"; then
+			echo "  Deleting $secret..."
+			oc delete "$secret" -n application-gitops --ignore-not-found=true || true
+		fi
+	done
 
 	# Delete application-manager addon (idempotent)
 	echo "Deleting application-manager addon for ${CLUSTER_NAME}..."
 	oc delete managedclusteraddon application-manager -n "${CLUSTER_NAME}" --ignore-not-found=true || true
+
+	# Delete Placement in application-gitops (idempotent)
+	echo "Deleting Placement ${CLUSTER_NAME} in application-gitops..."
+	oc delete placement "${CLUSTER_NAME}" -n application-gitops --ignore-not-found=true || true
+
+	# Delete ManagedClusterSetBinding in application-gitops (idempotent)
+	echo "Deleting ManagedClusterSetBinding ${CLUSTER_NAME} in application-gitops..."
+	oc delete managedclustersetbinding "${CLUSTER_NAME}" -n application-gitops --ignore-not-found=true || true
+
+	# Delete ManagedClusterSet (idempotent)
+	echo "Deleting ManagedClusterSet ${CLUSTER_NAME}..."
+	oc delete managedclusterset "${CLUSTER_NAME}" --ignore-not-found=true || true
+
+	# Delete acm-placement ConfigMap in application-gitops (idempotent)
+	echo "Deleting ConfigMap acm-placement-${CLUSTER_NAME} in application-gitops..."
+	oc delete configmap "acm-placement-${CLUSTER_NAME}" -n application-gitops --ignore-not-found=true || true
 
 	# Delete ManagedCluster (idempotent)
 	echo "Deleting ManagedCluster ${CLUSTER_NAME}..."
@@ -701,6 +727,10 @@ cleanup_acm_spoke() {
 	# Wait for cleanup to complete
 	echo "Waiting for cleanup to complete..."
 	sleep 10
+
+	# Delete the spoke namespace on the hub (may contain leftover secrets/imports)
+	echo "Deleting hub namespace ${CLUSTER_NAME}..."
+	oc delete namespace "${CLUSTER_NAME}" --ignore-not-found=true || true
 
 	echo "✓ ACM cleanup complete for spoke cluster ${CLUSTER_NAME}."
 }

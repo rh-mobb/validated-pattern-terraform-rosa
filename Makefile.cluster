@@ -22,7 +22,7 @@ check-cluster:
 .PHONY: help init plan apply destroy destroy_force sleep fmt validate clean
 .PHONY: show-endpoints show-credentials show-timing login verify
 .PHONY: tunnel-start tunnel-stop tunnel-status bastion-connect
-.PHONY: vpn-config vpn-start vpn-stop vpn-status bootstrap bootstrap-spoke ensure-tunnel
+.PHONY: vpn-config vpn-start vpn-stop vpn-status bootstrap bootstrap-spoke teardown-spoke ensure-tunnel
 
 help: ## Show this help message
 	@$(SCRIPT_DIR)/utils/get-network-config.sh $(CLUSTER_DIR) >/dev/null 2>&1 || true; \
@@ -48,6 +48,7 @@ help: ## Show this help message
 	echo "$(GREEN)GitOps:$(NC)"; \
 	echo "  make cluster.$(CLUSTER_NAME).bootstrap         Bootstrap GitOps operator on cluster"; \
 	echo "  make cluster.$(CLUSTER_NAME).bootstrap-spoke   Bootstrap as ACM spoke (requires HUB_CREDENTIALS_SECRET, ACM_REGION)"; \
+	echo "  make cluster.$(CLUSTER_NAME).teardown-spoke    Teardown spoke from ACM hub (requires HUB_CREDENTIALS_SECRET, ACM_REGION)"; \
 	echo ""; \
 	echo "$(GREEN)Cluster Access:$(NC)"; \
 	echo "  make cluster.$(CLUSTER_NAME).show-endpoints    Show API and console URLs"; \
@@ -172,6 +173,38 @@ bootstrap-spoke: init ensure-tunnel
 		bash "$$SCRIPT_PATH" || \
 		(echo "$(YELLOW)GitOps bootstrap (spoke) failed. Check the output above for details.$(NC)" && exit 1)
 	@echo "$(GREEN)GitOps bootstrap (spoke) completed for $(CLUSTER_NAME)$(NC)"
+
+# Teardown spoke - unregisters cluster from ACM hub and removes all hub-side resources
+# Requires: HUB_CREDENTIALS_SECRET and ACM_REGION passed on the command line
+# Usage: make cluster.<name>.teardown-spoke HUB_CREDENTIALS_SECRET=<secret> ACM_REGION=<region>
+teardown-spoke: init ensure-tunnel
+	@if [ -z "$(HUB_CREDENTIALS_SECRET)" ]; then \
+		echo "$(YELLOW)Error: HUB_CREDENTIALS_SECRET must be set.$(NC)"; \
+		echo "$(YELLOW)Usage: make cluster.$(CLUSTER_NAME).teardown-spoke HUB_CREDENTIALS_SECRET=<secret-name> ACM_REGION=<region>$(NC)"; \
+		exit 1; \
+	fi
+	@if [ -z "$(ACM_REGION)" ]; then \
+		echo "$(YELLOW)Error: ACM_REGION must be set.$(NC)"; \
+		echo "$(YELLOW)Usage: make cluster.$(CLUSTER_NAME).teardown-spoke HUB_CREDENTIALS_SECRET=<secret-name> ACM_REGION=<region>$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(BLUE)Tearing down spoke $(CLUSTER_NAME) from ACM hub...$(NC)"
+	@cd $(TERRAFORM_DIR) && \
+		SCRIPT_PATH=$$(terraform output -no-color -raw gitops_bootstrap_script_path 2>/dev/null | tr -d '\n\r' | sed 's/[[:space:]]*$$//') && \
+		if [ -z "$$SCRIPT_PATH" ] || [ "$$SCRIPT_PATH" = "null" ]; then \
+			echo "$(YELLOW)Error: GitOps bootstrap script path not found. Run terraform apply first.$(NC)"; \
+			exit 1; \
+		fi && \
+		export BOOTSTRAP_VALUES_FILE="$$PWD/../clusters/$(CLUSTER_NAME)/cluster-bootstrap-values.yaml" && \
+		eval $$(terraform output -no-color -raw gitops_bootstrap_env_exports 2>/dev/null) && \
+		export ENABLE="false" && \
+		export ACM_MODE="spoke" && \
+		export HUB_CREDENTIALS_SECRET="$(HUB_CREDENTIALS_SECRET)" && \
+		export ACM_REGION="$(ACM_REGION)" && \
+		echo "$(BLUE)Running spoke teardown script: $$SCRIPT_PATH$(NC)" && \
+		bash "$$SCRIPT_PATH" || \
+		(echo "$(YELLOW)Spoke teardown failed. Check the output above for details.$(NC)" && exit 1)
+	@echo "$(GREEN)Spoke teardown completed for $(CLUSTER_NAME)$(NC)"
 
 # Info operations
 show-endpoints: init
