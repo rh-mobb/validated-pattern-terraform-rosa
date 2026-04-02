@@ -1,0 +1,277 @@
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: open-cluster-management-agent
+spec: {}
+status: {}
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: klusterlet
+rules:
+# Allow the registration-operator to create workload
+- apiGroups: [""]
+  resources: ["configmaps", "serviceaccounts"]
+  verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["update", "get", "list", "watch", "delete"]
+  resourceNames:
+    - "open-cluster-management-image-pull-credentials"
+    - "bootstrap-hub-kubeconfig"
+    - "hub-kubeconfig-secret"
+    - "external-managed-kubeconfig"
+    - "external-managed-kubeconfig-work"
+    - "external-managed-kubeconfig-registration"
+    - "external-managed-kubeconfig-agent"
+# get pods and replicasets is for event creation
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get"]
+- apiGroups: [ "apps" ]
+  resources: [ "replicasets" ]
+  verbs: [ "get" ]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create", "get", "list", "update", "watch", "patch"]
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["", "events.k8s.io"]
+  resources: ["events"]
+  verbs: ["create", "patch", "update"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterrolebindings", "rolebindings"]
+  verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterroles", "roles"]
+  verbs: ["create", "get", "list", "update", "watch", "patch", "delete", "escalate", "bind"]
+# Allow the registration-operator to create crds
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
+# Allow the registration-operator to manage klusterlet apis.
+- apiGroups: ["operator.open-cluster-management.io"]
+  resources: ["klusterlets"]
+  verbs: ["get", "list", "watch", "update", "patch", "delete"]
+- apiGroups: ["operator.open-cluster-management.io"]
+  resources: ["klusterlets/status"]
+  verbs: ["update", "patch"]
+# Allow the registration-operator to update the appliedmanifestworks finalizer.
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["appliedmanifestworks"]
+  verbs: ["list", "update", "patch"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: klusterlet
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: klusterlet
+subjects:
+- kind: ServiceAccount
+  name: klusterlet
+  namespace: open-cluster-management-agent
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bootstrap-hub-kubeconfig
+  namespace: "open-cluster-management-agent"
+type: Opaque
+data:
+  kubeconfig: "YXBpVmVyc2lvbjogdjEKY2x1c3RlcnM6Ci0gY2x1c3RlcjoKICAgIHNlcnZlcjogaHR0cHM6Ly9hcGkuZGV2LWh1Yi0xLmJhb24ucDMub3BlbnNoaWZ0YXBwcy5jb206NDQzCiAgbmFtZTogZjg1NzE1YzYtYTk4ZC00ODdkLTkwYTItZmQ4ZDFiMjA1OTkxCmNvbnRleHRzOgotIGNvbnRleHQ6CiAgICBjbHVzdGVyOiBmODU3MTVjNi1hOThkLTQ4N2QtOTBhMi1mZDhkMWIyMDU5OTEKICAgIG5hbWVzcGFjZTogZGVmYXVsdAogICAgdXNlcjogZGVmYXVsdC1hdXRoCiAgbmFtZTogZGVmYXVsdC1jb250ZXh0CmN1cnJlbnQtY29udGV4dDogZGVmYXVsdC1jb250ZXh0CmtpbmQ6IENvbmZpZwp1c2VyczoKLSBuYW1lOiBkZWZhdWx0LWF1dGgKICB1c2VyOgogICAgdG9rZW46IGV5SmhiR2NpT2lKU1V6STFOaUlzSW10cFpDSTZJakIwUmkxa1NDMW1ZamR4WTFZdGRVRjBjM2M0V0c1NU0xOXhWRnBzVmxNMGRrRmZSVTV4UWpoTk9Wa2lmUS5leUpoZFdRaU9sc2lhSFIwY0hNNkx5OXZhV1JqTG05d01TNXZjR1Z1YzJocFpuUmhjSEJ6TG1OdmJTOHljR1JzWXpoaWFtdHZNMnBuT0hGbmJ6VXhkalptZERkd09ISXdiWEExWnlKZExDSmxlSEFpT2pFNE1EWXhPVFV6TkRrc0ltbGhkQ0k2TVRjM05UQTVNVE0wT1N3aWFYTnpJam9pYUhSMGNITTZMeTl2YVdSakxtOXdNUzV2Y0dWdWMyaHBablJoY0hCekxtTnZiUzh5Y0dSc1l6aGlhbXR2TTJwbk9IRm5ielV4ZGpabWREZHdPSEl3YlhBMVp5SXNJbXAwYVNJNkltRmlaRGhsWW1NekxUbG1OREl0TkROak5TMWhOVEJoTFdRM01XSmhOMlpsT1RreU5TSXNJbXQxWW1WeWJtVjBaWE11YVc4aU9uc2libUZ0WlhOd1lXTmxJam9pWkdWMkxYTndiMnRsTFRFaUxDSnpaWEoyYVdObFlXTmpiM1Z1ZENJNmV5SnVZVzFsSWpvaVpHVjJMWE53YjJ0bExURXRZbTl2ZEhOMGNtRndMWE5oSWl3aWRXbGtJam9pTmpNM05UQXdPR1l0TURCbU1DMDBNVGhsTFRobVpEUXRNMk5tTmpnMVpqWmhZelUzSW4xOUxDSnVZbVlpT2pFM056VXdPVEV6TkRrc0luTjFZaUk2SW5ONWMzUmxiVHB6WlhKMmFXTmxZV05qYjNWdWREcGtaWFl0YzNCdmEyVXRNVHBrWlhZdGMzQnZhMlV0TVMxaWIyOTBjM1J5WVhBdGMyRWlmUS5NYktQcV94MzNCaGVSdWZhTUtzUHY1Qm1sVGpDQlhkOGtIRDhOSzkyTUg4RVYwV3Z1Z3NGWTB6RG9zSHdad2VPcW9sX0JhSkM5eWdkcC1pWnA5NngyRjNRWHpUSkJKV1RZQTdMS05xc2RhWkhPNlVTMzNqNWVBUXJiQmd1R2kwaUgwclgzcElqNE1hcTdGMllDQ1c0WnlEOU9FdWhvTjBXbV92UWxRNVE4NUMzanFZbHpyR1lGV2pHVUZCd2ZhYkdwSzRJQlhzSllFZ0g1S3NVbWx0QTd4cDhjTkp6Z0NWWXNpTm43c3FCU1otSUVvM0F6dWV0ZnFlRDhYMWlsZjJUNlgyZFh6MWItaUhhQ1hLelh0bE9ianlkcGNNZHZTRFAyR0pBVkF1ZkFLSEt3ZVBEeHROSzBadGJZQXl1SDdJQ0RiMkE5TEw4QXVZSEFYc0IwdjZTNDgwTVZiMEdQWGt4LWt1YjNnQW9GcWtvM2lac3lTSDIzdzVtVERBODRyRm9oLTgzbERaQ3U1U1hkTjZ1STJULTVrT3QtU0V3eEFQVmU1UTlneWg0WEtja3NZZDVLUmZRcWd5aV81SXE0UUk0bTlEN19MR0xuWGtXZVgtUlJDZ091WHhoUlIybVhodGV4TWtvamM1N2hieDNvdWpXY3JqNVhKQWU1YkdjTzN3X1RpZGtLVk5PS1BpS1h3NXhVVC1YZHkwVFhYZFBYYU85cE40YkRhMzg2cUhDZk5NU2QzRFNxMHMwUzVUQXNCcW50SzFaQXpWNlhnVmJrcnZ6elNMa1dFQXdfVHVrbFRxcFpOTk51VFhJVVlBNE5YNUZhTUxFaTJLSFhycjZwYlVSUWhnOFZqanFkMUE3S2toc0Q1ZXlsQW1FYk1FdHpueTNjTVU3VzhiSmFERQo="
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: open-cluster-management-image-pull-credentials
+  namespace: open-cluster-management-agent
+  labels:
+    app: klusterlet
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: e30=
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: klusterlet
+  namespace: open-cluster-management-agent
+imagePullSecrets:
+  - name: open-cluster-management-image-pull-credentials
+
+---
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: klusterlet
+  namespace: open-cluster-management-agent
+  labels:
+    app: klusterlet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: klusterlet
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: klusterlet
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - klusterlet
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+            weight: 70
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - klusterlet
+              topologyKey: kubernetes.io/hostname
+            weight: 30
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/infra
+          operator: Exists
+      serviceAccountName: klusterlet
+      securityContext:
+        runAsNonRoot: true
+      containers:
+      - name: klusterlet
+        image:  "registry.redhat.io/multicluster-engine/registration-operator-rhel9@sha256:33046fd4dc4a1fe749e9e42740665cad307e609db7454dd5c9ffca7766e7d8af"
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/registration-operator"
+          - "klusterlet"
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+        resources:
+          limits:
+            memory: 2Gi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        volumeMounts:
+        - name: tmpdir
+          mountPath: /tmp
+      volumes:
+      - name: tmpdir
+        emptyDir: { }
+
+---
+
+apiVersion: operator.open-cluster-management.io/v1
+kind: Klusterlet
+metadata:
+  name: "klusterlet"
+spec:
+  deployOption:
+    mode: Singleton
+  registrationImagePullSpec: "registry.redhat.io/multicluster-engine/registration-rhel9@sha256:199712e4c401ac103c93bd6f411ef0f507cd65a2b71c2ef6c6be4b8a18764cdb"
+  workImagePullSpec: "registry.redhat.io/multicluster-engine/work-rhel9@sha256:390e483c430a9229abf05257ba7f2d834eb40fcf284a525a7240330299024895"
+  imagePullSpec: "registry.redhat.io/multicluster-engine/registration-operator-rhel9@sha256:33046fd4dc4a1fe749e9e42740665cad307e609db7454dd5c9ffca7766e7d8af"
+  clusterName: "dev-spoke-1"
+  namespace: "open-cluster-management-agent"
+  resourceRequirement:
+    type: Default
+  nodePlacement:
+    tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/infra
+      operator: Exists
+  registrationConfiguration:
+    bootstrapKubeConfigs: {}
+    clusterClaimConfiguration:
+      maxCustomClusterClaims: 0
+      reservedClusterClaimSuffixes:
+      - openshift.io
+      - open-cluster-management.io
+    registrationDriver: {}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: klusterlet-bootstrap-kubeconfig
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["bootstrap-hub-kubeconfig"]
+  verbs: ["get", "update"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:klusterlet-admin-aggregate-clusterrole
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+rules:
+- apiGroups: ["operator.open-cluster-management.io"]
+  resources: ["klusterlets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

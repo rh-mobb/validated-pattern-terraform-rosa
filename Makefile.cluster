@@ -86,12 +86,12 @@ apply: plan
 	@$(SCRIPT_DIR)/cluster/apply-infrastructure.sh $(CLUSTER_NAME)
 	@echo "$(GREEN)Applied $(CLUSTER_NAME)$(NC)"
 
-destroy: check-cluster
+destroy: init
 	@$(SCRIPT_DIR)/cluster/destroy-infrastructure.sh $(CLUSTER_NAME)
 	@echo "$(GREEN)Destroyed $(CLUSTER_NAME)$(NC)"
 	@echo "$(GREEN)All resources have been deleted from AWS.$(NC)"
 
-destroy_force: check-cluster
+destroy_force: init
 	@AUTO_APPROVE=true $(SCRIPT_DIR)/cluster/destroy-infrastructure.sh $(CLUSTER_NAME)
 	@echo "$(GREEN)Destroyed $(CLUSTER_NAME)$(NC)"
 	@echo "$(GREEN)All resources have been deleted from AWS.$(NC)"
