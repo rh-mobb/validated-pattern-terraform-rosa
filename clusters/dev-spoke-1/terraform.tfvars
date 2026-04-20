@@ -1,7 +1,7 @@
 # Infrastructure Configuration
 # This file contains variables for the infrastructure layer (VPC, network, cluster creation)
 
-cluster_name      = "dev-spoke-1"
+cluster_name = "dev-spoke-1"
 
 # Version pinning for production
 openshift_version = "4.20.12"

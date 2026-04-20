@@ -1,14 +1,14 @@
 # Infrastructure Configuration
 # This file contains variables for the infrastructure layer (VPC, network, cluster creation)
 
-cluster_name      = "dev-spoke-2"
+cluster_name = "dev-spoke-2"
 
 # Version pinning for production
 openshift_version = "4.20.12"
 
 # Network Configuration
 network_type = "public" # Public clusters use NAT Gateway for internet egress
-zero_egress  = true   # Public clusters don't use zero egress (have internet access). Matches ROSA API property name.
+zero_egress  = true     # Public clusters don't use zero egress (have internet access). Matches ROSA API property name.
 private      = false    # Public API endpoint (independent of network_type - can have public API in private VPC or vice versa)
 region       = "ap-southeast-4"
 vpc_cidr     = "10.10.0.0/16"
