@@ -225,8 +225,8 @@ resource "rhcs_cluster_rosa_hcp" "main" {
   autoscaling_enabled = local.autoscaling_enabled
   # Cluster-level min/max must be the TOTAL across all AZs/pools, not per-pool values.
   # OCM validates that the total is a multiple of the number of private subnets.
-  min_replicas        = local.autoscaling_enabled ? local.hcp_replicas : null
-  max_replicas        = local.autoscaling_enabled ? local.hcp_max_replicas : null
+  min_replicas = local.autoscaling_enabled ? local.hcp_replicas : null
+  max_replicas = local.autoscaling_enabled ? local.hcp_max_replicas : null
 
   # EC2 metadata HTTP tokens (required for security)
   ec2_metadata_http_tokens = "required"
