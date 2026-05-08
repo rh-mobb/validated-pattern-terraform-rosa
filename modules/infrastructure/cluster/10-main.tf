@@ -100,11 +100,13 @@ locals {
   # Cluster properties
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/04-cluster.tf
   # zero_egress property is set when zero_egress variable is true
+  # additional_cluster_properties are merged last so callers can override or extend
   cluster_properties = merge(
     {
       rosa_creator_arn = data.aws_caller_identity.current.arn
     },
-    var.zero_egress ? { "zero_egress" = "true" } : {}
+    var.zero_egress ? { "zero_egress" = "true" } : {},
+    var.additional_cluster_properties
   )
 
   # Additional machine pools validation
