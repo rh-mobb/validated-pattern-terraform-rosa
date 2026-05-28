@@ -453,6 +453,7 @@ variable "enable_termination_protection" {
   default     = false
 }
 
+
 ##############################################################
 # Proxy variables
 ##############################################################
@@ -615,6 +616,13 @@ variable "gitops_git_repo_url" {
   nullable    = true
 }
 
+variable "gitops_git_target_revision" {
+  description = "Git target revision (branch/tag/commit) for cluster-config repository used by ArgoCD value source. Defaults to HEAD (default branch). Set to a branch like 'autonode' to test preview config."
+  type        = string
+  default     = "HEAD"
+  nullable    = false
+}
+
 variable "ecr_account" {
   description = "ECR account ID for image pulls"
   type        = string
@@ -762,6 +770,26 @@ variable "admin_group" {
   type        = string
   default     = "cluster-admins"
   nullable    = false
+}
+
+
+variable "enable_autonode" {
+  description = "Enable AutoNode on rhcs_cluster_rosa_hcp (auto_node block) and tag private subnets/default SG for Karpenter discovery. Requires IAM AutoNode IRSA role. OCM does not support disabling AutoNode once enabled—do not set this back to false on an existing cluster without vendor guidance."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "autonode_iam_role_arn" {
+  description = "ARN of the Karpenter IRSA role from the IAM module. Required when enable_autonode is true."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = !var.enable_autonode || (var.autonode_iam_role_arn != null && var.autonode_iam_role_arn != "")
+    error_message = "When enable_autonode is true, autonode_iam_role_arn must be a non-empty string (IAM module AutoNode outputs)."
+  }
 }
 
 variable "additional_cluster_properties" {
