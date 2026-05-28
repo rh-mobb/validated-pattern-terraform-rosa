@@ -244,6 +244,32 @@ variable "default_instance_type" {
   nullable    = false
 }
 
+variable "default_labels" {
+  description = "Labels to apply to all default machine pool nodes. Format: map of key/value strings. Applied to all default pools (workers, workers-0/1/2 for multi-AZ)."
+  type        = map(string)
+  default     = {}
+  nullable    = false
+}
+
+variable "default_taints" {
+  description = "Taints to apply to all default machine pool nodes. Applied to all default pools. schedule_type must be one of: NoSchedule, PreferNoSchedule, NoExecute."
+  type = list(object({
+    key           = string
+    value         = string
+    schedule_type = string
+  }))
+  default  = []
+  nullable = false
+
+  validation {
+    condition = alltrue([
+      for t in var.default_taints :
+      contains(["NoSchedule", "PreferNoSchedule", "NoExecute"], t.schedule_type)
+    ])
+    error_message = "Each taint schedule_type must be one of: NoSchedule, PreferNoSchedule, NoExecute."
+  }
+}
+
 variable "default_min_replicas" {
   description = <<EOF
   Default minimum replicas per machine pool. If null, defaults are calculated:

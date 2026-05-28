@@ -264,6 +264,8 @@ module "cluster" {
   # - Single-AZ: min = 2, max = 4
   # - Multi-AZ: min = 3, max = 6
   default_instance_type = var.default_instance_type
+  default_labels        = var.default_labels
+  default_taints        = var.default_taints
   default_min_replicas  = null # Use module defaults (calculated based on single-AZ vs multi-AZ)
   default_max_replicas  = null # Use module defaults (calculated based on single-AZ vs multi-AZ)
   # Additional machine pools - resolved with actual subnet IDs
