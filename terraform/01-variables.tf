@@ -87,6 +87,24 @@ variable "default_instance_type" {
   nullable    = false
 }
 
+variable "default_labels" {
+  description = "Labels to apply to all default machine pool nodes. Applied to all default pools (workers, workers-0/1/2 for multi-AZ)."
+  type        = map(string)
+  default     = {}
+  nullable    = false
+}
+
+variable "default_taints" {
+  description = "Taints to apply to all default machine pool nodes. schedule_type must be one of: NoSchedule, PreferNoSchedule, NoExecute."
+  type = list(object({
+    key           = string
+    value         = string
+    schedule_type = string
+  }))
+  default  = []
+  nullable = false
+}
+
 variable "default_min_replicas" {
   description = <<-EOF
     Default minimum replicas per default machine pool. If null, the cluster module calculates bounds (single-AZ: 2 per pool; multi-AZ: 1 per AZ per pool).

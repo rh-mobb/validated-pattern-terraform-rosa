@@ -375,6 +375,10 @@ resource "rhcs_hcp_machine_pool" "default" {
     tags = local.common_tags
   }
 
+  # Only set labels/taints if they have values (provider requires at least 1 element if provided)
+  labels = length(var.default_labels) > 0 ? var.default_labels : null
+  taints = length(var.default_taints) > 0 ? var.default_taints : null
+
   # CRITICAL: Default machine pools are managed by Terraform for configuration (autoscaling, instance type, etc.)
   # but should NOT be deleted by Terraform during destroy. ROSA automatically deletes default machine pools
   # when the cluster is destroyed. Attempting to delete them manually causes errors because ROSA requires

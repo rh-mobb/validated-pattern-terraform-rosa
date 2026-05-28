@@ -18,7 +18,7 @@ vpc_cidr = "10.1.0.0/16"
 
 multi_az = false
 
-default_instance_type = "m5.xlarge"
+default_instance_type = "c6g.xlarge"
 default_min_replicas  = 2
 default_max_replicas  = 2
 
