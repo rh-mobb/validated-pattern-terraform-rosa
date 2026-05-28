@@ -238,6 +238,14 @@ resource "rhcs_cluster_rosa_hcp" "main" {
   # Properties are constructed in locals.cluster_properties for better readability and maintainability
   properties = local.cluster_properties
 
+  # AutoNode (Karpenter): nested attribute on rhcs_cluster_rosa_hcp (not a block). OCM does not allow
+  # removing it once enabled—do not set enable_autonode=false on existing clusters without vendor guidance.
+  # Reference: https://registry.terraform.io/providers/terraform-redhat/rhcs/latest/docs/resources/cluster_rosa_hcp#auto_node
+  auto_node = var.enable_autonode ? {
+    mode     = "enabled"
+    role_arn = var.autonode_iam_role_arn
+  } : null
+
   # Lifecycle settings
   disable_waiting_in_destroy          = false
   wait_for_create_complete            = true
@@ -252,6 +260,11 @@ resource "rhcs_cluster_rosa_hcp" "main" {
     # - Therefore, cluster (which depends on IAM outputs) will be destroyed BEFORE IAM resources
     # - This ensures Terraform maintains permissions to destroy the cluster
     # - No explicit depends_on needed - the dependency on IAM outputs is sufficient
+
+    # Workaround: rhcs provider v1.7.5/1.7.6 does not return auto_node in the post-apply state
+    # refresh response, causing "Provider produced inconsistent result after apply". AutoNode
+    # cannot be disabled via OCM once enabled, so ignoring drift on this attribute is safe.
+    ignore_changes = [auto_node]
 
     # Validate instance type is available for ROSA in the specified region
     precondition {
