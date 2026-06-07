@@ -1,0 +1,15 @@
+{{- if .Values.compliance.clusterImagePolicy.enabled }}
+apiVersion: config.openshift.io/v1
+kind: ClusterImagePolicy
+metadata:
+  name: rhhi-signed-images
+spec:
+  scopes:
+    - cluster
+  policy:
+    roots:
+      - signedBy:
+          - keyData: |
+              # Replace with Tekton pipeline Cosign public key for production enforcement
+              PLACEHOLDER_SIGNING_KEY
+{{- end }}

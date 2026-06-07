@@ -1,0 +1,12 @@
+{{- if and .Values.operators.ecrSecret.enabled .Values.supplyChain.enabled }}
+apiVersion: ecr.mobb.redhat.com/v1alpha1
+kind: Secret
+metadata:
+  name: {{ .Values.ecrOperator.secretName }}
+  namespace: {{ .Values.tekton.namespace }}
+spec:
+  generated_secret_name: {{ .Values.ecrOperator.generatedSecretName }}
+  ecr_registry: {{ required "global.ecrRegistryUrl is required" .Values.global.ecrRegistryUrl }}
+  frequency: {{ .Values.ecrOperator.frequency }}
+  region: {{ required "global.awsRegion is required" .Values.global.awsRegion }}
+{{- end }}

@@ -428,6 +428,29 @@ module "bastion" {
 # Alternative to sshuttle/bastion - works with AWS VPN Client, OpenVPN, Tunnelblick.
 # Reference: ./reference/rosa-tf/modules/networking/client-vpn/
 
+#------------------------------------------------------------------------------
+# RHHI Supply Chain (ECR pull-through, IAM for Tekton and workers)
+# Portable module source: clusters/rhhi/terraform/
+#------------------------------------------------------------------------------
+
+module "rhhi_supply_chain" {
+  count  = var.enable_rhhi_supply_chain ? 1 : 0
+  source = "../clusters/rhhi/terraform"
+
+  cluster_name              = var.cluster_name
+  region                    = var.region
+  account_role_prefix       = var.cluster_name
+  oidc_provider_arn         = module.iam.oidc_provider_arn
+  oidc_endpoint_url         = module.iam.oidc_endpoint_url
+  ecr_repository_prefix     = var.rhhi_ecr_repository_prefix
+  upstream_registry_url     = var.rhhi_upstream_registry_url
+  enable_ecr_kms_encryption = var.rhhi_enable_ecr_kms_encryption
+  persists_through_sleep    = var.persists_through_sleep
+  tags                      = local.tags
+
+  depends_on = [module.iam]
+}
+
 module "client_vpn" {
   count  = var.enable_client_vpn && var.persists_through_sleep && length(local.network.private_subnet_ids) > 0 ? 1 : 0
   source = "../modules/infrastructure/client-vpn"

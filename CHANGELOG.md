@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **RHHI pull-through cache**: Removed required Red Hat registry credentials for `quay.io` upstream; public `quay.io/hummingbird/*` images use anonymous pull-through. Secrets Manager secret and `TF_VAR_rhhi_redhat_registry_*` variables removed (can be re-added for authenticated upstreams).
+- **RHHI Tekton pipeline**: Application ECR repositories are created on demand via `ensure-ecr-repository` task; Tekton IRSA policy includes `ecr:CreateRepository` on the `quay-cache/*` prefix. `make all` no longer runs optional `seed-cache` debug step.
+
 ### Added
+- **RHHI secure supply chain example (`clusters/rhhi/`)**: Self-contained Red Hat Hardened Images demo with ECR pull-through cache (Terraform module in `clusters/rhhi/terraform/`), worker instance role ECR pull policy, Tekton IRSA, ECR Secret Operator + OpenShift Pipelines via Helm chart, bash-driven install scripts, and sample distroless Python `demo-app`. Wired from root Terraform via `enable_rhhi_supply_chain` in `clusters/rhhi/terraform.tfvars` (public cluster baseline, `enable_gitops_bootstrap = false`).
 - **Cluster module — `additional_cluster_properties` variable**: New `additional_cluster_properties` variable (`map(string)`, default `{}`) allows callers to inject arbitrary key/value pairs into the `rhcs_cluster_rosa_hcp` resource's `properties` block. The values are merged after the built-in properties (`rosa_creator_arn`, `zero_egress`), so caller-supplied entries take precedence. Available in both the cluster module (`modules/infrastructure/cluster/`) and the root module (`terraform/`).
 
 ### Fixed

@@ -251,3 +251,23 @@ output "cluster_creation_timing" {
   value       = var.enable_timing ? module.cluster_timing.timing_summary : null
   sensitive   = false
 }
+
+#------------------------------------------------------------------------------
+# RHHI Supply Chain (when enable_rhhi_supply_chain = true)
+#------------------------------------------------------------------------------
+
+output "rhhi_supply_chain" {
+  description = "RHHI supply chain outputs for Helm values rendering (null when disabled)"
+  value = var.enable_rhhi_supply_chain ? {
+    tekton_ecr_role_arn    = module.rhhi_supply_chain[0].tekton_ecr_role_arn
+    ecr_operator_role_arn  = module.rhhi_supply_chain[0].ecr_operator_role_arn
+    ecr_repository_prefix  = module.rhhi_supply_chain[0].ecr_repository_prefix
+    ecr_registry_url       = module.rhhi_supply_chain[0].ecr_registry_url
+    aws_account_id         = module.rhhi_supply_chain[0].aws_account_id
+    aws_region             = module.rhhi_supply_chain[0].aws_region
+    tekton_namespace       = module.rhhi_supply_chain[0].tekton_namespace
+    tekton_service_account = module.rhhi_supply_chain[0].tekton_service_account
+    ecr_operator_namespace = module.rhhi_supply_chain[0].ecr_operator_namespace
+  } : null
+  sensitive = false
+}
