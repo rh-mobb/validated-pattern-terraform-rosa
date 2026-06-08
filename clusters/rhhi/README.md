@@ -12,6 +12,68 @@ Designed for eventual extraction to a dedicated repository. AWS resources live i
 | Tekton pipeline | IRSA on `ecr-pipeline-sa` | Create destination ECR repo on demand, Buildah push |
 | Pipeline namespace | [ECR Secret Operator](https://github.com/rh-mobb/ecr-secret-operator) | Auto-refresh `aws-ecr-creds` dockerconfig (12h ECR tokens) |
 
+### Supply chain flow
+
+Images are referenced by **full ECR pull-through URLs** (`{account}.dkr.ecr.{region}.amazonaws.com/quay-cache/...`), not `quay.io/...`. OpenShift image mirroring is not required for this design.
+
+```mermaid
+flowchart TB
+  subgraph upstream["Upstream"]
+    QUAY["quay.io/hummingbird/*"]
+  end
+
+  subgraph aws["AWS"]
+    PTC["ECR pull-through rule<br/>prefix: quay-cache"]
+    CACHE["ECR repos<br/>quay-cache/hummingbird/*"]
+    APPS["ECR repos<br/>quay-cache/internal/*"]
+  end
+
+  subgraph openshift["OpenShift"]
+    WORKERS["Worker nodes<br/>instance profile ECR read"]
+    TEKTON["Tekton rhhi-secure-build<br/>ecr-pipeline-sa IRSA"]
+    ECR_OP["ECR Secret Operator<br/>aws-ecr-creds secret"]
+  end
+
+  QUAY -->|"first pull"| PTC
+  PTC --> CACHE
+  TEKTON -->|"ensure + push"| APPS
+  ECR_OP -->|"dockerconfig"| TEKTON
+  CACHE --> WORKERS
+  APPS --> WORKERS
+```
+
+### Tekton pipeline (`rhhi-secure-build`)
+
+Pipeline definition: [`helm/rhhi-supply-chain/templates/tekton-pipeline.yaml`](helm/rhhi-supply-chain/templates/tekton-pipeline.yaml)
+
+```mermaid
+flowchart LR
+  subgraph workspaces["Workspaces"]
+    SRC["source PVC<br/>demo-app / Dockerfile"]
+    DC["dockerconfig<br/>aws-ecr-creds"]
+  end
+
+  V["verify-base-image<br/>Task: verify-upstream-rhhi<br/>skopeo inspect cached base"]
+  E["ensure-destination-repository<br/>Task: ensure-ecr-repository<br/>aws ecr create-repository"]
+  B["build-and-push<br/>Task: build-and-push-distroless<br/>lint Dockerfile + buildah push"]
+  S["sign-image<br/>Task: sign-and-attest-image<br/>cosign placeholder"]
+
+  V --> E --> B --> S
+
+  DC -.-> V
+  DC -.-> B
+  DC -.-> S
+  SRC -.-> B
+  E -.->|"IRSA ecr-pipeline-sa"| E
+```
+
+| Task | Auth | Purpose |
+|------|------|---------|
+| `verify-base-image` | `aws-ecr-creds` | Confirm base image exists in ECR pull-through cache |
+| `ensure-destination-repository` | IRSA (`ecr-pipeline-sa`) | Create app repo on demand (`ecr:CreateRepository`) |
+| `build-and-push` | `aws-ecr-creds` | Multi-stage buildah build; push to `destination-image` |
+| `sign-image` | `aws-ecr-creds` | Cosign sign step (MVP placeholder) |
+
 ## Prerequisites
 
 - RHCS credentials (`RHCS_TOKEN` or `RHCS_CLIENT_ID` / `RHCS_CLIENT_SECRET`)

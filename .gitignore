@@ -72,3 +72,5 @@ clusters/*/cluster-bootstrap-values.yaml
 # RHHI generated/local config
 clusters/rhhi/config.env
 clusters/rhhi/helm/rhhi-supply-chain/values.generated.yaml
+
+kubeconfig
