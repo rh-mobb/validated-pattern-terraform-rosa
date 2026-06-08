@@ -261,11 +261,6 @@ resource "rhcs_cluster_rosa_hcp" "main" {
     # - This ensures Terraform maintains permissions to destroy the cluster
     # - No explicit depends_on needed - the dependency on IAM outputs is sufficient
 
-    # Workaround: rhcs provider v1.7.5/1.7.6 does not return auto_node in the post-apply state
-    # refresh response, causing "Provider produced inconsistent result after apply". AutoNode
-    # cannot be disabled via OCM once enabled, so ignoring drift on this attribute is safe.
-    ignore_changes = [auto_node]
-
     # Validate instance type is available for ROSA in the specified region
     precondition {
       condition = contains(
