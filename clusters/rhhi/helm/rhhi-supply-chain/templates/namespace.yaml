@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.tekton.namespace }}
+  labels:
+    app.kubernetes.io/name: rhhi-supply-chain
+    app.kubernetes.io/component: tekton
+---
+{{- if .Values.operators.ecrSecret.enabled }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.ecrOperator.namespace }}
+  labels:
+    app.kubernetes.io/name: rhhi-supply-chain
+    app.kubernetes.io/component: ecr-secret-operator
+{{- end }}

@@ -1,0 +1,56 @@
+{{- if and .Values.operators.pipelines.enabled .Values.supplyChain.enabled }}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: build-and-push-distroless
+  namespace: {{ .Values.tekton.namespace }}
+spec:
+  params:
+    - name: destination-image
+      type: string
+      default: {{ printf "%s/%s" .Values.global.ecrRegistryUrl .Values.images.destinationImage | quote }}
+  workspaces:
+    - name: source
+    - name: dockerconfig
+  steps:
+    - name: lint-dockerfile-exec-form
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        DOCKERFILE="Dockerfile"
+        echo "Validating that the Dockerfile ENTRYPOINT and CMD utilize JSON Exec Form..."
+
+        if grep -E "^(ENTRYPOINT|CMD)" "${DOCKERFILE}" | grep -qv "\\["; then
+          echo "ERROR: Hardened images do not contain shells (/bin/sh)."
+          echo "ENTRYPOINT and CMD declarations MUST use the JSON array Exec Form."
+          echo 'Example: ENTRYPOINT ["/app/server"] instead of ENTRYPOINT /app/server'
+          exit 1
+        fi
+        echo "Exec Form validated successfully."
+
+    - name: compile-and-assemble
+      image: registry.redhat.io/rhel9/buildah:latest
+      workingDir: $(workspaces.source.path)
+      securityContext:
+        capabilities:
+          add: ["SETFCAP"]
+      env:
+        - name: REGISTRY_AUTH_FILE
+          value: $(workspaces.dockerconfig.path)/.dockerconfigjson
+        - name: STORAGE_DRIVER
+          value: vfs
+        - name: BUILDAH_ISOLATION
+          value: chroot
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        echo "Building image using Buildah (vfs/chroot — no fuse-overlayfs on ROSA workers)..."
+        buildah bud --storage-driver=vfs --isolation=chroot --tls-verify=true -t "$(params.destination-image)" .
+
+        echo "Pushing hardened application layer directly to AWS ECR..."
+        buildah --storage-driver=vfs push "$(params.destination-image)"
+{{- end }}

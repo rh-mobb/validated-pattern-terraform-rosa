@@ -1,0 +1,28 @@
+{{- if and .Values.operators.pipelines.enabled .Values.supplyChain.enabled }}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: sign-and-attest-image
+  namespace: {{ .Values.tekton.namespace }}
+spec:
+  params:
+    - name: image-url
+      type: string
+      description: Image URL to sign with Cosign
+  workspaces:
+    - name: dockerconfig
+  steps:
+    - name: cosign-sign
+      image: {{ .Values.images.cosignImage }}
+      env:
+        - name: COSIGN_EXPERIMENTAL
+          value: "1"
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        echo "Signing image $(params.image-url)..."
+        # MVP: keyless or org signing key can be wired via additional workspace/secret in follow-up
+        echo "Sign step placeholder — configure Cosign signing key for production attestations."
+        cosign version
+{{- end }}

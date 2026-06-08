@@ -1,0 +1,47 @@
+global:
+  awsAccountId: ""
+  awsRegion: ""
+  ecrRegistryUrl: ""
+  ecrRepositoryPrefix: quay-cache
+
+tekton:
+  namespace: user-workload-pipeline
+  serviceAccount: ecr-pipeline-sa
+  tektonEcrRoleArn: ""
+
+ecrOperator:
+  namespace: ecr-secret-operator
+  roleArn: ""
+  channel: alpha
+  source: community-operators
+  sourceNamespace: openshift-marketplace
+  secretName: ecr-secret
+  generatedSecretName: aws-ecr-creds
+  frequency: 10h
+
+images:
+  rhhiBaseImage: hummingbird/python:3.14.5
+  rhhiBuilderImage: hummingbird/python:3.14.5-fips-builder
+  destinationImage: quay-cache/internal/hardened-app:1.0.0
+  cosignImage: registry.redhat.io/rhtas/cosign-rhel9:1.2.2
+
+# Phase 1 (operators only): set supplyChain.enabled=false for first helm install.
+supplyChain:
+  enabled: true
+
+operators:
+  pipelines:
+    enabled: true
+    channel: latest
+    source: redhat-operators
+    sourceNamespace: openshift-marketplace
+  ecrSecret:
+    enabled: true
+
+compliance:
+  clusterImagePolicy:
+    enabled: false
+
+demo:
+  enabled: false
+  pipelinerunName: rhhi-demo-build

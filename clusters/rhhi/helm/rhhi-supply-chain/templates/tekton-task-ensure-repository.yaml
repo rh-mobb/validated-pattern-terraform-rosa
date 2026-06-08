@@ -1,0 +1,40 @@
+{{- if and .Values.operators.pipelines.enabled .Values.supplyChain.enabled }}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ensure-ecr-repository
+  namespace: {{ .Values.tekton.namespace }}
+spec:
+  params:
+    - name: destination-image
+      type: string
+      description: Full ECR image URL (registry/repository:tag) to ensure exists before push
+    - name: aws-region
+      type: string
+      default: {{ required "global.awsRegion is required" .Values.global.awsRegion | quote }}
+  steps:
+    - name: ensure-repository
+      image: amazon/aws-cli:2.22.35
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        dest="$(params.destination-image)"
+        region="$(params.aws-region)"
+        repo_name="${dest#*/}"
+        repo_name="${repo_name%%:*}"
+
+        echo "Ensuring ECR repository ${repo_name} exists in ${region}..."
+        if aws ecr describe-repositories \
+          --repository-names "${repo_name}" \
+          --region "${region}" >/dev/null 2>&1; then
+          echo "Repository already exists: ${repo_name}"
+          exit 0
+        fi
+
+        aws ecr create-repository \
+          --repository-name "${repo_name}" \
+          --image-tag-mutability IMMUTABLE \
+          --region "${region}"
+        echo "Created repository: ${repo_name}"
+{{- end }}

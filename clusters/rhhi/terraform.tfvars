@@ -1,0 +1,101 @@
+# Infrastructure Configuration
+# This file contains variables for the infrastructure layer (VPC, network, cluster creation)
+# Based on clusters/public/terraform.tfvars with RHHI supply chain overrides.
+
+cluster_name = "rhhi"
+
+# Version pinning for production
+openshift_version = "4.20.12"
+
+# Network Configuration
+network_type = "public" # Public clusters use NAT Gateway for internet egress
+zero_egress  = false    # Public clusters don't use zero egress (have internet access). Matches ROSA API property name.
+private      = false    # Public API endpoint (independent of network_type - can have public API in private VPC or vice versa)
+region       = "ap-southeast-2"
+vpc_cidr     = "10.10.0.0/16"
+
+# Cluster Topology
+multi_az = false # Single AZ for dev cost savings (availability zones automatically determined)
+# Note: For multi-AZ clusters, default_min_replicas and default_max_replicas are per-AZ values
+# Example: min_replicas=1 means 1 replica per pool (3 total for 3 pools)
+
+# Machine Pool Configuration
+default_instance_type = "m5.xlarge" # EC2 instance type for default worker nodes
+
+# Default pool autoscaling — values are passed as day-1 creation hints to the cluster resource
+# (autoscaling_enabled / min_replicas / max_replicas on rhcs_cluster_rosa_hcp) so the default
+# pool is created with autoscaling active from the start, eliminating the CLUSTERS-MGMT-403
+# race on subsequent rhcs_hcp_machine_pool reconciliation.
+# For single-AZ: values are per-pool.
+# For multi-AZ:  values are per-AZ (each of the 3 pools gets these bounds).
+default_min_replicas = 2 # single-AZ minimum for HA
+default_max_replicas = 4 # allow the default pool to grow up to 2× the minimum
+
+# GitOps Bootstrap — disabled for RHHI MVP (bash + Helm install instead)
+enable_gitops_bootstrap = false
+gitops_git_repo_url     = "https://github.com/rh-mobb/rosa-cluster-config.git"
+gitops_git_path         = "dev/pczarkow" # Path to cluster configuration directory in Git repo
+
+# Additional Machine Pools
+# Create custom machine pools beyond the default pool
+# subnet_index: 0 = first AZ, 1 = second AZ, 2 = third AZ, etc.
+# Note: Replica values are per-pool (not per-AZ like default pools)
+additional_machine_pools = {
+  "compute-0" = {
+    subnet_index        = 0
+    instance_type       = "m5.xlarge"
+    autoscaling_enabled = true
+    min_replicas        = 1
+    max_replicas        = 3
+  }
+}
+
+# Destroy protection - set to true to allow resource destruction
+# enable_destroy = false
+
+# tags = {
+#   Environment = "development"
+#   ManagedBy   = "terraform"
+#   Project     = "rosa-hcp"
+# }
+
+# DNS Configuration
+enable_persistent_dns_domain = true # Use persistent DNS domain that survives cluster recreation
+
+# IAM Integration
+enable_cert_manager_iam = true # Create IAM role for cert-manager to use AWS Private CA
+
+# Cluster Protection
+enable_termination_protection = false # Prevent accidental cluster deletion (requires OCM console to disable)
+
+# Logging
+enable_cloudwatch_logging = true # Enable CloudWatch logging for OpenShift Logging Operator
+
+# Control Plane Log Forwarding (new ROSA managed log forwarder)
+enable_control_plane_log_forwarding         = true
+control_plane_log_cloudwatch_groups         = ["api", "authentication", "controller manager", "scheduler"]
+control_plane_log_cloudwatch_applications   = ["certified-operators-catalog", "cluster-api", "community-operators-catalog", "etcd", "private-router", "redhat-marketplace-catalog", "redhat-operators-catalog"]
+control_plane_log_s3_groups                 = ["api", "authentication", "controller manager", "scheduler"]
+control_plane_log_s3_applications           = ["certified-operators-catalog", "cluster-api", "community-operators-catalog", "etcd", "private-router", "redhat-marketplace-catalog", "redhat-operators-catalog"]
+control_plane_log_cloudwatch_enabled        = false
+control_plane_log_cloudwatch_log_group_name = null
+control_plane_log_s3_enabled                = true
+control_plane_log_s3_bucket_name            = null
+control_plane_log_s3_bucket_prefix          = null
+control_plane_log_s3_retention_days         = 30
+
+# Legacy audit logging (deprecated - disable when control plane log forwarding is enabled)
+enable_audit_logging = false # Disable legacy audit logging in favor of new control plane log forwarding
+
+# Debug / Timing
+enable_timing = true # Enable cluster creation timing capture
+
+#------------------------------------------------------------------------------
+# RHHI Supply Chain (AWS resources — cluster resources via Helm in clusters/rhhi/helm/)
+# Pull-through uses public quay.io/hummingbird/* — no upstream registry credentials required.
+#------------------------------------------------------------------------------
+
+enable_rhhi_supply_chain       = true
+rhhi_ecr_repository_prefix     = "quay-cache"
+rhhi_upstream_registry_url     = "quay.io"
+rhhi_enable_ecr_kms_encryption = false

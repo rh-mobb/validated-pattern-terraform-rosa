@@ -1,0 +1,27 @@
+{{- if and .Values.operators.pipelines.enabled .Values.supplyChain.enabled .Values.demo.enabled }}
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: {{ .Values.demo.pipelinerunName }}
+  namespace: {{ .Values.tekton.namespace }}
+spec:
+  pipelineRef:
+    name: rhhi-secure-build
+  params:
+    - name: base-image-url
+      value: {{ printf "%s/%s/%s" .Values.global.ecrRegistryUrl .Values.global.ecrRepositoryPrefix .Values.images.rhhiBaseImage | quote }}
+    - name: destination-image
+      value: {{ printf "%s/%s" .Values.global.ecrRegistryUrl .Values.images.destinationImage | quote }}
+  workspaces:
+    - name: source
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+    - name: dockerconfig
+      secret:
+        secretName: {{ .Values.ecrOperator.generatedSecretName }}
+{{- end }}

@@ -1,0 +1,29 @@
+{{- if and .Values.operators.pipelines.enabled .Values.supplyChain.enabled }}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: verify-upstream-rhhi
+  namespace: {{ .Values.tekton.namespace }}
+spec:
+  params:
+    - name: base-image-url
+      type: string
+      description: URL to the cached RHHI base image in ECR
+      default: {{ printf "%s/%s/%s" .Values.global.ecrRegistryUrl .Values.global.ecrRepositoryPrefix .Values.images.rhhiBaseImage | quote }}
+  workspaces:
+    - name: dockerconfig
+  steps:
+    - name: verify-cached-base-image
+      image: registry.redhat.io/rhel9/skopeo:latest
+      env:
+        - name: REGISTRY_AUTH_FILE
+          value: $(workspaces.dockerconfig.path)/.dockerconfigjson
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        echo "Verifying cached RHHI base image is present in ECR..."
+        skopeo inspect "docker://$(params.base-image-url)" >/dev/null
+
+        echo "SUCCESS: Base image $(params.base-image-url) is available via ECR pull-through cache."
+{{- end }}

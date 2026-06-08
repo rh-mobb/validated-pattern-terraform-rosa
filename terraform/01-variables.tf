@@ -586,3 +586,35 @@ variable "additional_cluster_properties" {
   default     = {}
   nullable    = false
 }
+
+#------------------------------------------------------------------------------
+# RHHI Supply Chain (clusters/rhhi)
+#------------------------------------------------------------------------------
+
+variable "enable_rhhi_supply_chain" {
+  description = "Enable RHHI ECR pull-through cache, IAM, and related AWS resources (see clusters/rhhi/)"
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "rhhi_ecr_repository_prefix" {
+  description = "ECR repository prefix for pull-through cache (e.g. quay-cache)"
+  type        = string
+  default     = "quay-cache"
+  nullable    = false
+}
+
+variable "rhhi_upstream_registry_url" {
+  description = "Upstream registry URL for ECR pull-through cache"
+  type        = string
+  default     = "quay.io"
+  nullable    = false
+}
+
+variable "rhhi_enable_ecr_kms_encryption" {
+  description = "Use customer-managed KMS for RHHI ECR repository creation template encryption"
+  type        = bool
+  default     = false
+  nullable    = false
+}
