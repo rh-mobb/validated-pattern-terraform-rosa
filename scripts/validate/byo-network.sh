@@ -94,7 +94,7 @@ else
 			--filters "Name=tag-key,Values=kubernetes.io/role/internal-elb" \
 			--query 'Subnets[*].VpcId' --output json 2>/dev/null | jq -r 'unique[]' | while read -r vid; do
 			aws ec2 describe-vpcs --vpc-ids "$vid" \
-			--query "Vpcs[0].[VpcId,CidrBlock,Tags[?Key==\`Name\`].Value|[0]]" \
+				--query "Vpcs[0].[VpcId,CidrBlock,Tags[?Key==\`Name\`].Value|[0]]" \
 				--output json 2>/dev/null | jq -r '"\(.[0]) \(.[1]) \(.[2] // "unnamed")"'
 		done)
 	fi
