@@ -37,20 +37,20 @@ vpn_session_timeout_hours = 12
 enable_bastion    = false
 bastion_public_ip = false
 
-enable_persistent_dns_domain = true
-enable_cert_manager_iam        = true
-enable_termination_protection  = false
+enable_persistent_dns_domain  = true
+enable_cert_manager_iam       = true
+enable_termination_protection = false
 
 enable_cloudwatch_logging = true
 
-enable_control_plane_log_forwarding         = true
-control_plane_log_cloudwatch_enabled        = false
-control_plane_log_s3_enabled                = true
-control_plane_log_s3_retention_days         = 30
-control_plane_log_cloudwatch_groups         = ["api", "authentication", "controller manager", "scheduler"]
-control_plane_log_s3_groups                 = ["api", "authentication", "controller manager", "scheduler"]
-control_plane_log_cloudwatch_applications   = ["certified-operators-catalog", "cluster-api", "community-operators-catalog", "etcd", "private-router", "redhat-marketplace-catalog", "redhat-operators-catalog"]
-control_plane_log_s3_applications           = ["certified-operators-catalog", "cluster-api", "community-operators-catalog", "etcd", "private-router", "redhat-marketplace-catalog", "redhat-operators-catalog"]
+enable_control_plane_log_forwarding       = true
+control_plane_log_cloudwatch_enabled      = false
+control_plane_log_s3_enabled              = true
+control_plane_log_s3_retention_days       = 30
+control_plane_log_cloudwatch_groups       = ["api", "authentication", "controller manager", "scheduler"]
+control_plane_log_s3_groups               = ["api", "authentication", "controller manager", "scheduler"]
+control_plane_log_cloudwatch_applications = ["certified-operators-catalog", "cluster-api", "community-operators-catalog", "etcd", "private-router", "redhat-marketplace-catalog", "redhat-operators-catalog"]
+control_plane_log_s3_applications         = ["certified-operators-catalog", "cluster-api", "community-operators-catalog", "etcd", "private-router", "redhat-marketplace-catalog", "redhat-operators-catalog"]
 
 enable_audit_logging = false
 
