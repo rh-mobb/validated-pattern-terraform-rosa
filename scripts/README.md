@@ -67,7 +67,7 @@ make cluster.my-cluster.plan-infrastructure
 make cluster.my-cluster.apply-infrastructure
 
 # Validate prerequisites (account + VPC when applicable)
-make cluster.my-cluster.validate-prereqs
+make cluster.my-cluster.validate
 ```
 
 See [Validation](../docs/operations/validation.md) in the documentation site for flags and BYO VPC checks.
@@ -93,7 +93,7 @@ Shared functions used across all scripts:
 - **`prereqs.sh`**: Runs account + network checks using cluster `terraform.tfvars`
 
 ```bash
-make cluster.egress-zero.validate-prereqs
+make cluster.egress-zero.validate
 make cluster.byo-vpc.validate-network
 ```
 

@@ -10,20 +10,13 @@ Layer **0** — required for every deployment path (full-stack and BYO).
 | AWS CLI credentials | Configured on the operator machine or CI runner |
 | Service quotas | See [Service quotas](#service-quotas) below |
 
-Verify permissions:
+Verify account readiness:
 
 ```bash
-rosa verify permissions
-rosa verify quota --region=<your-region>
+make cluster.public.validate
 ```
 
-Or use the validation script:
-
-```bash
-./scripts/validate/account.sh --region us-east-1
-# Or via Makefile:
-make cluster.public.validate-account
-```
+For HCP STS deployments this checks operator tools, OCM role linkage, ELB service-linked role, EC2 vCPU quota, and (when applicable) VPC configuration — driven by cluster `terraform.tfvars`.
 
 ## Service quotas
 
@@ -63,22 +56,36 @@ All steps must complete before cluster creation. Skipping any step causes `billi
 1. **Enable ROSA** — [AWS Console → ROSA](https://console.aws.amazon.com/rosa/) → Get started
 2. **Subscribe to ROSA HCP** — [HCP Marketplace listing](https://aws.amazon.com/marketplace/pp/prodview-juiwfhpeizxro) (not Classic ROSA)
 3. **Link AWS and Red Hat accounts** — AWS ROSA console → Continue to Red Hat → Connect accounts
-4. **Create OCM role** (if missing):
+4. **Create OCM role** (if missing) — requires **ROSA CLI >= 1.2.64** for the least-privilege `--no-console` profile:
 
    ```bash
    rosa login --token="<OCM_TOKEN>"
-   rosa create ocm-role --admin --mode auto --yes
-   rosa list ocm-role   # Linked=Yes, Admin=Yes
+   rosa whoami   # confirm AWS Account ID and OCM Organization ID
+
+   # Recommended: minimal OCM role (Admin=No, AWS Managed=No)
+   rosa create ocm-role --no-console --mode auto --yes
+   rosa list ocm-role   # Linked=Yes, Admin=No
+
+   # Manual mode (generates sts_ocm_trust_policy.json and sts_ocm_no_console_permission_policy.json):
+   # rosa create ocm-role --no-console --prefix <prefix> --mode manual
+   # Then run the printed aws iam create-role / create-policy / attach-role-policy commands
+   # and: rosa link ocm-role --role-arn <role_arn>
    ```
 
-5. **Create user role** (if missing):
+   Validate the attached policy is minimal (expect `iam:GetRole` on Red Hat–tagged roles only):
 
    ```bash
-   rosa create user-role --mode auto --yes
-   rosa list user-role  # Linked=Yes
+   POLICY_ARN=$(aws iam list-attached-role-policies --role-name <your_ocm_role_name> \
+     | jq -r '.AttachedPolicies[0].PolicyArn')
+   aws iam get-policy-version --policy-arn "$POLICY_ARN" \
+     --version-id "$(aws iam get-policy --policy-arn "$POLICY_ARN" \
+       --query 'Policy.DefaultVersionId' --output text)" \
+     --query 'PolicyVersion.Document'
    ```
 
-6. **Verify ELB service-linked role**:
+   > **User role:** Not required for Terraform, ROSA CLI, or CAPA cluster provisioning. Only needed if you create clusters via the [OpenShift Cluster Manager web console](https://console.redhat.com) — see [Understanding OCM and user roles](https://access.redhat.com/articles/6961686).
+
+5. **Verify ELB service-linked role**:
 
    ```bash
    aws iam get-role --role-name AWSServiceRoleForElasticLoadBalancing
@@ -98,7 +105,7 @@ Personal offline tokens (`RHCS_TOKEN`) are acceptable for local testing only.
 |------|---------|---------|
 | Terraform | >= 1.5.0 | Infrastructure |
 | AWS CLI | v2 | AWS API |
-| ROSA CLI | >= 1.2.48 | Account linking, admin user |
+| ROSA CLI | >= 1.2.64 | OCM role `--no-console` profile, account linking |
 | `oc` | >= 4.17 | Cluster operations |
 | `helm`, `jq` | latest | GitOps bootstrap |
 | `curl` | any | Validation connectivity checks |

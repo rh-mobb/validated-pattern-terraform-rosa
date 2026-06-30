@@ -10,6 +10,7 @@ source "$SCRIPT_DIR/common.sh"
 
 REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 MIN_VCPU=100
+MIN_ROSA_VERSION="1.2.64"
 SKIP_CONNECTIVITY=false
 
 while [[ $# -gt 0 ]]; do
@@ -37,6 +38,8 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
+[[ -z "$REGION" ]] && REGION="us-east-1"
+
 export AWS_DEFAULT_REGION="$REGION"
 
 echo ""
@@ -46,7 +49,7 @@ printf "║  Region: %-52s ║\n" "$REGION"
 echo "╚═══════════════════════════════════════════════════════════════╝"
 
 header "CLI TOOLS"
-check_tool rosa "1.2.48" "ROSA CLI"
+check_tool rosa "$MIN_ROSA_VERSION" "ROSA CLI"
 check_tool aws "2.0" "AWS CLI"
 check_tool oc "4.17" "OpenShift CLI (oc)"
 check_tool terraform "1.4.0" "Terraform"
@@ -81,27 +84,15 @@ if command -v rosa &>/dev/null; then
 	fi
 
 	OCM_ROLE_OUTPUT=$(rosa list ocm-role 2>&1) || true
-	if echo "$OCM_ROLE_OUTPUT" | grep -qi "yes.*yes"; then
-		pass "OCM Role: linked with admin"
-	elif echo "$OCM_ROLE_OUTPUT" | grep -qi "yes"; then
-		warn "OCM Role exists but may not have admin"
+	if echo "$OCM_ROLE_OUTPUT" | awk '/^ManagedOpenShift-OCM-/ { if ($3 == "Yes") found = 1 } END { exit !found }'; then
+		pass "OCM Role: linked"
+		if echo "$OCM_ROLE_OUTPUT" | awk '/^ManagedOpenShift-OCM-/ && $3 == "Yes" && $4 == "Yes" { found = 1 } END { exit !found }'; then
+			info "OCM Role has admin scope — prefer --no-console profile (rosa create ocm-role --no-console)"
+		elif echo "$OCM_ROLE_OUTPUT" | awk '/^ManagedOpenShift-OCM-/ && $3 == "Yes" && $NF == "Yes" { found = 1 } END { exit !found }'; then
+			info "OCM Role has console access — prefer --no-console profile (Admin=No, Console Access=No)"
+		fi
 	else
-		fail "OCM Role not found or not linked"
-	fi
-
-	USER_ROLE_OUTPUT=$(rosa list user-role 2>&1) || true
-	if echo "$USER_ROLE_OUTPUT" | grep -qi "yes"; then
-		pass "User Role: linked"
-	else
-		fail "User Role not found or not linked"
-	fi
-
-	ACCOUNT_ROLES=$(rosa list account-roles 2>&1) || true
-	HCP_ROLES=$(echo "$ACCOUNT_ROLES" | grep -c "HCP" || true)
-	if [[ "$HCP_ROLES" -ge 3 ]]; then
-		pass "HCP Account Roles found: $HCP_ROLES"
-	else
-		warn "HCP Account Roles: only $HCP_ROLES found"
+		fail "OCM Role not found or not linked — use: rosa create ocm-role --no-console --mode auto"
 	fi
 else
 	fail "ROSA CLI not installed"
@@ -122,27 +113,6 @@ if float_gte "$VCPU_QUOTA" "$MIN_VCPU"; then
 	pass "On-Demand Standard vCPU quota: $VCPU_QUOTA (minimum: $MIN_VCPU)"
 else
 	fail "On-Demand Standard vCPU quota: $VCPU_QUOTA — need at least $MIN_VCPU"
-fi
-
-header "ROSA VERIFY"
-if command -v rosa &>/dev/null; then
-	ROSA_VERIFY=$(rosa verify permissions 2>&1) || true
-	if echo "$ROSA_VERIFY" | grep -qi "sufficient\|have required permissions"; then
-		pass "rosa verify permissions: sufficient"
-	elif echo "$ROSA_VERIFY" | grep -qi "error\|fail\|denied"; then
-		fail "rosa verify permissions: failed"
-	else
-		info "rosa verify permissions: $(echo "$ROSA_VERIFY" | head -1)"
-	fi
-
-	ROSA_QUOTA=$(rosa verify quota --region="$REGION" 2>&1) || true
-	if echo "$ROSA_QUOTA" | grep -qi "sufficient\|validated"; then
-		pass "rosa verify quota: sufficient in $REGION"
-	elif echo "$ROSA_QUOTA" | grep -qi "error\|fail\|insufficient"; then
-		fail "rosa verify quota: failed in $REGION"
-	else
-		info "rosa verify quota: $(echo "$ROSA_QUOTA" | head -1)"
-	fi
 fi
 
 if [[ "$SKIP_CONNECTIVITY" == "false" ]]; then

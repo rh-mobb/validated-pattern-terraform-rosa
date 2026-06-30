@@ -3,7 +3,7 @@
 # network_type = "existing" with zero_egress = true
 # Network team must pre-provision VPC per docs/prerequisites/byo/network.md
 #
-# Validate: make cluster.byo-vpc-egress-zero.validate-prereqs
+# Validate: make cluster.byo-vpc-egress-zero.validate
 
 # cluster_name = "prod-byo-ze-01"
 

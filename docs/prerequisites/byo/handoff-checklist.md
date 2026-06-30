@@ -39,7 +39,7 @@ multi_az    = true
 ## Validation before apply
 
 ```bash
-make cluster.<name>.validate-prereqs
+make cluster.<name>.validate
 ```
 
 Expected: account checks pass; network checks pass for provided VPC.

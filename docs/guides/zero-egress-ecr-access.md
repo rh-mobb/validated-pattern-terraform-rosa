@@ -91,4 +91,4 @@ The `ecr.api` and `ecr.dkr` endpoints in your VPC serve both Red Hat mirror and 
 
 ## Reference
 
-Adapted from the zero-egress prerequisites reference material (local clone: `reference/ROSAHcpZeroEgressPrerequisites/`).
+Adapted from Red Hat zero-egress ROSA HCP prerequisite guidance.

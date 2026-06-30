@@ -61,6 +61,23 @@ float_gte() {
 	awk -v a="$1" -v b="$2" 'BEGIN { exit (a + 0 >= b + 0) ? 0 : 1 }'
 }
 
+# Returns 0 if first semver (major.minor.patch) >= second
+semver_gte() {
+	local a="$1"
+	local b="$2"
+	awk -v a="$a" -v b="$b" 'BEGIN {
+		split(a, A, ".");
+		split(b, B, ".");
+		for (i = 1; i <= 3; i++) {
+			ai = (A[i] == "" ? 0 : A[i]) + 0;
+			bi = (B[i] == "" ? 0 : B[i]) + 0;
+			if (ai > bi) exit 0;
+			if (ai < bi) exit 1;
+		}
+		exit 0;
+	}'
+}
+
 check_tool() {
 	local cmd="$1"
 	local min_ver="$2"
@@ -77,7 +94,13 @@ check_tool() {
 		curl) ver=$(curl --version 2>&1 | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1) ;;
 		*) ver="unknown" ;;
 		esac
-		pass "$label found: v${ver:-unknown} (minimum: $min_ver)"
+		if [[ -z "${ver:-}" || "$ver" == "unknown" ]]; then
+			fail "$label found but version could not be determined (minimum: $min_ver)"
+		elif semver_gte "$ver" "$min_ver"; then
+			pass "$label found: v${ver} (minimum: $min_ver)"
+		else
+			fail "$label v${ver} is below minimum v${min_ver}"
+		fi
 	else
 		fail "$label NOT FOUND — install v${min_ver}+"
 	fi

@@ -41,7 +41,7 @@ flowchart TD
 
 | Layer | Scope | Document | Validation |
 |-------|-------|----------|------------|
-| **0 — Account** | AWS account, ROSA Marketplace, quotas, operator tools | [Account Prerequisites](account.md) | `make cluster.<name>.validate-account` |
+| **0 — Account** | AWS account, ROSA Marketplace, quotas, operator tools | [Account Prerequisites](account.md) | `make cluster.<name>.validate` |
 | **1 — Full-stack** | Terraform creates VPC, IAM, cluster | [Full-Stack Deployment](full-stack.md) | Account validation before init |
 | **2a — BYO network** | Pre-provisioned VPC, subnets, endpoints | [BYO Network](byo/network.md) | `make cluster.<name>.validate-network` |
 | **2b — BYO IAM/KMS** | Separate security team owns roles/keys | [BYO IAM and KMS](byo/iam-kms.md) | Manual handoff checklist |
