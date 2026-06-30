@@ -1,0 +1,2728 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Production-grade Terraform for Red Hat OpenShift Service on AWS with Hosted Control Planes">
+      
+      
+      
+        <link rel="canonical" href="https://rh-mobb.github.io/vp-terraform-rosa/reference/changelog/">
+      
+      
+        <link rel="prev" href="../../operations/validation/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Changelog - ROSA HCP Terraform</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="red" data-md-color-accent="red">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#changelog" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="ROSA HCP Terraform" class="md-header__button md-logo" aria-label="ROSA HCP Terraform" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ROSA HCP Terraform
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Changelog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="red" data-md-color-accent="red"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="red" data-md-color-accent="red"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/rh-mobb/vp-terraform-rosa" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    rh-mobb/vp-terraform-rosa
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/overview/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../prerequisites/" class="md-tabs__link">
+          
+  
+  
+  Prerequisites
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../deployment/enablement/" class="md-tabs__link">
+          
+  
+  
+  Deployment
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/egress-zero-gitops/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../modules/cluster/" class="md-tabs__link">
+          
+  
+  
+  Modules
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../operations/scripts/" class="md-tabs__link">
+          
+  
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="ROSA HCP Terraform" class="md-nav__button md-logo" aria-label="ROSA HCP Terraform" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ROSA HCP Terraform
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/rh-mobb/vp-terraform-rosa" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    rh-mobb/vp-terraform-rosa
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prerequisites
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Prerequisites
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choose Your Path
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/account/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Account Prerequisites
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/full-stack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full-Stack Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/customer-intake/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Customer Intake Form
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bring Your Own
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Bring Your Own
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/byo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/byo/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/byo/iam-kms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IAM and KMS Handoff
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/byo/handoff-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handoff Checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Deployment
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/enablement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Enablement Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/cluster-configurations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cluster Configurations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/egress-zero-gitops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Egress-Zero GitOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/zero-egress-ecr-access/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero Egress ECR Access
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/ci-cd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI/CD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/infra-nodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infra Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/improvements/ingress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ingress Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modules
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modules
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/cluster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cluster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/iam/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IAM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/network-private/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network (Private)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/network-public/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network (Public)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/network-existing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network (Existing)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/client-vpn/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Client VPN
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/bastion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bastion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/timing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Timing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/scripts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/bootstrap-gitops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GitOps Bootstrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [Unreleased]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deprecated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deprecated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#removed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#work-in-progress-egress-zero-cluster" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Work in Progress - Egress-Zero Cluster
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [Unreleased]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deprecated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deprecated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#removed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#work-in-progress-egress-zero-cluster" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Work in Progress - Egress-Zero Cluster
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/rh-mobb/vp-terraform-rosa/edit/main/docs/reference/changelog.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
+<p>All notable changes to this project will be documented in this file.</p>
+<p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
+and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
+<h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>MkDocs documentation site</strong>: Material-themed site with GitHub Pages deployment (<code>.github/workflows/docs.yml</code>), local preview via <code>make docs-preview</code>, strict build in PR checks</li>
+<li><strong>Layered prerequisites docs</strong> (<code>docs/prerequisites/</code>): account, full-stack, BYO network/IAM handoff, customer intake, and validation script documentation</li>
+<li><strong>Prerequisite validation scripts</strong> (<code>scripts/validate/</code>): <code>account.sh</code>, <code>byo-network.sh</code>, <code>prereqs.sh</code>; Makefile targets <code>validate-account</code>, <code>validate-network</code>, <code>validate-prereqs</code></li>
+<li><strong>BYO VPC egress-zero example</strong> (<code>clusters/byo-vpc-egress-zero/terraform.tfvars</code>)</li>
+<li><strong>Zero egress ECR access guide</strong> (<code>docs/guides/zero-egress-ecr-access.md</code>)</li>
+<li><strong>GitOps CMP tools container</strong> (<code>hack/docker/gitops-tools/</code>): UBI9-based multi-arch image with <code>oc</code>, <code>helm</code>, <code>argocd-vault-plugin</code>, and <code>jq</code> for Argo CD repo-server CMP sidecar. Local build via <code>hack/docker/gitops-tools/test-image.sh</code>. CI publishes <code>ghcr.io/&lt;repo&gt;/gitops-tools:latest</code> (and <code>:sha</code>) on merge to main.</li>
+<li><strong>Enablement guide</strong> (<code>docs/ENABLEMENT.md</code>): Comprehensive implementation guide for the three-repository ROSA HCP pattern — repository rehoming, Helm chart publishing, end-to-end deployment runbook, ACM hub/spoke, network topology decisions, CI/CD integration, and troubleshooting (18 mermaid diagrams)</li>
+<li><strong>Enablement guide — OCM service accounts</strong>: Recommends Hybrid Cloud Console service accounts for cluster provisioning (avoid tying clusters to individual users); documents post-creation notification contacts and User Access configuration</li>
+<li><strong>Enablement guide — composable tfvars</strong>: Documents that example cluster directories are reference recipes, not exclusive topologies; clusters combine dimensions (BYO VPC + egress-zero + AutoNode, etc.) in a single <code>terraform.tfvars</code></li>
+<li>
+<p><strong>Cluster module — <code>additional_cluster_properties</code> variable</strong>: New <code>additional_cluster_properties</code> variable (<code>map(string)</code>, default <code>{}</code>) allows callers to inject arbitrary key/value pairs into the <code>rhcs_cluster_rosa_hcp</code> resource's <code>properties</code> block. The values are merged after the built-in properties (<code>rosa_creator_arn</code>, <code>zero_egress</code>), so caller-supplied entries take precedence. Available in both the cluster module (<code>modules/infrastructure/cluster/</code>) and the root module (<code>terraform/</code>).</p>
+</li>
+<li>
+<p><strong>AWS Client VPN</strong> (<code>enable_client_vpn</code>): Terraform module for robust private cluster access</p>
+</li>
+<li>Creates AWS Client VPN endpoint in VPC with mutual TLS authentication</li>
+<li>Generates <code>.ovpn</code> config for OpenVPN, AWS VPN Client, or Tunnelblick</li>
+<li>Recommended over sshuttle/bastion for cross-platform reliability</li>
+<li>Single subnet by default (~$108/mo); configurable for multi-subnet HA</li>
+<li>New variables: <code>enable_client_vpn</code>, <code>vpn_client_cidr_block</code>, <code>vpn_split_tunnel</code>, <code>vpn_session_timeout_hours</code></li>
+<li>Makefile targets: <code>vpn-config.&lt;cluster&gt;</code> (config path/instructions), <code>vpn-start.&lt;cluster&gt;</code>, <code>vpn-stop.&lt;cluster&gt;</code>, <code>vpn-status.&lt;cluster&gt;</code> for OpenVPN tunnel control</li>
+<li><code>ensure-tunnel</code> starts OpenVPN automatically when Client VPN is deployed (bootstrap/login)</li>
+<li><strong>BYO VPC Support</strong> (<code>network_type = "existing"</code>): Deploy clusters into an existing VPC without running any network module</li>
+<li>New variables: <code>existing_vpc_id</code>, <code>existing_private_subnet_ids</code>, <code>existing_public_subnet_ids</code></li>
+<li>Root module uses data sources to look up subnets and constructs synthetic <code>local.network</code> object</li>
+<li>No network module invocation—user creates VPC, subnets, VPC endpoints, and NAT gateways before Terraform</li>
+<li>Documentation references <code>rosa create network</code> (ROSA CLI v1.2.48+) as a quick way to create compliant networking</li>
+<li>
+<p>New example: <code>clusters/byo-vpc/terraform.tfvars</code> with prerequisite documentation</p>
+</li>
+<li>
+<p><strong>Termination Protection</strong>: Added cluster termination protection feature</p>
+</li>
+<li>New variable <code>enable_termination_protection</code> (default: <code>false</code>) in cluster module</li>
+<li>Creates <code>shell_script</code> resource that uses ROSA CLI to enable/disable delete protection</li>
+<li>Prevents accidental cluster deletion via ROSA CLI</li>
+<li>Note: Disabling protection requires manual action via OCM console (cannot be done via CLI)</li>
+<li>Script: <code>scripts/cluster/termination-protection.sh</code></li>
+<li>Reference: <code>./reference/pfoster/rosa-hcp-dedicated-vpc/terraform/13.termination-protection.tf</code></li>
+<li><strong>ETCD KMS Key</strong>: Added dedicated KMS key for etcd encryption</li>
+<li>Creates <code>aws_kms_key.etcd</code> resource when <code>enable_storage = true</code> and <code>etcd_encryption = true</code></li>
+<li>KMS key persists through sleep operations (like EBS/EFS keys)</li>
+<li>Cluster resource automatically uses etcd KMS key ARN when <code>etcd_encryption = true</code></li>
+<li>New outputs: <code>etcd_kms_key_id</code> and <code>etcd_kms_key_arn</code></li>
+<li>Reference: <code>./reference/pfoster/rosa-hcp-dedicated-vpc/terraform/1.main.tf:5-12</code></li>
+<li><strong>Cert Manager IAM Roles</strong>: Added IAM role and policy for cert-manager to use AWS Private CA</li>
+<li>New variable <code>enable_cert_manager_iam</code> (default: <code>false</code>) in cluster module</li>
+<li>Creates IAM role for <code>cert-manager:cert-manager</code> service account</li>
+<li>IAM policy grants AWS Private CA permissions (<code>acm-pca:DescribeCertificateAuthority</code>, <code>acm-pca:GetCertificate</code>, <code>acm-pca:IssueCertificate</code>)</li>
+<li>Bootstrap script updated to use <code>CERT_MANAGER_ROLE_ARN</code> environment variable from Terraform output</li>
+<li>New output <code>cert_manager_role_arn</code> exposes IAM role ARN</li>
+<li>Reference: <code>./reference/pfoster/rosa-hcp-dedicated-vpc/terraform/6.cert-manager.tf</code></li>
+<li><strong>Secrets Manager IAM Integration</strong>: Added IAM role and policy for ArgoCD Vault Plugin to access AWS Secrets Manager</li>
+<li>New variable <code>enable_secrets_manager_iam</code> (default: <code>false</code>) in cluster module</li>
+<li>New variable <code>additional_secrets</code> (optional list of secret names) for granting access to additional secrets</li>
+<li>Creates IAM role for <code>openshift-gitops:vplugin</code> service account</li>
+<li>IAM policy uses explicit secret ARN list for security (not wildcards)</li>
+<li>Cluster credentials secret automatically included in policy</li>
+<li>Additional secrets looked up by name via data sources to get exact ARNs</li>
+<li>New output <code>secrets_manager_role_arn</code> exposes IAM role ARN</li>
+<li>Reference: <code>./reference/pfoster/rosa-hcp-dedicated-vpc/terraform/3.secrets.tf</code></li>
+<li><strong>CloudWatch Logging for OpenShift Logging Operator</strong>: Added IAM role and policy for OpenShift Logging Operator to send logs to CloudWatch</li>
+<li>New variable <code>enable_cloudwatch_logging</code> (default: <code>false</code>) in cluster module</li>
+<li>Creates IAM role for <code>openshift-logging:logging</code> service account (used by ClusterLogForwarder)</li>
+<li>IAM policy grants CloudWatch Logs permissions (CreateLogGroup, CreateLogStream, PutLogEvents, etc.)</li>
+<li>New output <code>cloudwatch_logging_role_arn</code> exposes IAM role ARN</li>
+<li>
+<p>Reference: <code>./reference/pfoster/rosa-hcp-dedicated-vpc/terraform/4.logging.tf</code></p>
+</li>
+<li>
+<p><strong>DNS Domain Registration</strong>: Added DNS domain registration using <code>rhcs_dns_domain</code> resource with feature toggle:</p>
+</li>
+<li>New <code>enable_persistent_dns_domain</code> variable in cluster module (default: <code>false</code>) controls DNS domain registration</li>
+<li>When enabled, creates <code>rhcs_dns_domain</code> resource in cluster module that persists between cluster creations (not gated by <code>persists_through_sleep</code>)</li>
+<li>DNS domain resource is created and managed within the cluster module for better encapsulation</li>
+<li>When disabled, ROSA uses default DNS domain</li>
+<li>Infrastructure files pass the toggle to the cluster module</li>
+<li>Reference implementation: <code>./reference/rosa-hcp-dedicated-vpc/terraform/1.main.tf:17-19</code></li>
+<li><strong>CloudWatch Audit Log Forwarding</strong>: Added CloudWatch audit log forwarding as a toggleable feature (enabled by default):</li>
+<li>New <code>enable_audit_logging</code> variable (default: <code>true</code>) in cluster module</li>
+<li>Creates IAM role and policy for CloudWatch audit log forwarding</li>
+<li>IAM role uses OIDC federation for OpenShift logging service account (<code>system:serviceaccount:openshift-logging:cluster-logging</code>)</li>
+<li>New output <code>cloudwatch_audit_logging_role_arn</code> provides the role ARN for cluster configuration</li>
+<li>Configuration file: <code>modules/infrastructure/cluster/20-audit-logging.tf</code></li>
+<li>Reference implementation: <code>./reference/rosa-hcp-dedicated-vpc/terraform/4.logging.tf</code></li>
+<li>Note: Cluster configuration via OCM API or rosa CLI may be required depending on provider version</li>
+<li><strong>DEPRECATED</strong>: Use <code>enable_control_plane_log_forwarding</code> instead for the new ROSA managed log forwarder</li>
+<li><strong>API Endpoint Security Group Access</strong>: Added optional <code>api_endpoint_allowed_cidrs</code> variable to cluster module:</li>
+<li>Allows specifying additional IPv4 CIDR blocks to access the ROSA HCP API endpoint</li>
+<li>By default, the VPC endpoint security group only allows access from within the VPC</li>
+<li>Useful for allowing access from VPN ranges, bastion hosts, or other VPCs</li>
+<li>Automatically finds the ROSA-managed VPC endpoint security group by tag name</li>
+<li>Creates ingress rules for each specified CIDR block (port 443/TCP)</li>
+<li>Only creates resources when CIDRs are provided and <code>persists_through_sleep</code> is true</li>
+<li>Reference implementation: <code>reference/rosa-hcp-dedicated-vpc/terraform/2.expose-api.tf</code></li>
+<li><strong>Machine Pool Management</strong>: Added support for additional custom machine pools beyond default pools:</li>
+<li>New <code>additional_machine_pools</code> variable in cluster module for creating custom pools</li>
+<li>Support for advanced features: taints, labels, kubelet configs, tuning configs, version pinning</li>
+<li>Support for AWS features: capacity reservations, additional security groups, custom disk size</li>
+<li>New outputs: <code>default_machine_pools</code>, <code>additional_machine_pools</code>, <code>all_machine_pools</code></li>
+<li>Validation to prevent name conflicts between default and additional pools</li>
+<li>Validation for subnet IDs, instance types, and autoscaling configuration</li>
+<li>Uses <code>for_each</code> pattern for stable resource addressing</li>
+<li>
+<p>Reference implementation: <code>./reference/rosa-hcp-dedicated-vpc/terraform/1.main.tf:212-233</code></p>
+</li>
+<li>
+<p><strong>Sleep Protection Pattern</strong>: Implemented <code>persists_through_sleep</code> pattern to prevent accidental resource destruction:</p>
+</li>
+<li>Global <code>persists_through_sleep</code> variable (default: <code>true</code>) controls all resources by default</li>
+<li>Per-resource override variables: <code>persists_through_sleep_cluster</code>, <code>persists_through_sleep_iam</code>, <code>persists_through_sleep_network</code></li>
+<li>When <code>persists_through_sleep = true</code>, resources are active and managed by Terraform</li>
+<li>To sleep cluster: Set <code>persists_through_sleep = false</code>, run <code>terraform apply</code> (resources are destroyed but essential metadata preserved)</li>
+<li>OIDC configuration and provider are never gated (preserved for reuse across clusters)</li>
+<li>Subnet tags in <code>network-existing</code> module are never gated (read-only, managed by ROSA)</li>
+<li>All modules updated: cluster, IAM, network (public/private/egress-zero), bastion</li>
+<li>All example clusters updated with <code>persists_through_sleep = true</code> by default</li>
+<li>Module outputs updated to handle conditional resources (return null when slept)</li>
+<li>Example cluster module calls updated to use <code>try()</code> for conditional dependencies</li>
+<li>Comprehensive documentation added to README.md with usage examples and workflow</li>
+<li>Resources tagged with <code>persists_through_sleep = "true"</code> tag to indicate they persist through sleep operations</li>
+<li>
+<p>Designed for enterprise environments with strict change control and permission constraints</p>
+</li>
+<li>
+<p>Created gitops module (<code>modules/configuration/gitops/</code>) for deploying OpenShift GitOps operator:</p>
+</li>
+<li>Deploys OpenShift GitOps operator (ArgoCD) via OperatorHub using oc CLI</li>
+<li>Uses terraform_data with local-exec provisioner to avoid Kubernetes provider interpolation issues</li>
+<li>Configurable operator channel, source, and install plan approval</li>
+<li>Waits for operator installation to complete and verifies deployment</li>
+<li>Supports custom namespace configuration</li>
+<li>Handles cluster authentication via oc CLI</li>
+<li>Comprehensive error handling and timeout configuration</li>
+<li>
+<p>Full documentation with usage examples and troubleshooting guide</p>
+</li>
+<li>
+<p>Added identity provider support to cluster module:</p>
+</li>
+<li>HTPasswd identity provider for admin user (optional, via <code>admin_password</code>)</li>
+<li>Group membership to add admin user to cluster-admins group</li>
+<li>Configurable admin username and group</li>
+<li>Added <code>admin_password</code> variable to all example clusters</li>
+<li>
+<p>Removed duplicate <code>05-identity.tf</code> files from example clusters (now handled by cluster module)</p>
+</li>
+<li>
+<p>Created identity-admin module (<code>modules/identity-admin/</code>) for admin user creation:</p>
+</li>
+<li>Separated admin user creation from cluster module for independent lifecycle management</li>
+<li>Allows admin user to be created initially and removed when external IDP is configured</li>
+<li>HTPasswd identity provider with cluster-admin group membership</li>
+<li>Can be easily added or removed from cluster configuration</li>
+<li>Updated all example clusters to use the new module</li>
+<li>Created bastion module (<code>modules/bastion/</code>) for secure access to private clusters:</li>
+<li>SSM Session Manager support (no public IP, no SSH keys required)</li>
+<li>Optional public IP mode for testing</li>
+<li>Pre-installed OpenShift CLI (<code>oc</code>) and Kubernetes CLI (<code>kubectl</code>)</li>
+<li>IAM-based authentication via SSM</li>
+<li>Supports SSH tunnels for Terraform automation</li>
+<li>Supports sshuttle for VPN-like access</li>
+<li>Integrated into private and egress-zero cluster examples (optional, enabled by default)</li>
+<li>Added Makefile targets for bastion and tunnel management:</li>
+<li><code>make tunnel-start.&lt;cluster&gt;</code>: Start SSH tunnel to cluster API via bastion (for Terraform/automation)</li>
+<li><code>make tunnel-stop.&lt;cluster&gt;</code>: Stop SSH tunnel</li>
+<li><code>make tunnel-status.&lt;cluster&gt;</code>: Check if tunnel is running</li>
+<li><code>make bastion-connect.&lt;cluster&gt;</code>: Connect to bastion via SSM Session Manager</li>
+<li>Tunnels forward localhost:6443 to cluster API, enabling Terraform to access private clusters</li>
+<li>
+<p>Automatic tunnel cleanup on stop</p>
+</li>
+<li>
+<p>Added Makefile targets for cluster access and credential management:</p>
+</li>
+<li><code>make login-public</code>, <code>make login-private</code>, <code>make login-egress-zero</code>: Login to clusters using <code>oc login</code> with terraform outputs</li>
+<li><code>make show-endpoints-public</code>, <code>make show-endpoints-private</code>, <code>make show-endpoints-egress-zero</code>: Display API and console URLs from terraform outputs</li>
+<li><code>make show-credentials-public</code>, <code>make show-credentials-private</code>, <code>make show-credentials-egress-zero</code>: Display admin credentials and endpoints (show-credentials automatically runs show-endpoints)</li>
+<li>All targets support getting admin password from <code>TF_VAR_admin_password</code> environment variable or <code>terraform.tfvars</code> file</li>
+<li>Login targets verify <code>oc</code> CLI is installed and handle errors gracefully</li>
+<li>Added STS VPC endpoint to <code>network-public</code> module:</li>
+<li>STS endpoint is required for IAM role assumption (IRSA), OIDC provider operations</li>
+<li>Benefits: cost optimization (avoids NAT Gateway charges), lower latency, improved security</li>
+<li>Worker nodes in private subnets benefit from STS endpoint even in public networks</li>
+<li>Updated outputs to include STS endpoint ID</li>
+<li>
+<p>Updated README to document all VPC endpoints created by the module</p>
+</li>
+<li>
+<p>Makefile with targets for cluster management (init, plan, apply, destroy)</p>
+</li>
+<li>Code quality targets (fmt, validate)</li>
+<li>Utility targets (clean, init-all, plan-all)</li>
+<li>Initial repository structure</li>
+<li>Network modules (public, private, egress-zero)</li>
+<li>Public module with Regional NAT Gateway (default) and zonal option</li>
+<li>Private module with VPC endpoints only</li>
+<li>Egress-zero module with strict security controls and VPC Flow Logs</li>
+<li>IAM module for ROSA HCP</li>
+<li>OIDC configuration and provider</li>
+<li>Account roles using terraform-redhat/rosa-hcp/rhcs module</li>
+<li>Operator roles (Ingress, Control Plane, CSI, Image Registry, Network, Node Pool)</li>
+<li>Cluster module (thin wrapper)</li>
+<li>Organizational defaults (private=true, etcd_encryption=false)</li>
+<li>Machine pool support with defaults</li>
+<li>Pass-through for all provider variables</li>
+<li>Example cluster configurations</li>
+<li>Public cluster (development example)</li>
+<li>Private cluster (development example)</li>
+<li>Egress-zero cluster (production-ready with hardening)</li>
+<li>Project documentation</li>
+<li>README.md with overview and quick start</li>
+<li>PLAN.md with detailed architecture and implementation plan</li>
+<li>CHANGELOG.md following Keep a Changelog format</li>
+<li>Module READMEs for all modules</li>
+<li>Development guidelines (.cursorrules)</li>
+<li>Terraform best practices</li>
+<li>PLAN.md compliance requirements</li>
+<li>Documentation and versioning standards</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>ROSA default SG wait duration</strong>: Increased <code>rosa_default_sg_wait_duration</code> default from <code>30s</code> to <code>120s</code> (Hypershift SG tagging still exceeded 30s on a fresh autonode apply).</li>
+<li><strong>GitOps bootstrap chart versions</strong>: Bump <code>cluster-bootstrap</code> to <code>0.5.15</code> and <code>cluster-bootstrap-acm-spoke</code> to <code>0.6.11</code> (CMP init removed; chart defaults to GHCR <code>gitops-tools</code> image).</li>
+<li><strong>GitOps bootstrap <code>defaultImage</code></strong>: Hub and spoke bootstrap templates now emit <code>defaultImage</code> from new cluster module variable <code>gitops_tools_image</code> (default <code>ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:latest</code>).</li>
+<li><strong>Enablement guide — CMP tools image</strong>: Documents re-hosting <code>gitops-tools</code> to a private registry for egress-zero or registry policy, and overriding <code>gitops_tools_image</code> / <code>defaultImage</code> in bootstrap templates and Helm chart fork.</li>
+<li><strong>ROSA VPCE security group destroy workaround retained</strong>: OCPBUGS-74960 (<a href="https://github.com/openshift/hypershift/pull/7868">openshift/hypershift#7868</a>) does not fully prevent orphaned "VPC endpoint security group" on 4.22.0 cluster delete; <code>null_resource.cleanup_rosa_security_groups</code> remains enabled.</li>
+<li><strong>RHCS provider</strong>: Updated to <code>~&gt; 1.7.7</code> (OCM-25158 AutoNode fix — post-create PATCH and state reconciliation for <code>auto_node</code>)</li>
+<li>Updated in root <code>terraform/00-providers.tf</code> and cluster/iam module <code>00-versions.tf</code></li>
+<li>Removed <code>lifecycle { ignore_changes = [auto_node] }</code> workaround from <code>rhcs_cluster_rosa_hcp</code></li>
+<li>
+<p><strong>GitOps bootstrap defaultImage</strong>: Reverted global <code>defaultImage: openshift/cli</code> in hub/spoke bootstrap templates. That change (from autonode PR #17) applied to all clusters but was intended only for ARM testing; it removed bundled helm from the CMP sidecar and broke plugin-based Argo CD apps. Chart default (<code>quay.io/gnunn/tools:latest</code>, amd64) is restored.</p>
+</li>
+<li>
+<p><strong>Cluster module — autoscaling hints at cluster creation</strong>: <code>rhcs_cluster_rosa_hcp</code> now passes <code>autoscaling_enabled</code>, <code>min_replicas</code>, and <code>max_replicas</code> as write-once creation-time hints (added in provider 1.7.5). This ensures the default machine pool is created with autoscaling already active, making the subsequent <code>rhcs_hcp_machine_pool.default</code> reconciliation a no-op and eliminating the <code>CLUSTERS-MGMT-403</code> race on multi-AZ clusters. <code>replicas</code> is set to <code>null</code> when autoscaling is enabled (mutually exclusive per the provider schema). The precondition error message was updated to reference <code>min_replicas</code> vs <code>replicas</code> based on the autoscaling toggle.</p>
+</li>
+<li><strong>Cluster module — bumped RHCS provider minimum to <code>~&gt; 1.7.5</code></strong>: Required for <code>autoscaling_enabled</code>/<code>min_replicas</code>/<code>max_replicas</code> support on <code>rhcs_cluster_rosa_hcp</code>. Lock file updated to 1.7.6 (latest patch). Run <code>terraform init -upgrade</code> in <code>modules/infrastructure/cluster/</code> after pulling this change.</li>
+<li><strong>GitOps bootstrap templates</strong>: Moved <code>hub-values.yaml.tftpl</code> and <code>spoke-values.yaml.tftpl</code> from <code>scripts/cluster/templates/</code> to <code>modules/infrastructure/cluster/templates/</code> for better module encapsulation</li>
+<li><strong>GitOps bootstrap values generation</strong>: Moved Helm values generation from bootstrap script to Terraform</li>
+<li>Terraform generates values via <code>templatefile()</code> and exposes <code>gitops_bootstrap_hub_values</code> and <code>gitops_bootstrap_spoke_values</code></li>
+<li><strong>Makefile owns orchestration</strong>: writes values to <code>clusters/&lt;cluster-dir&gt;/cluster-bootstrap-values.yaml</code>, sets BOOTSTRAP_VALUES_FILE, evals <code>gitops_bootstrap_env_exports</code>, runs script</li>
+<li>Removed <code>gitops_bootstrap_command</code>; replaced <code>gitops_bootstrap_env_vars</code> with <code>gitops_bootstrap_env_exports</code> (shell export statements)</li>
+<li>Added <code>gitops_bootstrap_acm_mode</code> for Makefile to select hub vs spoke values</li>
+<li>Bootstrap script requires <code>BOOTSTRAP_VALUES_FILE</code> (set by Makefile)</li>
+<li>Cluster domain derived from cluster API URL in Terraform (<code>cluster_domain</code> output)</li>
+<li>Reduced env vars: GIT_REPO_URL, AWS_ACCOUNT_ID, ECR_ACCOUNT, EBS_KMS_KEY_ARN, EFS_FILE_SYSTEM_ID, GITOPS_CSV, GIT_PATH (and AWS Private CA vars) now in values file</li>
+<li>Templates in <code>modules/infrastructure/cluster/templates/</code> (hub-values.yaml.tftpl, spoke-values.yaml.tftpl)</li>
+<li><strong>Default Helm repository</strong>: Updated default Helm repository URL from <code>rosa-hcp-dedicated-vpc.github.io/helm-repository</code> to <code>rh-mobb.github.io/validated-pattern-helm-charts</code></li>
+<li>Updated in <code>modules/infrastructure/cluster/01-variables.tf</code>, <code>scripts/cluster/bootstrap-gitops.sh</code>, and <code>scripts/cluster/README-bootstrap-gitops.md</code></li>
+<li>Can still be overridden per-cluster via <code>helm_repo_url</code> in terraform.tfvars or <code>HELM_REPO_URL</code> environment variable</li>
+<li><strong>Control Plane Log Forwarding</strong>: Migrated from ROSA CLI shell workaround to native <code>rhcs_log_forwarder</code> Terraform resource</li>
+<li>Updated RHCS provider from <code>~&gt; 1.7</code> to <code>~&gt; 1.7.4</code> (adds <code>rhcs_log_forwarder</code> support)</li>
+<li>Replaced <code>null_resource</code> + <code>local_file</code> + <code>rosa create/edit/delete log-forwarder</code> with <code>rhcs_log_forwarder</code> resource</li>
+<li>Removed <code>local</code> provider dependency from cluster module (was only used for log forwarder YAML file)</li>
+<li><strong>Separate resources per destination</strong>: Two <code>rhcs_log_forwarder</code> resources (CloudWatch and S3) allow different log groups and applications per destination</li>
+<li>New variables: <code>control_plane_log_cloudwatch_groups</code>, <code>control_plane_log_cloudwatch_applications</code>, <code>control_plane_log_s3_groups</code>, <code>control_plane_log_s3_applications</code> (replaced shared <code>control_plane_log_groups</code> and <code>control_plane_log_applications</code>)</li>
+<li>Configuration now managed declaratively by Terraform; no ROSA CLI or jq required</li>
+<li>
+<p>Reference: https://registry.terraform.io/providers/terraform-redhat/rhcs/latest/docs/guides/log-forwarders</p>
+</li>
+<li>
+<p><strong>BREAKING</strong>: Renamed <code>enable_strict_egress</code> variable to <code>zero_egress</code> throughout the codebase</p>
+</li>
+<li>Root module: <code>terraform/01-variables.tf</code> - variable renamed from <code>enable_strict_egress</code> to <code>zero_egress</code></li>
+<li>Network-private module: variable renamed from <code>enable_strict_egress</code> to <code>zero_egress</code></li>
+<li>All <code>.tfvars</code> files updated to use <code>zero_egress</code> instead of <code>enable_strict_egress</code></li>
+<li>Scripts updated: <code>get-network-config.sh</code>, <code>Makefile.cluster</code>, tunnel scripts (<code>start.sh</code>, <code>stop.sh</code>, <code>status.sh</code>)</li>
+<li>Documentation updated: <code>README.md</code>, <code>PLAN.md</code>, <code>clusters/README.md</code>, module READMEs</li>
+<li><strong>Migration</strong>: Update all <code>terraform.tfvars</code> files to replace <code>enable_strict_egress = true/false</code> with <code>zero_egress = true/false</code></li>
+<li><strong>Rationale</strong>: Matches ROSA API property name (<code>zero_egress</code>) for consistency across all modules and eliminates mapping layer</li>
+<li><strong>IMPORTANT</strong>: <code>zero_egress</code> is now independent of <code>network_type</code> - it's a cluster-level ROSA API property</li>
+<li><code>zero_egress</code> is passed directly to cluster and IAM modules (independent of network configuration)</li>
+<li>Network infrastructure (NAT Gateway, security groups) is configured for zero egress when both <code>network_type="private"</code> AND <code>zero_egress=true</code></li>
+<li>
+<p>This allows <code>zero_egress</code> to be set independently, though it typically requires <code>network_type="private"</code> for PrivateLink API endpoint</p>
+</li>
+<li>
+<p><strong>BREAKING</strong>: Admin password management moved to AWS Secrets Manager:</p>
+</li>
+<li><strong>BREAKING</strong>: Variable renamed: <code>admin_password</code> → <code>admin_password_override</code> (nullable, optional)</li>
+<li><strong>BREAKING</strong>: Removed <code>admin_password</code> output (password never output by Terraform)</li>
+<li>Added <code>admin_password_secret_arn</code> output (ARN of AWS Secrets Manager secret)</li>
+<li>If <code>admin_password_override</code> is not set, a random password is generated and stored in AWS Secrets Manager</li>
+<li>Password stored in secret: <code>rosa-hcp-{cluster_name}-admin-password</code></li>
+<li>Makefile updated to retrieve password from AWS Secrets Manager using AWS CLI</li>
+<li><strong>Migration required</strong>: Update any references to <code>admin_password</code> variable or output</li>
+<li>
+<p><strong>Security improvement</strong>: Password no longer stored in Terraform state or outputs</p>
+</li>
+<li>
+<p><strong>BREAKING</strong>: Reorganized repository structure to separate infrastructure and configuration:</p>
+</li>
+<li>Modules reorganized: <code>modules/infrastructure/</code> (network, iam, cluster, bastion, identity-admin) and <code>modules/configuration/</code> (gitops)</li>
+<li>Module organization is based on provider type: infrastructure modules use OCM/AWS providers, configuration modules use Kubernetes/Terraform providers</li>
+<li><strong>BREAKING</strong>: Moved <code>identity-admin</code> module from <code>modules/configuration/</code> to <code>modules/infrastructure/</code>:<ul>
+<li>Uses <code>rhcs</code> (OCM) provider, not Kubernetes/Terraform providers</li>
+<li>Belongs in infrastructure based on provider type</li>
+<li>Updated all example cluster references to new path</li>
+<li>Updated documentation (README.md, PLAN.md, module READMEs)</li>
+</ul>
+</li>
+<li>Cluster examples reorganized: Each cluster now has <code>infrastructure/</code> and <code>configuration/</code> subdirectories with separate state files</li>
+<li>Configuration uses <code>terraform_remote_state</code> data source to read infrastructure outputs</li>
+<li>Updated Makefile with infrastructure/configuration specific targets</li>
+<li>Module source paths updated: <code>modules/infrastructure/...</code> and <code>modules/configuration/...</code></li>
+<li>
+<p><strong>Migration required</strong>: Existing clusters need to be migrated to new structure (see README.md for migration guide)</p>
+</li>
+<li>
+<p>Clarified bastion host is for development/demo use only:</p>
+</li>
+<li>Added prominent warnings in bastion module README and main README</li>
+<li>Updated variable descriptions in example clusters to warn against production use</li>
+<li>Added comments in example cluster configurations explaining production alternatives</li>
+<li>Documented that production should use AWS Transit Gateway, Direct Connect, or VPN</li>
+<li>
+<p>Updated bastion subnet recommendation document with decision rationale</p>
+</li>
+<li>
+<p>Switched tunnel implementation from SSH port forwarding to sshuttle VPN tunnel:</p>
+</li>
+<li><code>make tunnel-start.&lt;cluster&gt;</code> now uses <code>sshuttle</code> instead of SSH port forwarding</li>
+<li>sshuttle creates a VPN-like tunnel that routes ALL VPC traffic through the bastion</li>
+<li>This enables full cluster access including OAuth flows required for <code>oc login</code></li>
+<li>Requires <code>sshuttle</code> to be installed (provides installation instructions if missing)</li>
+<li>Requires sudo privileges - displays warning message before prompting for local sudo password</li>
+<li>Tunnel detection in <code>show-endpoints</code> and <code>login</code> targets updated to check for sshuttle process</li>
+<li>Direct API URL is used (sshuttle routes traffic transparently)</li>
+<li>Added <code>vpc_cidr_block</code> and <code>region</code> outputs to all example clusters for tunnel management</li>
+<li>Updated help text and documentation to reflect sshuttle usage</li>
+<li>Refactored admin user creation into separate <code>identity-admin</code> module:</li>
+<li>Removed <code>admin_password</code>, <code>admin_username</code>, and <code>admin_group</code> variables from cluster module</li>
+<li>Removed <code>rhcs_identity_provider.admin</code> and <code>rhcs_group_membership.admin</code> resources from cluster module</li>
+<li>Updated all example clusters to use <code>modules/identity-admin/</code> instead</li>
+<li>Enables independent lifecycle management (create initially, remove when external IDP configured)</li>
+<li>Refactored Makefile to use pattern rules, reducing duplication:</li>
+<li>New pattern syntax: <code>make &lt;action&gt;.&lt;cluster&gt;</code> (e.g., <code>make apply.public</code>, <code>make login.private</code>)</li>
+<li>Supports all actions: <code>init</code>, <code>plan</code>, <code>apply</code>, <code>destroy</code>, <code>login</code>, <code>show-endpoints</code>, <code>show-credentials</code></li>
+<li>Supports all clusters: <code>public</code>, <code>private</code>, <code>egress-zero</code></li>
+<li>Legacy syntax still supported for backwards compatibility (e.g., <code>make apply-public</code>)</li>
+<li>Uses Make functions to map cluster names to directories automatically</li>
+<li>
+<p>Updated help text to show both pattern and legacy syntax</p>
+</li>
+<li>
+<p>Automatic version detection in cluster module: if <code>openshift_version</code> is not provided, the module now uses <code>rhcs_versions</code> data source to automatically determine the latest installable OpenShift version</p>
+</li>
+<li>Added <code>rhcs_versions</code> data source to query available OpenShift versions from the ROSA API</li>
+<li>Updated IAM module to use upstream terraform-redhat/rosa-hcp/rhcs modules:</li>
+<li><code>account-iam-resources</code> for account roles</li>
+<li><code>oidc-config-and-provider</code> for OIDC configuration</li>
+<li><code>operator-roles</code> for operator roles</li>
+<li>
+<p>Added <code>oidc_endpoint_url</code> variable to cluster module (required for STS configuration)</p>
+</li>
+<li>
+<p>Updated all network modules to automatically calculate subnet CIDR size (matching reference pattern):</p>
+</li>
+<li>Made <code>subnet_cidr_size</code> variable optional (defaults to <code>null</code>)</li>
+<li>Subnet CIDR size is now automatically calculated based on VPC CIDR size and number of subnets needed</li>
+<li>Calculation ensures sufficient space: <code>subnet_cidr_size = vpc_cidr_size + ceil(log2(total_subnets))</code></li>
+<li>Examples: /16 VPC with 6 subnets (multi-AZ public) → /19, /16 VPC with 3 subnets (multi-AZ private) → /18</li>
+<li>Can still be overridden by explicitly setting <code>subnet_cidr_size</code> if needed</li>
+<li>Removed <code>subnet_cidr_size</code> from all example cluster configurations</li>
+<li>Updated all network modules to automatically calculate availability zones (matching reference implementation):</li>
+<li>Removed <code>availability_zones</code> variable from all network modules</li>
+<li>Added <code>data.aws_availability_zones.available</code> data source to automatically query available AZs</li>
+<li>Network modules now use first 3 AZs for multi-AZ, first 1 AZ for single-AZ</li>
+<li>Added <code>private_subnet_azs</code> and <code>public_subnet_azs</code> outputs to network modules</li>
+<li>Cluster module now receives <code>availability_zones</code> from network module output instead of requiring it as input</li>
+<li>Removed <code>availability_zones</code> variable from all example cluster configurations</li>
+<li>Updated example clusters to use <code>module.network.private_subnet_azs</code> for cluster availability zones</li>
+<li>Added machine type validation using <code>rhcs_machine_types</code> data source in cluster module:</li>
+<li>Instance types are now validated against available ROSA machine types for the specified region</li>
+<li>Clear error messages guide users to available machine types if validation fails</li>
+<li>Validation applies to both <code>default_instance_type</code> and <code>machine_pools[].instance_type</code></li>
+<li>Added <code>name_prefix</code> variable to all network modules to ensure unique AWS resource names across clusters:</li>
+<li>All resource names (VPC, subnets, NAT gateways, VPC endpoints, security groups, etc.) now use <code>${var.name_prefix}-</code> prefix</li>
+<li>Example clusters updated to pass <code>name_prefix = var.cluster_name</code></li>
+<li>Updated all module README files to document the new variable</li>
+<li>Updated all network modules to automatically calculate subnet CIDRs (matching reference implementation):</li>
+<li>Removed <code>private_subnet_cidrs</code> and <code>public_subnet_cidrs</code> variables</li>
+<li>Added <code>subnet_cidr_size</code> variable (default: 20 for /20 subnets)</li>
+<li>Subnet CIDRs are now calculated automatically from VPC CIDR and subnet size</li>
+<li>Private subnets are calculated first, then public subnets (for network-public module)</li>
+<li>Removed regional NAT Gateway support from network-public module - now uses standard (zonal) NAT Gateways only (one per AZ)</li>
+<li>Removed <code>nat_gateway_type</code> variable from network-public module</li>
+<li>Updated network-public module to always create public subnets (required for NAT Gateways)</li>
+<li>Updated all example clusters to use automatic subnet CIDR calculation</li>
+<li>Updated Makefile to save plan files (<code>terraform.tfplan</code>) for all plan targets</li>
+<li>Updated apply targets to use saved plan files instead of running plan again</li>
+<li>Added <code>*.tfplan</code> and <code>terraform.tfplan</code> to <code>.gitignore</code></li>
+<li>Fixed deprecation warning: Replaced <code>data.aws_region.current.name</code> with <code>data.aws_region.current.id</code> in all network modules (public, private, egress-zero)</li>
+<li>Updated cluster module to align with rh-mobb reference implementation:</li>
+<li>Added <code>machine_cidr</code> attribute (required, uses <code>vpc_cidr</code> variable)</li>
+<li>Added <code>aws_billing_account_id</code> variable (optional, defaults to current account)</li>
+<li>Added <code>replicas</code>, <code>compute_machine_type</code>, <code>ec2_metadata_http_tokens</code>, <code>properties</code>, and lifecycle settings to cluster resource</li>
+<li>Machine pool <code>aws_node_pool</code> now preserves instance type from data source (allows override via <code>machine_pools</code> variable)</li>
+<li>Updated example clusters to pass <code>vpc_cidr</code> and <code>multi_az</code> to cluster module</li>
+<li>Updated cluster module to follow rh-mobb patterns:</li>
+<li>Version detection: Uses <code>rhcs_versions</code> data source with search filter and order</li>
+<li>Machine pools: Reads default pools created by cluster, then manages them (following rh-mobb pattern)</li>
+<li>Replicas logic: HCP uses 1 per subnet for multi-AZ, 2 for single-AZ</li>
+<li>Added <code>compute_machine_type</code>, <code>replicas</code>, <code>ec2_metadata_http_tokens</code>, <code>properties</code>, and lifecycle settings to cluster resource</li>
+<li>Updated cluster module STS configuration to match upstream pattern:</li>
+<li><code>role_arn</code> now uses installer_role_arn (not operator role ARN)</li>
+<li>Added <code>oidc_endpoint_url</code> to STS block</li>
+<li>
+<p>Removed <code>operator_role_arns</code> variable (operator roles created via prefix)</p>
+</li>
+<li>
+<p>Default Terraform backend to local state storage in all cluster examples</p>
+</li>
+<li>S3 backend configuration commented out for easy reference when needed</li>
+<li>Updated machine pool replica settings in all cluster examples:</li>
+<li>Single AZ: min_replicas = 2, max_replicas = 4 (double min)</li>
+<li>Multi-AZ: min_replicas = 3, max_replicas = 6 (double min)</li>
+<li>Renamed module Terraform files to use numbered prefixes following best practices:</li>
+<li><code>versions.tf</code> → <code>00-versions.tf</code> (provider configuration, always first)</li>
+<li><code>variables.tf</code> → <code>01-variables.tf</code> (variable definitions)</li>
+<li><code>main.tf</code> → <code>10-main.tf</code> (main resources)</li>
+<li><code>outputs.tf</code> → <code>90-outputs.tf</code> (outputs, always last)</li>
+</ul>
+<h3 id="deprecated">Deprecated<a class="headerlink" href="#deprecated" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Bastion and sshuttle</strong>: No longer used by default for egress-zero clusters. AWS Client VPN is the default. Bastion/sshuttle modules remain available; <code>tunnel-start</code>/<code>tunnel-stop</code>/<code>tunnel-status</code> targets exist for manual use, but <code>ensure-tunnel</code> no longer auto-starts sshuttle. Set <code>enable_bastion = true</code> and run <code>tunnel-start</code> manually if needed.</li>
+<li><strong>network-existing module</strong>: Deprecated in favor of <code>network_type = "existing"</code>. The root module now handles BYO VPC directly via variables and data sources. The module will be removed in a future release.</li>
+<li><strong>RHCS API Authentication Options</strong>: Documented two authentication methods for the RHCS provider:</li>
+<li><strong>Option 1 (Token):</strong> <code>RHCS_TOKEN</code> — offline token from console.redhat.com</li>
+<li><strong>Option 2 (Service account):</strong> <code>RHCS_CLIENT_ID</code> + <code>RHCS_CLIENT_SECRET</code> — Red Hat Hybrid Cloud Console service account</li>
+<li>Added RHCS Authentication section to README.md and clusters/README.md</li>
+<li><strong>Removed <code>token</code> variable</strong> — RHCS provider reads credentials from env vars only (RHCS_TOKEN, RHCS_CLIENT_ID, RHCS_CLIENT_SECRET)</li>
+<li>Audit logging provisioner now checks <code>RHCS_TOKEN</code> first (before OCM_TOKEN, ROSA_TOKEN)</li>
+<li>Added <code>.rhcs_creds</code> and <code>.rhcs_client_creds</code> to .gitignore</li>
+<li>Project does not manage credentials — user responsibility to set before make</li>
+<li><strong>GitHub Actions CI/CD Workflows</strong>: Added automated Terraform and shell script validation and quality checks</li>
+<li><code>terraform-pr-checks.yml</code>: Runs on pull requests to validate Terraform code and shell scripts</li>
+<li><code>terraform-master-checks.yml</code>: Runs on pushes to main/master branches</li>
+<li><strong>Terraform checks</strong>: Formatting (<code>terraform fmt -check</code>), TFLint linting, validation for all modules and root config, init for all modules</li>
+<li><strong>Shell script checks</strong>: ShellCheck linting and shfmt formatting checks for all scripts in <code>scripts/</code> directory</li>
+<li>TFLint configuration (<code>.tflint.hcl</code>) with AWS provider plugin and Terraform best practices</li>
+<li>ShellCheck configuration (<code>.shellcheckrc</code>) for shell script linting rules</li>
+<li>Workflows run in parallel for faster feedback</li>
+<li>Note: Terraform plan is not included by default (requires AWS credentials and RHCS token)</li>
+<li>Documentation updated in <code>docs/CI_CD.md</code> with workflow details and local testing instructions</li>
+<li><strong>Makefile Targets for Code Quality</strong>: Reorganized Makefile with consistent <code>tf-</code> and <code>sh-</code> prefixes</li>
+<li><strong>Terraform targets</strong>: <code>tf-fmt</code>, <code>tf-fmt-check</code>, <code>tf-validate</code>, <code>tf-validate-modules</code>, <code>tf-validate-root</code></li>
+<li><strong>Shell script targets</strong>: <code>sh-fmt</code>, <code>sh-fmt-check</code>, <code>sh-lint</code>, <code>sh-lint-fix</code></li>
+<li><strong>Combined targets</strong>: <code>fmt</code> (runs <code>tf-fmt</code> and <code>sh-fmt</code>), <code>fmt-check</code> (runs <code>tf-fmt-check</code> and <code>sh-fmt-check</code>), <code>validate</code> (runs <code>tf-validate</code> and <code>sh-lint</code>), <code>lint</code> (runs <code>tf-fmt-check</code>, <code>sh-fmt-check</code>, and <code>sh-lint</code>), <code>lint-fix</code> (runs <code>tf-fmt</code> and <code>sh-fmt</code>), <code>test</code> (runs all checks)</li>
+<li>All targets include helpful error messages with installation instructions</li>
+<li>Clear separation between Terraform and shell script operations</li>
+<li><strong>Contributing Guide</strong>: Added comprehensive <code>CONTRIBUTING.md</code> guide</li>
+<li>Development setup instructions for macOS, Ubuntu/Debian, and RHEL/CentOS/Fedora</li>
+<li>Installation instructions for all required tools (Terraform, AWS CLI, OpenShift CLI, ShellCheck, shfmt, TFLint)</li>
+<li>Development workflow (fork, clone, branch, test, commit, PR)</li>
+<li>Code quality guidelines and testing instructions</li>
+<li>Code style guidelines for Terraform and shell scripts</li>
+<li>Pull request checklist and process</li>
+<li><strong>macOS Installation Instructions</strong>: Added macOS-specific installation instructions</li>
+<li>Homebrew installation commands for all development tools</li>
+<li>Updated <code>docs/CI_CD.md</code> with macOS instructions</li>
+<li>Makefile targets detect missing tools and provide macOS installation hints</li>
+<li><strong>Control Plane Log Forwarding</strong>: Added new ROSA managed log forwarder for control plane logs:</li>
+<li>New <code>enable_control_plane_log_forwarding</code> variable (default: <code>false</code>) in root, cluster, and IAM modules</li>
+<li>Supports forwarding multiple log groups: api, authentication, controller manager, scheduler (case-insensitive input, converted to lowercase)</li>
+<li>Note: 'Other' group is not supported by ROSA CLI despite documentation</li>
+<li>Supports forwarding to CloudWatch and/or S3 destinations</li>
+<li>Uses ROSA's managed log forwarder service (doesn't contend for cluster resources)</li>
+<li>IAM role uses STS assume role with ROSA's central log distribution role (not OIDC federation)</li>
+<li>IAM role name must include "CustomerLogDistribution" (e.g., <code>${cluster_name}-CustomerLogDistribution-RH</code>)</li>
+<li>CloudWatch log group and S3 bucket created in cluster module (cluster-specific infrastructure)</li>
+<li>Configuration via <code>rosa create log-forwarder</code> with YAML config file</li>
+<li>New outputs: <code>control_plane_log_forwarding_role_arn</code>, <code>control_plane_log_cloudwatch_log_group_name</code>, <code>control_plane_log_s3_bucket_name</code></li>
+<li>Reference: https://docs.redhat.com/en/documentation/red_hat_openshift_service_on_aws/4/html/security_and_compliance/rosa-forwarding-control-plane-logs</li>
+<li>Files: <code>modules/infrastructure/iam/22-control-plane-log-forwarding.tf</code>, <code>modules/infrastructure/cluster/21-control-plane-log-forwarding.tf</code>, <code>modules/infrastructure/cluster/22-control-plane-log-forwarding-resources.tf</code></li>
+</ul>
+<h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>BREAKING</strong>: Removed <code>modules/infrastructure/network-egress-zero/</code> module</li>
+<li>Egress-zero functionality has been consolidated into <code>network-private</code> module</li>
+<li>Use <code>network-private</code> with <code>zero_egress = true</code> and <code>enable_nat_gateway = false</code> for zero-egress mode</li>
+<li>Migration: Update module source from <code>network-egress-zero</code> to <code>network-private</code> and add <code>zero_egress = true</code></li>
+<li>Updated all documentation and references to reflect consolidation</li>
+<li>Updated <code>modules/infrastructure/bastion/</code> and <code>modules/infrastructure/network-existing/</code> READMEs</li>
+<li><strong>BREAKING</strong>: Removed <code>examples/private/</code> cluster example</li>
+<li>Private cluster example removed (only public and egress-zero examples remain)</li>
+<li>Private network module (<code>modules/infrastructure/network-private/</code>) retained for use with egress-zero clusters</li>
+<li>Updated Makefile to remove all private cluster targets</li>
+<li>
+<p>Updated README.md to remove private cluster deployment instructions</p>
+</li>
+<li>
+<p>Removed developer user functionality from cluster module (additional users should be configured separately after cluster creation)</p>
+</li>
+<li>Added <code>token</code> variable to all example clusters for RHCS provider authentication</li>
+<li>Updated provider configuration to match rh-mobb reference implementation</li>
+</ul>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>GitOps CMP tools image missing <code>find</code></strong>: UBI9 minimal lacked <code>findutils</code>, causing CMP plugin discover to fail (<code>find: command not found</code>) and plugin apps (e.g. <code>cluster-config-autonode</code>) to stay <code>Sync: Unknown</code>. Added <code>findutils</code> and <code>git</code> (for <code>helm dependency update</code> on git-based chart deps); also bundle <code>kubectl</code> from the OC client tarball.</li>
+<li>
+<p><strong>ROSA default SG race on first apply</strong>: EFS and AutoNode resources failed when <code>{cluster_id}-default-sg</code> was not yet tagged in AWS after <code>rhcs_cluster_rosa_hcp</code> became ready. Added <code>time_sleep</code> delay and shared <code>data.aws_security_groups.cluster_default</code> lookup (no local-exec).</p>
+</li>
+<li>
+<p><strong>GitOps bootstrap before workers ready</strong>: Bootstrap now waits for at least two Ready worker nodes after cluster login and before Helm install. Pre-install hooks (e.g. <code>installplan-approver</code>) schedule on workers; running bootstrap immediately after <code>terraform apply</code> caused <code>FailedScheduling: no nodes available</code> and a failed Helm release.</p>
+</li>
+<li><strong>Client VPN config path wrong directory</strong>: VPN .ovpn files were written to <code>clusters/${cluster_name}/</code> instead of <code>clusters/${directory}/</code>. Added <code>cluster_config_dir</code> variable; plan script now passes <code>-var "cluster_config_dir=$CLUSTER_NAME"</code> so output path matches the Makefile cluster directory (e.g., <code>egress-zero</code>).</li>
+<li><strong>Client VPN connection instructions path format</strong>: Instructions now show path relative to project root (<code>./clusters/&lt;cluster-dir&gt;/&lt;name&gt;-vpn-client.ovpn</code>) instead of terraform-relative path. Added <code>client_config_display_path</code> to module; root outputs use constructed path.</li>
+<li><strong>ArgoCD application-gitops invalid initialRepositories</strong>: application-gitops subchart passed <code>null</code> to ArgoCD CR <code>spec.initialRepositories</code> when not set, causing validation error. The API expects a string (YAML/JSON), not array. Set <code>application-gitops.argocd.initialRepositories: "[]"</code> in hub-values template.</li>
+<li>
+<p><strong>GitOps operator not installing</strong>: cluster-bootstrap Helm chart subscriptions default to <code>csv: null</code>, which produces invalid <code>spec.startingCSV: null</code> in the Subscription (Kubernetes rejects null). Added subscription override in values file (<code>subscriptions[0].csv</code>) so the GitOps operator installs correctly. Using values file merge (not <code>--set</code>) preserves name, channel, source, and sourceNamespace from chart defaults.</p>
+</li>
+<li>
+<p>Added HTTPS and DNS egress rules to worker node security group in egress-zero module:</p>
+</li>
+<li>Worker nodes need HTTPS (443) egress to VPC CIDR to reach VPC endpoints (ECR, STS, CloudWatch)</li>
+<li>Worker nodes need DNS (53) egress to VPC CIDR for DNS resolution</li>
+<li>Previous configuration had no egress rules, preventing nodes from pulling container images from ECR</li>
+<li><strong>Note</strong>: This fix is part of ongoing investigation - worker nodes still not starting successfully</li>
+<li>Fixed cluster replicas calculation for multi-AZ clusters:</li>
+<li>Changed cluster-level <code>replicas</code> to always be set (not null when autoscaling enabled)</li>
+<li>Cluster-level replicas must be set for validation, even with autoscaling (autoscaling is handled at machine pool level)</li>
+<li>Added precondition to validate replicas is a multiple of number of subnets for multi-AZ clusters</li>
+<li>For multi-AZ with 3 subnets, replicas must be 3, 6, 9, etc. (multiple of 3)</li>
+<li>Fixes "Invalid number of compute nodes: 2" error for multi-AZ clusters</li>
+<li>Fixed network ACL rule number in egress-zero module:</li>
+<li>Changed deny rule from <code>rule_no = 32767</code> to <code>rule_no = 32766</code> (maximum allowed is 32766)</li>
+<li>AWS Network ACL rule numbers must be in range 1-32766</li>
+<li>Removed unsupported <code>disable_workload_monitoring</code> attribute from cluster resource:</li>
+<li>This attribute is not supported by the ROSA HCP provider</li>
+<li>Removed from cluster resource, variables, and README</li>
+<li>Variable was already commented out in egress-zero example</li>
+<li>Fixed egress-zero cluster configuration:</li>
+<li>Added <code>zero_egress</code> variable to cluster module to enable zero egress mode</li>
+<li>Sets <code>zero_egress = "true"</code> property in cluster properties when enabled</li>
+<li>Added <code>zero_egress</code> variable to IAM module to attach ECR read-only policy to worker role</li>
+<li>When <code>zero_egress = true</code>, IAM module attaches <code>AmazonEC2ContainerRegistryReadOnly</code> policy to worker role (required for egress-zero clusters to pull container images via VPC endpoints)</li>
+<li>Added <code>depends_on = [module.account_roles]</code> to policy attachment to ensure worker role exists before attaching policy</li>
+<li>Updated egress-zero cluster example to set <code>zero_egress = true</code> in both IAM and cluster modules</li>
+<li>This ensures proper egress-zero cluster configuration with required IAM permissions</li>
+<li>Fixed SSM agent installation in bastion module user_data script:</li>
+<li>Replaced <code>wget</code> with <code>curl</code> for downloading SSM agent RPM (wget not installed by default on RHEL 9 AMI)</li>
+<li><code>curl</code> is available by default on RHEL, ensuring SSM agent installs successfully</li>
+<li>Resolves <code>TargetNotConnected</code> error when connecting via SSM Session Manager</li>
+<li>SSM agent now registers correctly with AWS Systems Manager</li>
+<li>Fixed destroy-time dependency ordering to ensure cluster is destroyed before IAM roles/OIDC:</li>
+<li>Updated Makefile <code>destroy.%</code> targets to use two-phase destroy: <code>terraform destroy -target=module.cluster</code> first, then full destroy</li>
+<li>This explicitly destroys the cluster BEFORE IAM roles/OIDC, preventing permission loss during cluster destruction</li>
+<li>Terraform's implicit dependency graph wasn't sufficient - explicit targeting ensures proper order</li>
+<li>Added documentation comments in example clusters explaining the destroy process</li>
+<li>Manual destroy instructions: <code>terraform destroy -target=module.cluster</code> then <code>terraform destroy</code></li>
+<li>Documented destroy-time dependency ordering to ensure cluster is destroyed before IAM roles/OIDC:</li>
+<li>Cluster resource depends on IAM module outputs (installer_role_arn, support_role_arn, worker_role_arn, oidc_config_id, oidc_endpoint_url)</li>
+<li>Terraform destroys resources in reverse dependency order, so cluster (dependent) is destroyed BEFORE IAM resources (dependencies)</li>
+<li>This ensures Terraform maintains permissions to destroy the cluster</li>
+<li>Added documentation comments in cluster and IAM modules explaining the dependency ordering</li>
+<li>Updated Makefile destroy targets with warnings about proper destroy order</li>
+<li>Refactored machine pool resource to match reference implementation:</li>
+<li>Changed from <code>for_each</code> to <code>count</code> for data source and resource (matching reference pattern)</li>
+<li>Removed complex null-checking logic - reference trusts data source will have values</li>
+<li>Simplified subnet_id, auto_repair, and aws_node_pool handling to directly use data source values</li>
+<li>This ensures the magic import pattern works correctly as designed by the provider</li>
+<li>ROSA HCP creates "workers" (plural) for single-AZ, "workers-0", "workers-1", "workers-2" for multi-AZ</li>
+<li>Added lifecycle block to ignore tag changes on subnet resources:</li>
+<li>ROSA automatically adds tags like <code>kubernetes.io/cluster/{cluster_id}</code> to subnets</li>
+<li>Added <code>lifecycle { ignore_changes = [tags] }</code> to all subnet resources in network modules</li>
+<li>Prevents Terraform from removing service-managed tags on subsequent runs</li>
+<li>Applied to network modules: <code>network-public</code>, <code>network-private</code> (egress-zero functionality consolidated into network-private)</li>
+<li>Fixed null reference errors in machine pool resource:</li>
+<li>Added null checks for <code>subnet_id</code>, <code>auto_repair</code>, and <code>aws_node_pool</code> in <code>rhcs_hcp_machine_pool</code> resource</li>
+<li>When these values are null (e.g., during initial cluster creation), use appropriate defaults:<ul>
+<li><code>subnet_id</code>: Derive from machine pool name (e.g., "workers-1" maps to <code>var.subnet_ids[1]</code>, "workers" maps to <code>var.subnet_ids[0]</code>)</li>
+<li><code>auto_repair</code>: Default to <code>true</code> (standard ROSA default)</li>
+<li><code>instance_type</code>: Fallback to <code>var.default_instance_type</code></li>
+<li><code>ec2_metadata_http_tokens</code>: Default to <code>"required"</code> (matching cluster-level setting)</li>
+</ul>
+</li>
+<li>Updated precondition validation to handle null <code>aws_node_pool</code> gracefully</li>
+<li>Fixed double-dash issue in IAM role names:</li>
+<li>Removed trailing dashes from <code>account_role_prefix</code> and <code>operator_role_prefix</code> in all example clusters</li>
+<li>The upstream modules (<code>account-iam-resources</code> and <code>operator-roles</code>) add their own dashes, so passing a trailing dash caused double dashes (e.g., <code>pczarkow--HCP-ROSA-Installer-Role</code>)</li>
+<li>Now matches reference implementation: prefixes should be <code>var.cluster_name</code> without trailing dash</li>
+<li>
+<p>This fixes the cluster waiting state error: "Operator Role(s) not found"</p>
+</li>
+<li>
+<p>Updated Makefile so plan targets depend on init targets, ensuring backend is initialized before planning</p>
+</li>
+<li>Fixed <code>rhcs_cluster_rosa_hcp</code> resource structure to match Terraform Registry API:</li>
+<li>Changed <code>sts</code> from block to attribute (object) with required fields:<ul>
+<li>Added <code>role_arn</code> (operator role ARN) and <code>instance_iam_roles</code> (required)</li>
+<li>Moved <code>oidc_config_id</code> into <code>sts</code> attribute</li>
+</ul>
+</li>
+<li>Changed <code>openshift_version</code> to <code>version</code></li>
+<li>Changed <code>aws_node_pool</code> and <code>autoscaling</code> from blocks to attributes (objects)</li>
+<li>Added <code>enabled</code> attribute to <code>autoscaling</code> configuration</li>
+<li>Removed unsupported attributes (<code>fips</code>, <code>disable_workload_monitoring</code>, <code>tags</code> on machine pools)</li>
+<li>Removed invalid outputs (<code>kubeconfig</code>, <code>cluster_admin_password</code>) that don't exist on the resource</li>
+<li>Corrected module source paths in all cluster examples (changed from <code>../../../../modules</code> to <code>../../../modules</code>)</li>
+<li>Removed invalid <code>multi_az</code> attribute from cluster module calls (multi_az is only used in machine pools, not cluster-level)</li>
+</ul>
+<h3 id="work-in-progress-egress-zero-cluster">⚠️ Work in Progress - Egress-Zero Cluster<a class="headerlink" href="#work-in-progress-egress-zero-cluster" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Egress-zero cluster configuration is currently non-functional</strong></li>
+<li>Worker nodes are not starting successfully (0/1 replicas)</li>
+<li>Security group egress rules have been added (HTTPS and DNS to VPC CIDR) but issues persist</li>
+<li>Investigation ongoing: checking console logs, security groups, VPC endpoints, and IAM permissions</li>
+<li><strong>Do not use egress-zero cluster example for production until this issue is resolved</strong></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,4463 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Production-grade Terraform for Red Hat OpenShift Service on AWS with Hosted Control Planes">
+      
+      
+      
+        <link rel="canonical" href="https://rh-mobb.github.io/vp-terraform-rosa/deployment/enablement/">
+      
+      
+        <link rel="prev" href="../../prerequisites/byo/handoff-checklist/">
+      
+      
+        <link rel="next" href="../cluster-configurations/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Enablement Guide - ROSA HCP Terraform</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="red" data-md-color-accent="red">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#rosa-hcp-enablement-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="ROSA HCP Terraform" class="md-header__button md-logo" aria-label="ROSA HCP Terraform" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ROSA HCP Terraform
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Enablement Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="red" data-md-color-accent="red"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="red" data-md-color-accent="red"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/rh-mobb/vp-terraform-rosa" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    rh-mobb/vp-terraform-rosa
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/overview/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../prerequisites/" class="md-tabs__link">
+          
+  
+  
+  Prerequisites
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Deployment
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/egress-zero-gitops/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../modules/cluster/" class="md-tabs__link">
+          
+  
+  
+  Modules
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../operations/scripts/" class="md-tabs__link">
+          
+  
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/changelog/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="ROSA HCP Terraform" class="md-nav__button md-logo" aria-label="ROSA HCP Terraform" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ROSA HCP Terraform
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/rh-mobb/vp-terraform-rosa" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    rh-mobb/vp-terraform-rosa
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prerequisites
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Prerequisites
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choose Your Path
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/account/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Account Prerequisites
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/full-stack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full-Stack Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/customer-intake/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Customer Intake Form
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bring Your Own
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Bring Your Own
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/byo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/byo/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/byo/iam-kms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IAM and KMS Handoff
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/byo/handoff-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handoff Checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Deployment
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Enablement Guide
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Enablement Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-executive-summary-and-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Executive Summary and Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Executive Summary and Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#three-repository-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three-repository model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deployment-phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment phases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#terraform-vs-gitops-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Terraform vs GitOps boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-prerequisites-and-access-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Prerequisites and Access Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Prerequisites and Access Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tooling-and-accounts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tooling and accounts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ocm-service-accounts-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OCM service accounts (recommended)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OCM service accounts (recommended)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-the-service-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create the service account
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-creation-notification-contacts-and-console-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-creation: notification contacts and console access
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#authentication-and-access-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication and access flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#credential-hygiene" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Credential hygiene
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-repository-rehoming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Repository Rehoming
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Repository Rehoming">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#3a-repository-1-infrastructure-this-repo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3a. Repository 1: Infrastructure (this repo)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3b-repository-2-cluster-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3b. Repository 2: cluster-config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3c-repository-3-helm-charts-always-fork" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3c. Repository 3: Helm charts (always fork)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gitops-cmp-tools-container-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitOps CMP tools container image
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-provider-and-reference-material-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Provider and Reference Material Strategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Provider and Reference Material Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#provider-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#air-gapped-provider-mirror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Air-gapped provider mirror
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-end-to-end-deployment-runbook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. End-to-End Deployment Runbook
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. End-to-End Deployment Runbook">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#standard-deployment-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standard deployment sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bootstrap-internals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bootstrap internals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-walkthrough-acme-organization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example walkthrough: Acme organization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-creation-ocm-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-creation OCM configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#composable-cluster-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composable cluster configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Composable cluster configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#worked-example-byo-vpc-egress-zero-autonode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked example: BYO VPC + egress-zero + AutoNode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reference-tfvars-quick-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference tfvars quick index
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-bootstrap-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-bootstrap validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-acm-hubspoke-fleet-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. ACM Hub/Spoke Fleet Pattern
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. ACM Hub/Spoke Fleet Pattern">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spoke-registration-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spoke registration sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-organization-specific-customization-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Organization-Specific Customization Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-configuration-decision-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Configuration Decision Guide
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Configuration Decision Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#network-source-one-choice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network source (one choice)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#independent-dimensions-combine-freely" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Independent dimensions (combine freely)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#network-building-blocks-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network building blocks (reference)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-team-state-separation-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-team state separation (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-cicd-and-operational-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. CI/CD and Operational Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. CI/CD and Operational Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline stages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#day-2-change-flows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Day 2 change flows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-troubleshooting-and-known-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Troubleshooting and Known Limitations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Troubleshooting and Known Limitations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#troubleshooting-decision-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting decision tree
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommended-follow-ups-not-yet-in-terraform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended follow-ups (not yet in Terraform)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-appendices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Appendices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Appendices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-gitops-linking-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. GitOps-linking variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-terraform-bootstrap-outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Terraform bootstrap outputs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c-makefile-quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C. Makefile quick reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d-upstream-source-repositories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D. Upstream source repositories
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e-related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E. Related documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cluster-configurations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cluster Configurations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/egress-zero-gitops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Egress-Zero GitOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/zero-egress-ecr-access/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero Egress ECR Access
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/ci-cd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI/CD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/infra-nodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infra Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/improvements/ingress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ingress Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modules
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modules
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/cluster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cluster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/iam/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IAM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/network-private/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network (Private)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/network-public/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network (Public)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/network-existing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network (Existing)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/client-vpn/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Client VPN
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/bastion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bastion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modules/timing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Timing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/scripts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/bootstrap-gitops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GitOps Bootstrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-executive-summary-and-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Executive Summary and Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Executive Summary and Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#three-repository-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three-repository model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deployment-phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment phases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#terraform-vs-gitops-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Terraform vs GitOps boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-prerequisites-and-access-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Prerequisites and Access Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Prerequisites and Access Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tooling-and-accounts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tooling and accounts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ocm-service-accounts-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OCM service accounts (recommended)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OCM service accounts (recommended)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-the-service-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create the service account
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-creation-notification-contacts-and-console-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-creation: notification contacts and console access
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#authentication-and-access-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication and access flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#credential-hygiene" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Credential hygiene
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-repository-rehoming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Repository Rehoming
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Repository Rehoming">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#3a-repository-1-infrastructure-this-repo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3a. Repository 1: Infrastructure (this repo)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3b-repository-2-cluster-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3b. Repository 2: cluster-config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3c-repository-3-helm-charts-always-fork" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3c. Repository 3: Helm charts (always fork)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gitops-cmp-tools-container-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitOps CMP tools container image
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-provider-and-reference-material-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Provider and Reference Material Strategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Provider and Reference Material Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#provider-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#air-gapped-provider-mirror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Air-gapped provider mirror
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-end-to-end-deployment-runbook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. End-to-End Deployment Runbook
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. End-to-End Deployment Runbook">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#standard-deployment-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standard deployment sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bootstrap-internals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bootstrap internals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-walkthrough-acme-organization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example walkthrough: Acme organization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-creation-ocm-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-creation OCM configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#composable-cluster-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composable cluster configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Composable cluster configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#worked-example-byo-vpc-egress-zero-autonode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked example: BYO VPC + egress-zero + AutoNode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reference-tfvars-quick-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference tfvars quick index
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-bootstrap-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-bootstrap validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-acm-hubspoke-fleet-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. ACM Hub/Spoke Fleet Pattern
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. ACM Hub/Spoke Fleet Pattern">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spoke-registration-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spoke registration sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-organization-specific-customization-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Organization-Specific Customization Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-configuration-decision-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Configuration Decision Guide
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Configuration Decision Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#network-source-one-choice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network source (one choice)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#independent-dimensions-combine-freely" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Independent dimensions (combine freely)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#network-building-blocks-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network building blocks (reference)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-team-state-separation-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-team state separation (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-cicd-and-operational-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. CI/CD and Operational Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. CI/CD and Operational Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline stages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#day-2-change-flows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Day 2 change flows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-troubleshooting-and-known-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Troubleshooting and Known Limitations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Troubleshooting and Known Limitations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#troubleshooting-decision-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting decision tree
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommended-follow-ups-not-yet-in-terraform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended follow-ups (not yet in Terraform)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-appendices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Appendices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Appendices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-gitops-linking-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. GitOps-linking variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-terraform-bootstrap-outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Terraform bootstrap outputs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c-makefile-quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C. Makefile quick reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d-upstream-source-repositories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D. Upstream source repositories
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e-related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E. Related documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/rh-mobb/vp-terraform-rosa/edit/main/docs/deployment/enablement.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="rosa-hcp-enablement-guide">ROSA HCP Enablement Guide<a class="headerlink" href="#rosa-hcp-enablement-guide" title="Permanent link">&para;</a></h1>
+<p>Implementation guide for deploying Red Hat OpenShift Service on AWS (ROSA) with Hosted Control Planes (HCP) using the three-repository pattern in this project.</p>
+<p><strong>Audience:</strong> Platform engineers, SREs, architects, and delivery teams adopting this pattern in your own or a client's AWS account.</p>
+<p><strong>Assumptions:</strong></p>
+<ul>
+<li>All three repositories are rehomed into your organization's Git</li>
+<li>Helm charts are forked and published to an organization-owned chart repository (not the public <code>rh-mobb</code> GitHub Pages default)</li>
+</ul>
+<p>This pattern favors per-cluster state isolation and composable modules over pre-baked environment stacks.</p>
+<hr />
+<h2 id="1-executive-summary-and-architecture">1. Executive Summary and Architecture<a class="headerlink" href="#1-executive-summary-and-architecture" title="Permanent link">&para;</a></h2>
+<h3 id="three-repository-model">Three-repository model<a class="headerlink" href="#three-repository-model" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Repository</th>
+<th>Role</th>
+<th>Upstream source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1. Infrastructure</strong> (this repo)</td>
+<td>Terraform: VPC, IAM, ROSA HCP cluster, GitOps bootstrap orchestration</td>
+<td><code>vp-terraform-rosa</code></td>
+</tr>
+<tr>
+<td><strong>2. cluster-config</strong></td>
+<td>GitOps configuration consumed by ArgoCD after bootstrap</td>
+<td><a href="https://github.com/rh-mobb/rosa-cluster-config">rh-mobb/rosa-cluster-config</a></td>
+</tr>
+<tr>
+<td><strong>3. Helm charts</strong></td>
+<td>Bootstrap and app-of-apps charts</td>
+<td><a href="https://github.com/rh-mobb/validated-pattern-helm-charts">rh-mobb/validated-pattern-helm-charts</a></td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid"><code>flowchart TB
+  subgraph orgGit [Organization Git Repositories]
+    InfraRepo[org-rosa-infrastructure&lt;br/&gt;fork of vp-terraform-rosa]
+    ConfigRepo[org-cluster-config&lt;br/&gt;fork of rosa-cluster-config]
+    HelmRepo[org-helm-charts&lt;br/&gt;fork of validated-pattern-helm-charts]
+  end
+
+  subgraph awsAccount [AWS Account]
+    TF[Terraform apply] --&gt; ROSA[ROSA HCP Cluster]
+    TF --&gt; Bootstrap[bootstrap-gitops.sh]
+    Bootstrap --&gt; GitOps[OpenShift GitOps]
+    GitOps --&gt; ArgoCD[ArgoCD Applications]
+    ArgoCD --&gt; ConfigRepo
+    ArgoCD --&gt; HelmPages[Org Helm Pages / Chart Museum]
+    HelmPages --&gt; HelmRepo
+  end
+
+  InfraRepo --&gt; TF
+  ConfigRepo --&gt; ArgoCD
+  HelmRepo --&gt; HelmPages</code></pre>
+<h3 id="deployment-phases">Deployment phases<a class="headerlink" href="#deployment-phases" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart LR
+  Day0[Terraform Day 0] --&gt; Day1[Bootstrap Day 1] --&gt; Day2[GitOps Day 2]
+  Day0 --&gt; VpcIam[VPC IAM Cluster]
+  Day1 --&gt; GitOpsOp[GitOps Operator]
+  Day2 --&gt; Day2Apps[cert-manager ingress apps]</code></pre>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>What happens</th>
+<th>Who drives it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Day 0</strong></td>
+<td>VPC, IAM, KMS, cluster, EFS, logging IAM, bootstrap values</td>
+<td>Terraform (<code>make cluster.&lt;name&gt;.apply</code>)</td>
+</tr>
+<tr>
+<td><strong>Day 1</strong></td>
+<td>OpenShift GitOps operator, ArgoCD repo wiring</td>
+<td><code>make cluster.&lt;name&gt;.bootstrap</code></td>
+</tr>
+<tr>
+<td><strong>Day 2+</strong></td>
+<td>cert-manager, external-dns, ingress, apps, monitoring</td>
+<td>ArgoCD sync from cluster-config</td>
+</tr>
+</tbody>
+</table>
+<h3 id="terraform-vs-gitops-boundary">Terraform vs GitOps boundary<a class="headerlink" href="#terraform-vs-gitops-boundary" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart TB
+  subgraph terraformLayer [Terraform Day 0]
+    VPC[VPC and subnets]
+    IAM[IAM roles and OIDC]
+    KMS[KMS keys]
+    Cluster[ROSA HCP cluster]
+    EFS[EFS storage]
+    LogIAM[Logging IAM roles]
+    BootstrapVals[bootstrap values YAML]
+  end
+
+  subgraph gitopsLayer [GitOps Day 2]
+    CertMgr[cert-manager]
+    ExtDNS[external-dns]
+    Ingress[Ingress controllers]
+    IDP[Identity providers]
+    AppNS[Application namespaces]
+    Monitoring[Monitoring stack]
+  end
+
+  terraformLayer --&gt; BootstrapVals
+  BootstrapVals --&gt; gitopsLayer</code></pre>
+<p>Terraform creates AWS infrastructure and generates Helm values for bootstrap. GitOps deploys Kubernetes resources and ongoing cluster configuration. See <a href="../../PLAN.md">PLAN.md</a> for the full architecture rationale.</p>
+<hr />
+<h2 id="2-prerequisites-and-access-model">2. Prerequisites and Access Model<a class="headerlink" href="#2-prerequisites-and-access-model" title="Permanent link">&para;</a></h2>
+<h3 id="tooling-and-accounts">Tooling and accounts<a class="headerlink" href="#tooling-and-accounts" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Prerequisite</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Terraform &gt;= 1.5.0</td>
+<td>See <a href="../../terraform/00-providers.tf">terraform/00-providers.tf</a></td>
+</tr>
+<tr>
+<td>AWS CLI</td>
+<td>Configured with permissions for VPC, IAM, ROSA, Secrets Manager</td>
+</tr>
+<tr>
+<td><code>oc</code>, <code>helm</code>, <code>jq</code></td>
+<td>Required for bootstrap; see <a href="../../scripts/cluster/README-bootstrap-gitops.md">README-bootstrap-gitops.md</a></td>
+</tr>
+<tr>
+<td>OCM service account (recommended)</td>
+<td>For Terraform and CI/CD — see <a href="#ocm-service-accounts-recommended">OCM service accounts</a> below</td>
+</tr>
+<tr>
+<td>Personal RHCS token (dev only)</td>
+<td>Offline token for local testing — <a href="../../README.md#rhcs-api-authentication">README.md</a></td>
+</tr>
+<tr>
+<td>ROSA subscription / OCM access</td>
+<td><a href="https://docs.redhat.com/en/documentation/red_hat_openshift_service_on_aws/">ROSA HCP documentation</a></td>
+</tr>
+<tr>
+<td>Client VPN (private/egress-zero)</td>
+<td><a href="../../clusters/README.md#vpn-tunnel-requirement">clusters/README.md</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="ocm-service-accounts-recommended">OCM service accounts (recommended)<a class="headerlink" href="#ocm-service-accounts-recommended" title="Permanent link">&para;</a></h3>
+<p><strong>Use a Red Hat Hybrid Cloud Console service account</strong> for <code>terraform apply</code> and CI/CD pipelines — not a personal user offline token. Clusters created with a user token are tied to that individual as the OCM cluster owner. If that person leaves the organization or loses access, cluster ownership, notification routing, and console management can break.</p>
+<p>A dedicated service account decouples cluster lifecycle from any single person. Humans manage the cluster through Hybrid Cloud Console RBAC and notification contacts configured <strong>after</strong> creation.</p>
+<pre class="mermaid"><code>flowchart TB
+  subgraph beforeApply [Before terraform apply]
+    CreateSA[Create service account in HCC]
+    CreateSA --&gt; AddGroup[Add to User Access group]
+    AddGroup --&gt; AssignRoles[Assign OCM roles e.g. Cluster Provisioner]
+    AssignRoles --&gt; ExportCreds[Export RHCS_CLIENT_ID and RHCS_CLIENT_SECRET]
+  end
+
+  subgraph applyPhase [terraform apply]
+    ExportCreds --&gt; TFAuth[Terraform uses service account]
+    TFAuth --&gt; ClusterCreated[Cluster created in OCM]
+  end
+
+  subgraph afterApply [After cluster is Ready - manual in HCC]
+    ClusterCreated --&gt; NotifContacts[Add notification contact emails]
+    ClusterCreated --&gt; UserAccess[Grant users OCM management roles]
+  end</code></pre>
+<h4 id="create-the-service-account">Create the service account<a class="headerlink" href="#create-the-service-account" title="Permanent link">&para;</a></h4>
+<ol>
+<li>Sign in to <a href="https://console.redhat.com">Red Hat Hybrid Cloud Console</a></li>
+<li>Go to <strong>User Management → Service accounts</strong> (or <strong>Identity and Access Management → Service accounts</strong>)</li>
+<li>Create a service account (e.g. <code>rosa-terraform-provisioner</code>) and copy the <strong>client ID</strong> and <strong>client secret</strong> — the secret is shown only once</li>
+<li>Go to <strong>User Access → Groups</strong></li>
+<li>Add the service account to a group with OCM roles sufficient to create and manage clusters — typically <strong>OpenShift Cluster Manager</strong> roles such as <strong>Cluster Provisioner</strong> (create/manage) or a custom combination for your policy</li>
+<li>An Organization Administrator or User Access administrator must perform the group assignment — see <a href="https://docs.redhat.com/en/documentation/red_hat_hybrid_cloud_console/1-latest/html/creating_and_managing_service_accounts/">Creating and managing service accounts</a> and the <a href="https://docs.redhat.com/en/documentation/red_hat_hybrid_cloud_console/1-latest/html/user_access_configuration_guide_for_role-based_access_control_rbac/">User Access RBAC guide</a></li>
+</ol>
+<p><strong>Export credentials for Terraform:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">RHCS_CLIENT_ID</span><span class="o">=</span><span class="s2">&quot;your-client-id-uuid&quot;</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">RHCS_CLIENT_SECRET</span><span class="o">=</span><span class="s2">&quot;your-client-secret&quot;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Do not set RHCS_TOKEN when using a service account</span>
+</code></pre></div>
+<p>Store these in <code>.rhcs_creds</code> (gitignored) or your CI/CD secret store. See <a href="../../README.md#rhcs-api-authentication">README.md</a>.</p>
+<p><strong>Personal offline tokens</strong> (<code>RHCS_TOKEN</code>) are acceptable for short local experiments only. Do not use them for production clusters or shared automation.</p>
+<h4 id="post-creation-notification-contacts-and-console-access">Post-creation: notification contacts and console access<a class="headerlink" href="#post-creation-notification-contacts-and-console-access" title="Permanent link">&para;</a></h4>
+<p>After <code>terraform apply</code> completes and the cluster reaches <strong>Ready</strong>, configure OCM settings in the Hybrid Cloud Console. The service account that created the cluster does not receive human-readable notification emails — you must add contacts explicitly.</p>
+<p><strong>1. Add notification contacts (service logs)</strong></p>
+<p>Cluster notifications (service logs) are how Red Hat SRE communicates about cluster health, upgrades, and required actions. By default, only the cluster <strong>owner</strong> receives email — and when a service account owns the cluster, no mailbox receives them unless you add contacts.</p>
+<ol>
+<li>Open <a href="https://console.redhat.com/openshift">OpenShift Cluster Manager</a></li>
+<li>Select your cluster</li>
+<li>Open the <strong>Support</strong> tab (or cluster notifications settings)</li>
+<li>Click <strong>Add notification contact</strong> and enter one or more team distribution lists or on-call mailboxes (e.g. <code>platform-oncall@example.com</code>, <code>rosa-alerts@example.com</code>)</li>
+</ol>
+<p>See <a href="https://docs.redhat.com/en/documentation/red_hat_openshift_service_on_aws_classic_architecture/4/html/cluster_administration/rosa-cluster-notifications">Cluster notifications</a> for details on service log types and severity.</p>
+<p><strong>2. Grant users Hybrid Cloud Console management access</strong></p>
+<p>User Access in the Hybrid Cloud Console controls who can view and manage clusters in OCM — this is separate from OpenShift cluster RBAC (<code>cluster-admin</code>, etc.) inside the cluster.</p>
+<ol>
+<li>Go to <strong>User Access → Groups</strong></li>
+<li>Create or update a group for your platform team</li>
+<li>Add <strong>users</strong> (not the provisioning service account) to the group</li>
+<li>Assign OCM roles appropriate to each role:</li>
+<li><strong>Cluster Editor</strong> or <strong>Cluster Provisioner</strong> — manage cluster settings, upgrades, and lifecycle in OCM</li>
+<li><strong>Cluster Viewer</strong> — read-only access to cluster details in OCM</li>
+<li>Users in these groups can open the cluster in the Hybrid Cloud Console, view service logs, and perform permitted OCM actions</li>
+</ol>
+<p>Cluster <strong>in-cluster</strong> access (logging into OpenShift itself) is configured separately via identity providers and GitOps — not through User Access.</p>
+<pre class="mermaid"><code>flowchart LR
+  subgraph ocmLayer [Hybrid Cloud Console OCM]
+    SA[Service account creates cluster]
+    Notif[Notification contacts receive service logs]
+    Users[Users in User Access groups manage in OCM]
+  end
+
+  subgraph clusterLayer [OpenShift cluster]
+    IDP[Identity provider and cluster RBAC]
+    GitOps[GitOps-managed config]
+  end
+
+  SA --&gt; Notif
+  Users --&gt; ocmLayer
+  IDP --&gt; clusterLayer
+  GitOps --&gt; clusterLayer</code></pre>
+<h3 id="authentication-and-access-flow">Authentication and access flow<a class="headerlink" href="#authentication-and-access-flow" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart LR
+  Operator[Operator or CI pipeline]
+
+  Operator --&gt;|RHCS_CLIENT_ID and RHCS_CLIENT_SECRET recommended| OCM[OCM API]
+  Operator -.-&gt;|RHCS_TOKEN dev only| OCM
+  Operator --&gt;|AWS credentials| TF[Terraform]
+  Operator --&gt;|AWS credentials| SM[Secrets Manager]
+  TF --&gt; AWS[AWS resources]
+  Operator --&gt;|oc and helm| API[Cluster API]
+  VPN[Client VPN] -.-&gt;|if private API| API
+  HCC[Hybrid Cloud Console] --&gt;|post-creation| Notif[Notification contacts]
+  HCC --&gt;|User Access groups| OCM</code></pre>
+<h3 id="credential-hygiene">Credential hygiene<a class="headerlink" href="#credential-hygiene" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Never commit secrets to Git</li>
+<li><strong>Production and CI/CD:</strong> use service account <code>RHCS_CLIENT_ID</code> + <code>RHCS_CLIENT_SECRET</code> — not personal <code>RHCS_TOKEN</code></li>
+<li>Store credentials in <code>.rhcs_creds</code> (gitignored) or CI secrets; rotate service account secrets per your security policy</li>
+<li>Cluster admin password: <code>TF_VAR_admin_password</code> or AWS Secrets Manager</li>
+<li>Cluster credentials for bootstrap: stored in Secrets Manager by Terraform; bootstrap script reads them automatically</li>
+</ul>
+<hr />
+<h2 id="3-repository-rehoming">3. Repository Rehoming<a class="headerlink" href="#3-repository-rehoming" title="Permanent link">&para;</a></h2>
+<p>Rehome all three repositories before your first <code>terraform apply</code>. The workflow below assumes you fork upstream sources into your organization's Git hosting.</p>
+<pre class="mermaid"><code>flowchart TD
+  Start[Fork upstream repos] --&gt; Repo1[Repo 1 Infrastructure]
+  Start --&gt; Repo2[Repo 2 cluster-config]
+  Start --&gt; Repo3[Repo 3 Helm charts]
+  Repo1 --&gt; ClusterDir[Create clusters/env dir]
+  Repo2 --&gt; ConfigLayout[Create env/cluster paths]
+  Repo3 --&gt; PublishHelm[Publish to Helm repo URL]
+  ClusterDir --&gt; WireTfvars[Wire gitops_git_repo_url and helm_repo_url]
+  ConfigLayout --&gt; WireTfvars
+  PublishHelm --&gt; WireTfvars
+  WireTfvars --&gt; Ready[Ready for terraform apply]</code></pre>
+<h3 id="3a-repository-1-infrastructure-this-repo">3a. Repository 1: Infrastructure (this repo)<a class="headerlink" href="#3a-repository-1-infrastructure-this-repo" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Fork or copy this repository into your organization (GitHub Enterprise, GitLab, Bitbucket, etc.)</li>
+<li>Replace example cluster directories under <a href="../../clusters/">clusters/</a> with your naming convention, e.g. <code>clusters/&lt;org&gt;-&lt;env&gt;/</code></li>
+<li>Configure remote state (S3 + DynamoDB) — see <a href="../../clusters/README.md#backend-configuration">clusters/README.md</a> and <a href="../../guides/ci-cd/">CI/CD guide</a></li>
+<li>Pin provider versions in <a href="../../terraform/00-providers.tf">terraform/00-providers.tf</a></li>
+<li>Modules are already in-repo under <a href="../../modules/infrastructure/">modules/infrastructure/</a> — no external module registry required</li>
+</ol>
+<p><strong>Create a cluster directory:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>clusters/acme-prod
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># Start from the closest reference, then merge blocks from other examples as needed</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>cp<span class="w"> </span>clusters/egress-zero/terraform.tfvars<span class="w"> </span>clusters/acme-prod/
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Add BYO VPC IDs from byo-vpc, enable_autonode from autonode, etc.</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># Edit clusters/acme-prod/terraform.tfvars</span>
+</code></pre></div>
+<p>See <a href="#composable-cluster-configuration">Composable cluster configuration</a> for combining multiple reference tfvars.</p>
+<h3 id="3b-repository-2-cluster-config">3b. Repository 2: cluster-config<a class="headerlink" href="#3b-repository-2-cluster-config" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Fork <a href="https://github.com/rh-mobb/rosa-cluster-config">rh-mobb/rosa-cluster-config</a> into your organization</li>
+<li>Create the directory layout expected by ArgoCD (derived from <a href="../../modules/infrastructure/cluster/templates/hub-values.yaml.tftpl">hub-values.yaml.tftpl</a>):</li>
+</ol>
+<pre class="mermaid"><code>flowchart TB
+  Root[cluster-config repo root]
+  Root --&gt; EnvDev[dev/]
+  Root --&gt; EnvProd[prod/]
+  EnvDev --&gt; ClusterDev[acme-dev/]
+  ClusterDev --&gt; InfraYaml[infrastructure.yaml]
+  ClusterDev --&gt; AppsYaml[applications-ns.yaml]</code></pre>
+<p>The <code>gitops_git_path</code> in Terraform must match the path prefix:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="na">enable_gitops_bootstrap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="na">gitops_git_repo_url</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://github.com/&lt;org&gt;/acme-cluster-config.git&quot;</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="na">gitops_git_path</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;dev/acme-dev&quot;</span>
+</code></pre></div>
+<p>ArgoCD resolves <code>gitPathFile</code> relative to that path:</p>
+<ul>
+<li><code>dev/acme-dev/infrastructure.yaml</code> — infrastructure app-of-apps (cert-manager, external-dns, etc.)</li>
+<li><code>dev/acme-dev/applications-ns.yaml</code> — application namespace onboarding</li>
+</ul>
+<p><strong>Organization-specific edits</strong> in cluster-config (not Terraform):</p>
+<ul>
+<li>AD/LDAP groups for RBAC</li>
+<li>Ingress hostnames and TLS</li>
+<li>cert-manager issuer configuration</li>
+<li>ClusterLogForwarder and monitoring — see <a href="../../guides/improvements/ingress/">improvements/ingress.md</a> for ingress examples</li>
+</ul>
+<h3 id="3c-repository-3-helm-charts-always-fork">3c. Repository 3: Helm charts (always fork)<a class="headerlink" href="#3c-repository-3-helm-charts-always-fork" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Fork <a href="https://github.com/rh-mobb/validated-pattern-helm-charts">rh-mobb/validated-pattern-helm-charts</a></li>
+<li>Publish to your organization-owned Helm repository</li>
+<li>Point Terraform/bootstrap at your published URL</li>
+</ol>
+<pre class="mermaid"><code>flowchart TD
+  Fork[Fork validated-pattern-helm-charts]
+  Fork --&gt; Choice{Publish target}
+  Choice --&gt; GHPages[GitHub Pages]
+  Choice --&gt; S3Static[S3 static hosting]
+  Choice --&gt; Artifactory[Artifactory / Nexus / Harbor]
+  GHPages --&gt; HelmUrl[helm_repo_url]
+  S3Static --&gt; HelmUrl
+  Artifactory --&gt; HelmUrl
+  HelmUrl --&gt; Terraform[Terraform or HELM_REPO_URL env]</code></pre>
+<p><strong>Chart catalog:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Chart</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cluster-bootstrap</code></td>
+<td>Day 1: GitOps operator + ArgoCD repository wiring</td>
+</tr>
+<tr>
+<td><code>cluster-bootstrap-acm-spoke</code></td>
+<td>ACM spoke cluster bootstrap</td>
+</tr>
+<tr>
+<td><code>cluster-bootstrap-acm-hub-registration</code></td>
+<td>Hub-side spoke import</td>
+</tr>
+<tr>
+<td><code>app-of-apps-infrastructure</code></td>
+<td>Day 2: cert-manager, external-dns, platform infra</td>
+</tr>
+<tr>
+<td><code>app-of-apps-application</code></td>
+<td>Application namespace onboarding (standalone)</td>
+</tr>
+<tr>
+<td><code>app-of-apps-acm-team-onboarding</code></td>
+<td>ACM hub fleet onboarding</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Helm chart dependency chain:</strong></p>
+<pre class="mermaid"><code>flowchart LR
+  Bootstrap[cluster-bootstrap] --&gt; InfraApps[app-of-apps-infrastructure]
+  Bootstrap --&gt; AppApps[app-of-apps-application]
+  InfraApps --&gt; CertMgr[cert-manager]
+  InfraApps --&gt; ExtDNS[external-dns]
+  SpokeChart[cluster-bootstrap-acm-spoke] --&gt; HubReg[cluster-bootstrap-acm-hub-registration]</code></pre>
+<p><strong>Version pinning:</strong> Chart versions are hardcoded in <a href="../../modules/infrastructure/cluster/templates/hub-values.yaml.tftpl">hub-values.yaml.tftpl</a>:</p>
+<table>
+<thead>
+<tr>
+<th>Chart</th>
+<th>Pinned version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>app-of-apps-infrastructure</code></td>
+<td><code>0.2.2</code></td>
+</tr>
+<tr>
+<td><code>app-of-apps-application</code></td>
+<td><code>1.5.8</code></td>
+</tr>
+<tr>
+<td><code>app-of-apps-acm-team-onboarding</code></td>
+<td><code>0.4.1</code></td>
+</tr>
+</tbody>
+</table>
+<p>Align your fork with these versions, or update the template in your infrastructure fork.</p>
+<p><strong>Override Helm repo URL</strong> (not exposed at root <code>terraform.tfvars</code> today):</p>
+<ul>
+<li>Edit <code>helm_repo_url</code> default in <a href="../../modules/infrastructure/cluster/01-variables.tf">modules/infrastructure/cluster/01-variables.tf</a>, <strong>or</strong></li>
+<li>Set <code>HELM_REPO_URL</code> at bootstrap time — see <a href="../../scripts/cluster/README-bootstrap-gitops.md">README-bootstrap-gitops.md</a></li>
+</ul>
+<h3 id="gitops-cmp-tools-container-image">GitOps CMP tools container image<a class="headerlink" href="#gitops-cmp-tools-container-image" title="Permanent link">&para;</a></h3>
+<p>The <code>cluster-bootstrap</code> and <code>cluster-bootstrap-acm-spoke</code> charts configure an Argo CD repo-server <strong>ConfigManagementPlugin (CMP) sidecar</strong> named <code>avp</code>. That sidecar runs <code>helm</code>, <code>argocd-vault-plugin</code>, <code>find</code>, <code>git</code>, and related tools so Argo CD can render Application sources marked <code>plugin: true</code> in cluster-config (for example AutoNode charts that use AVP with AWS Secrets Manager).</p>
+<p><strong>Upstream image</strong> (multi-arch, built from <a href="../../hack/docker/gitops-tools/">hack/docker/gitops-tools/</a>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:&lt;tag&gt;
+</code></pre></div>
+<p>CI publishes <code>:latest</code> and <code>:sha</code> tags on merge to main. Pin a digest or SHA tag in production rather than floating <code>:latest</code>.</p>
+<p><strong>When to re-host:</strong> Mirror this image into <strong>your private registry</strong> when any of the following apply:</p>
+<ul>
+<li><code>zero_egress = true</code> (no pull path to <code>ghcr.io</code> without a VPC endpoint and allowlist)</li>
+<li>Corporate registry policy (only ECR, Artifactory, Harbor, etc.)</li>
+<li>ACM spoke clusters that must not depend on public GHCR at runtime</li>
+</ul>
+<p>Typical target: <strong>Amazon ECR</strong> in the cluster account (or a shared platform registry). Ensure worker nodes and the GitOps repo-server can pull the mirrored image (same-account ECR, pull secrets, or IRSA as appropriate).</p>
+<p><strong>Re-hosting workflow:</strong></p>
+<pre class="mermaid"><code>flowchart LR
+  Upstream[ghcr.io gitops-tools image]
+  Upstream --&gt; Mirror[skopeo or crane copy to ECR]
+  Mirror --&gt; Private[Private registry URL]
+  Private --&gt; Tftpl[hub-values / spoke-values defaultImage]
+  Private --&gt; ChartFork[Helm chart values.yaml defaultImage]
+  Tftpl --&gt; Bootstrap[make cluster.NAME.bootstrap]
+  ChartFork --&gt; Bootstrap</code></pre>
+<ol>
+<li>Copy the image to your registry (multi-arch recommended):</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Example: mirror to ECR (run from a host with registry access)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>aws<span class="w"> </span>ecr<span class="w"> </span>create-repository<span class="w"> </span>--repository-name<span class="w"> </span>rosa/gitops-tools
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>skopeo<span class="w"> </span>copy<span class="w"> </span>--all<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>docker://ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>docker://808082629126.dkr.ecr.us-east-1.amazonaws.com/rosa/gitops-tools:latest
+</code></pre></div>
+<ol>
+<li>
+<p>Point Terraform bootstrap values at the mirrored image — set <code>gitops_tools_image</code> in the cluster module (<a href="../../modules/infrastructure/cluster/01-variables.tf">01-variables.tf</a>), which flows into <code>defaultImage</code> in both bootstrap templates:</p>
+</li>
+<li>
+<p><a href="../../modules/infrastructure/cluster/templates/hub-values.yaml.tftpl">hub-values.yaml.tftpl</a> — hub and standalone (<code>cluster-bootstrap</code>)</p>
+</li>
+<li><a href="../../modules/infrastructure/cluster/templates/spoke-values.yaml.tftpl">spoke-values.yaml.tftpl</a> — ACM spoke (<code>cluster-bootstrap-acm-spoke</code>)</li>
+</ol>
+<p>Example module override:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="na">gitops_tools_image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;808082629126.dkr.ecr.us-east-1.amazonaws.com/rosa/gitops-tools:9e983e6&quot;</span>
+</code></pre></div>
+<p>Or edit the <code>defaultImage: ${gitops_tools_image}</code> line default in those <code>.tftpl</code> files in your infrastructure fork.</p>
+<ol>
+<li>
+<p>Update <strong><code>defaultImage</code></strong> in your Helm chart fork as well (<a href="https://github.com/rh-mobb/validated-pattern-helm-charts/blob/main/charts/cluster-bootstrap/values.yaml">cluster-bootstrap/values.yaml</a> and <a href="https://github.com/rh-mobb/validated-pattern-helm-charts/blob/main/charts/cluster-bootstrap-acm-spoke/values.yaml">cluster-bootstrap-acm-spoke/values.yaml</a>) so chart defaults match when bootstrap is run outside Terraform or when values are not regenerated.</p>
+</li>
+<li>
+<p>Re-run bootstrap (or apply the rendered ArgoCD CR) and hard-refresh plugin-based Applications if the repo-server image changed after initial install.</p>
+</li>
+</ol>
+<p>For zero-egress Git source mirroring (separate from this container image), see <a href="../../guides/egress-zero-gitops/">egress-zero GitOps guide</a>.</p>
+<hr />
+<h2 id="4-provider-and-reference-material-strategy">4. Provider and Reference Material Strategy<a class="headerlink" href="#4-provider-and-reference-material-strategy" title="Permanent link">&para;</a></h2>
+<h3 id="provider-versions">Provider versions<a class="headerlink" href="#provider-versions" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Version constraint</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>terraform-redhat/rhcs</code></td>
+<td><code>~&gt; 1.7</code></td>
+<td><a href="../../terraform/00-providers.tf">terraform/00-providers.tf</a></td>
+</tr>
+<tr>
+<td><code>hashicorp/aws</code></td>
+<td><code>~&gt; 6.0</code></td>
+<td><a href="../../terraform/00-providers.tf">terraform/00-providers.tf</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="air-gapped-provider-mirror">Air-gapped provider mirror<a class="headerlink" href="#air-gapped-provider-mirror" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart LR
+  Internet[Internet-connected host] --&gt; MirrorCmd[terraform providers mirror]
+  MirrorCmd --&gt; MirrorDir[mirror directory]
+  MirrorDir --&gt; OfflineHost[Air-gapped workstation]
+  OfflineHost --&gt; InitCmd[terraform init -plugin-dir=mirror]</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># On internet-connected host</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>terraform<span class="w"> </span>providers<span class="w"> </span>mirror<span class="w"> </span>./provider-mirror
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># Copy provider-mirror/ to air-gapped environment</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="nb">cd</span><span class="w"> </span>terraform/
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>terraform<span class="w"> </span>init<span class="w"> </span>-plugin-dir<span class="o">=</span>../provider-mirror
+</code></pre></div>
+<h2 id="5-end-to-end-deployment-runbook">5. End-to-End Deployment Runbook<a class="headerlink" href="#5-end-to-end-deployment-runbook" title="Permanent link">&para;</a></h2>
+<h3 id="standard-deployment-sequence">Standard deployment sequence<a class="headerlink" href="#standard-deployment-sequence" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>sequenceDiagram
+  participant Operator
+  participant TF as Terraform
+  participant ROSA as ROSA_HCP
+  participant Bootstrap as bootstrap-gitops.sh
+  participant Argo as ArgoCD
+  participant Config as cluster-config
+
+  Operator-&gt;&gt;TF: make cluster.NAME.init
+  Operator-&gt;&gt;TF: make cluster.NAME.plan
+  Operator-&gt;&gt;TF: make cluster.NAME.apply
+  TF-&gt;&gt;ROSA: Create VPC IAM Cluster
+  Operator-&gt;&gt;ROSA: Configure notification contacts in HCC
+  Operator-&gt;&gt;ROSA: Grant users OCM access via User Access
+  Operator-&gt;&gt;Bootstrap: make cluster.NAME.bootstrap
+  Bootstrap-&gt;&gt;Argo: Install cluster-bootstrap chart
+  Argo-&gt;&gt;Config: Sync infrastructure.yaml
+  Argo-&gt;&gt;Config: Sync applications-ns.yaml
+  Operator-&gt;&gt;Operator: make cluster.NAME.verify</code></pre>
+<h3 id="bootstrap-internals">Bootstrap internals<a class="headerlink" href="#bootstrap-internals" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart TD
+  Apply[terraform apply] --&gt; WriteValues[Write cluster-bootstrap-values.yaml]
+  WriteValues --&gt; EvalExports[eval gitops_bootstrap_env_exports]
+  EvalExports --&gt; Script[bootstrap-gitops.sh]
+  Script --&gt; WaitWorkers[Wait for 2+ Ready workers]
+  WaitWorkers --&gt; HelmInstall[helm install cluster-bootstrap]
+  HelmInstall --&gt; ArgoRepos[ArgoCD initialRepositories wired]</code></pre>
+<p>The Makefile (<a href="../../Makefile.cluster">Makefile.cluster</a>) orchestrates bootstrap:</p>
+<ol>
+<li>Writes <code>clusters/&lt;name&gt;/cluster-bootstrap-values.yaml</code> from <code>gitops_bootstrap_hub_values</code> or <code>gitops_bootstrap_spoke_values</code></li>
+<li>Runs <code>eval $(terraform output -raw gitops_bootstrap_env_exports)</code></li>
+<li>Executes <code>gitops_bootstrap_script_path</code></li>
+</ol>
+<h3 id="example-walkthrough-acme-organization">Example walkthrough: Acme organization<a class="headerlink" href="#example-walkthrough-acme-organization" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart LR
+  ForkInfra[Fork vp-terraform-rosa] --&gt; AcmeInfra[acme-rosa-infrastructure]
+  ForkConfig[Fork rosa-cluster-config] --&gt; AcmeConfig[acme-cluster-config]
+  ForkHelm[Fork helm-charts] --&gt; AcmeHelm[acme-helm-charts published]
+  AcmeInfra --&gt; ClusterDir[clusters/acme-dev/]
+  AcmeConfig --&gt; ConfigPath[dev/acme-dev/ layout]
+  AcmeHelm --&gt; HelmUrl[helm_repo_url set]
+  ClusterDir --&gt; Apply[terraform apply]
+  ConfigPath --&gt; Apply
+  HelmUrl --&gt; Apply
+  Apply --&gt; OcmConfig[Notification contacts and User Access in HCC]
+  OcmConfig --&gt; Bootstrap[make cluster.acme-dev.bootstrap]
+  Bootstrap --&gt; Verify[make cluster.acme-dev.verify]</code></pre>
+<p><strong>Commands for a first public dev cluster:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># OCM service account credentials (recommended)</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">RHCS_CLIENT_ID</span><span class="o">=</span><span class="s2">&quot;your-client-id-uuid&quot;</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">RHCS_CLIENT_SECRET</span><span class="o">=</span><span class="s2">&quot;your-client-secret&quot;</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="nb">export</span><span class="w"> </span><span class="nv">TF_VAR_admin_password</span><span class="o">=</span><span class="s2">&quot;your-secure-password&quot;</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="c1"># Infrastructure</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>make<span class="w"> </span>cluster.acme-dev.init
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>make<span class="w"> </span>cluster.acme-dev.plan
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>make<span class="w"> </span>cluster.acme-dev.apply
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="c1"># Post-creation (Hybrid Cloud Console — before or after bootstrap)</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="c1"># 1. Add notification contact emails on cluster Support tab</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="c1"># 2. Add platform team users to User Access group with OCM roles</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="c1"># GitOps bootstrap</span>
+<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>make<span class="w"> </span>cluster.acme-dev.bootstrap
+<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>
+<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="c1"># Validation</span>
+<a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>make<span class="w"> </span>cluster.acme-dev.verify
+</code></pre></div>
+<h3 id="post-creation-ocm-configuration">Post-creation OCM configuration<a class="headerlink" href="#post-creation-ocm-configuration" title="Permanent link">&para;</a></h3>
+<p>Complete these steps in the <a href="https://console.redhat.com/openshift">Hybrid Cloud Console</a> once the cluster is <strong>Ready</strong>. They are not managed by Terraform in this repository.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Where</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Add notification contacts</td>
+<td>Cluster → <strong>Support</strong> tab → <strong>Add notification contact</strong></td>
+<td>Service logs and SRE communications need a real mailbox; service account owners do not receive email</td>
+</tr>
+<tr>
+<td>Grant OCM management access</td>
+<td><strong>User Access → Groups</strong> → add users + OCM roles</td>
+<td>Platform engineers manage upgrades and lifecycle in OCM without sharing the provisioning service account</td>
+</tr>
+<tr>
+<td>Verify cluster visibility</td>
+<td>OpenShift Cluster Manager cluster list</td>
+<td>Confirm intended users can see and open the cluster</td>
+</tr>
+</tbody>
+</table>
+<p>Do not share the provisioning service account credentials with human operators for day-to-day console use — grant User Access roles instead.</p>
+<h3 id="composable-cluster-configuration">Composable cluster configuration<a class="headerlink" href="#composable-cluster-configuration" title="Permanent link">&para;</a></h3>
+<p>Example directories under <a href="../../clusters/">clusters/</a> are <strong>reference <code>terraform.tfvars</code> recipes</strong> — not mutually exclusive topology types. A production cluster often combines characteristics from several examples. You create one directory (e.g. <code>clusters/acme-prod/</code>) and compose the variables you need.</p>
+<pre class="mermaid"><code>flowchart TB
+  NewCluster[clusters/my-cluster/terraform.tfvars]
+
+  NewCluster --&gt; NetVars[Network vars from examples]
+  NewCluster --&gt; ClusterVars[Cluster vars from examples]
+  NewCluster --&gt; GitOpsVars[GitOps vars from examples]
+  NewCluster --&gt; OptionalVars[Optional feature vars]
+
+  NetVars --&gt; PublicEx[public]
+  NetVars --&gt; PrivateEx[egress-zero]
+  NetVars --&gt; ByoEx[byo-vpc]
+
+  ClusterVars --&gt; AutonodeEx[autonode]
+  ClusterVars --&gt; HubEx[dev-hub-1]
+  ClusterVars --&gt; SpokeEx[dev-spoke-1]
+
+  GitOpsVars --&gt; AnyEx[any example with gitops block]</code></pre>
+<p><strong>Configuration dimensions</strong> — pick values independently; merge into a single tfvars file:</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Key variables</th>
+<th>Reference tfvars</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Network source</td>
+<td><code>network_type</code>, <code>existing_vpc_id</code>, <code>existing_private_subnet_ids</code>, <code>existing_public_subnet_ids</code></td>
+<td><a href="../../clusters/public/terraform.tfvars">public</a>, <a href="../../clusters/egress-zero/terraform.tfvars">egress-zero</a>, <a href="../../clusters/byo-vpc/terraform.tfvars">byo-vpc</a></td>
+</tr>
+<tr>
+<td>Egress posture</td>
+<td><code>zero_egress</code>, <code>private</code></td>
+<td><a href="../../clusters/egress-zero/terraform.tfvars">egress-zero</a> — can combine with BYO VPC</td>
+</tr>
+<tr>
+<td>Cluster access</td>
+<td><code>enable_client_vpn</code>, <code>enable_bastion</code></td>
+<td><a href="../../clusters/egress-zero/terraform.tfvars">egress-zero</a></td>
+</tr>
+<tr>
+<td>Compute model</td>
+<td><code>enable_autonode</code>, <code>default_*_replicas</code>, <code>additional_machine_pools</code></td>
+<td><a href="../../clusters/autonode/terraform.tfvars">autonode</a>, <a href="../../clusters/public/terraform.tfvars">public</a></td>
+</tr>
+<tr>
+<td>Fleet / ACM</td>
+<td><code>acm_mode</code>, hub/spoke bootstrap targets</td>
+<td><a href="../../clusters/dev-hub-1/terraform.tfvars">dev-hub-1</a>, <a href="../../clusters/dev-spoke-1/terraform.tfvars">dev-spoke-1</a></td>
+</tr>
+<tr>
+<td>GitOps</td>
+<td><code>enable_gitops_bootstrap</code>, <code>gitops_git_repo_url</code>, <code>gitops_git_path</code></td>
+<td>Any example with GitOps enabled</td>
+</tr>
+<tr>
+<td>Production hardening</td>
+<td><code>openshift_version</code>, KMS, <code>fips</code>, <code>enable_termination_protection</code></td>
+<td><a href="../../clusters/egress-zero/terraform.tfvars">egress-zero</a></td>
+</tr>
+</tbody>
+</table>
+<h4 id="worked-example-byo-vpc-egress-zero-autonode">Worked example: BYO VPC + egress-zero + AutoNode<a class="headerlink" href="#worked-example-byo-vpc-egress-zero-autonode" title="Permanent link">&para;</a></h4>
+<p>A cluster might use a network team's existing VPC, require zero egress, and use Karpenter-based AutoNode. Copy the relevant blocks from each reference file into one <code>terraform.tfvars</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># --- From byo-vpc: network source ---</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="na">network_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;existing&quot;</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="na">existing_vpc_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;vpc-xxxxxxxx&quot;</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="na">existing_private_subnet_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;subnet-a&quot;, &quot;subnet-b&quot;, &quot;subnet-c&quot;</span><span class="p">]</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="na">existing_public_subnet_ids</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[]</span><span class="c1">  # empty for private API / zero egress</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># --- From egress-zero: egress and access ---</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="na">zero_egress</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="no">true</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="na">private</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="no">true</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="na">enable_client_vpn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="c1"># Ensure BYO VPC has VPC endpoints and no NAT on private routes (see byo-vpc comments)</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="c1"># --- From autonode: compute model ---</span>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="na">enable_autonode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span>
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="na">openshift_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;4.19.30&quot;</span><span class="c1">  # AutoNode version/region constraints — verify current docs</span>
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="na">region</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;us-east-1&quot;</span>
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="c1"># --- Your org: GitOps and naming ---</span>
+<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a><span class="na">cluster_name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;acme-prod-01&quot;</span>
+<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a><span class="na">gitops_git_repo_url</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://github.com/&lt;org&gt;/acme-cluster-config.git&quot;</span>
+<a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a><span class="na">gitops_git_path</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;prod/acme-prod-01&quot;</span>
+<a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a><span class="na">enable_gitops_bootstrap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span>
+</code></pre></div>
+<p><strong>Operational steps</strong> for this combination:</p>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BYO VPC prerequisites</td>
+<td>Pre-provision VPC, subnets, endpoints per <a href="../../clusters/byo-vpc/terraform.tfvars">byo-vpc/terraform.tfvars</a> header comments</td>
+</tr>
+<tr>
+<td>Zero egress GitOps</td>
+<td>CodeCommit mirroring — <a href="../../guides/egress-zero-gitops/">egress-zero GitOps guide</a></td>
+</tr>
+<tr>
+<td>Private API access</td>
+<td><code>make cluster.&lt;name&gt;.vpn-start</code> before bootstrap/login</td>
+</tr>
+<tr>
+<td>AutoNode</td>
+<td>Confirm region/version eligibility; optional <code>autonode_kubernetes_cluster_tag_id</code> after first apply</td>
+</tr>
+<tr>
+<td>Bootstrap</td>
+<td>Standard <code>make cluster.&lt;name&gt;.bootstrap</code> unless ACM spoke (then <code>bootstrap-spoke</code>)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="reference-tfvars-quick-index">Reference tfvars quick index<a class="headerlink" href="#reference-tfvars-quick-index" title="Permanent link">&para;</a></h4>
+<p>Use these as copy-paste sources — not as exclusive cluster "types":</p>
+<table>
+<thead>
+<tr>
+<th>Reference directory</th>
+<th>Primary variables to borrow</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../../clusters/public/terraform.tfvars">public</a></td>
+<td><code>network_type = "public"</code>, dev-sized pools, GitOps block</td>
+</tr>
+<tr>
+<td><a href="../../clusters/egress-zero/terraform.tfvars">egress-zero</a></td>
+<td><code>zero_egress</code>, <code>private</code>, Client VPN, production encryption</td>
+</tr>
+<tr>
+<td><a href="../../clusters/byo-vpc/terraform.tfvars">byo-vpc</a></td>
+<td><code>network_type = "existing"</code>, <code>existing_*</code> subnet IDs, prerequisite comments</td>
+</tr>
+<tr>
+<td><a href="../../clusters/autonode/terraform.tfvars">autonode</a></td>
+<td><code>enable_autonode</code>, <code>additional_cluster_properties</code>, version/region</td>
+</tr>
+<tr>
+<td><a href="../../clusters/dev-hub-1/terraform.tfvars">dev-hub-1</a></td>
+<td>Hub cluster sizing; set <code>acm_mode = hub</code> in module</td>
+</tr>
+<tr>
+<td><a href="../../clusters/dev-spoke-1/terraform.tfvars">dev-spoke-1</a></td>
+<td>Spoke GitOps path; use <code>bootstrap-spoke</code> Makefile target</td>
+</tr>
+</tbody>
+</table>
+<h3 id="post-bootstrap-validation">Post-bootstrap validation<a class="headerlink" href="#post-bootstrap-validation" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>make<span class="w"> </span>cluster.&lt;name&gt;.verify
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="c1"># or</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>python3<span class="w"> </span>scripts/verify_cluster.py<span class="w"> </span>--cluster-dir<span class="w"> </span>&lt;name&gt;
+</code></pre></div>
+<p>Checks OpenShift GitOps operator health and <code>cluster-config-applicationset</code> deployment.</p>
+<hr />
+<h2 id="6-acm-hubspoke-fleet-pattern">6. ACM Hub/Spoke Fleet Pattern<a class="headerlink" href="#6-acm-hubspoke-fleet-pattern" title="Permanent link">&para;</a></h2>
+<p>For multi-cluster management with Advanced Cluster Management (ACM), deploy a hub cluster first, then register spokes.</p>
+<h3 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart TB
+  subgraph hubCluster [Hub Cluster]
+    ACM[ACM Hub]
+    ArgoHub[ArgoCD on Hub]
+    TeamOnboard[app-of-apps-acm-team-onboarding]
+  end
+
+  subgraph spokeCluster [Spoke Cluster]
+    Klusterlet[klusterlet agent]
+    ArgoSpoke[GitOps on Spoke]
+    SpokeChart[cluster-bootstrap-acm-spoke]
+  end
+
+  HubReg[cluster-bootstrap-acm-hub-registration] --&gt; ACM
+  SpokeChart --&gt; Klusterlet
+  ACM --&gt; Klusterlet
+  ArgoHub --&gt; spokeCluster</code></pre>
+<h3 id="spoke-registration-sequence">Spoke registration sequence<a class="headerlink" href="#spoke-registration-sequence" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>sequenceDiagram
+  participant Operator
+  participant Spoke as Spoke Cluster
+  participant Hub as Hub Cluster
+  participant ACM
+
+  Operator-&gt;&gt;Spoke: bootstrap-spoke installs spoke chart
+  Operator-&gt;&gt;Hub: login with hub credentials
+  Operator-&gt;&gt;Hub: install hub registration chart
+  Hub-&gt;&gt;ACM: Create ManagedCluster import secret
+  Operator-&gt;&gt;Spoke: apply import manifest and CRDs
+  Operator-&gt;&gt;Hub: verify ArgoCD integration</code></pre>
+<h3 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Command</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hub bootstrap</td>
+<td><code>make cluster.&lt;hub&gt;.bootstrap</code> (with <code>acm_mode = hub</code>)</td>
+</tr>
+<tr>
+<td>Spoke bootstrap</td>
+<td><code>make cluster.&lt;spoke&gt;.bootstrap-spoke HUB_CREDENTIALS_SECRET=&lt;secret&gt; ACM_REGION=&lt;region&gt;</code></td>
+</tr>
+<tr>
+<td>Spoke teardown</td>
+<td><code>make cluster.&lt;spoke&gt;.teardown-spoke HUB_CREDENTIALS_SECRET=&lt;secret&gt; ACM_REGION=&lt;region&gt;</code></td>
+</tr>
+</tbody>
+</table>
+<p>Hub credentials are stored in AWS Secrets Manager. The spoke bootstrap script reads hub credentials from the secret named in <code>HUB_CREDENTIALS_SECRET</code>.</p>
+<p><strong>Known limitation:</strong> <code>acm_mode</code> is defined in the cluster module (<a href="../../modules/infrastructure/cluster/01-variables.tf">01-variables.tf</a>) but not yet exposed in root <a href="../../terraform/10-main.tf">terraform/10-main.tf</a>. Set it in your fork's module call or extend root variable passthrough. Example cluster directories named <code>dev-hub-1</code> / <code>dev-spoke-1</code> default to <code>noacm</code> unless you configure <code>acm_mode</code> explicitly; <code>bootstrap-spoke</code> overrides <code>ACM_MODE=spoke</code> at runtime via the Makefile.</p>
+<hr />
+<h2 id="7-organization-specific-customization-checklist">7. Organization-Specific Customization Checklist<a class="headerlink" href="#7-organization-specific-customization-checklist" title="Permanent link">&para;</a></h2>
+<p>Complete this checklist before your first production deployment:</p>
+<ul>
+<li>[ ] Create an OCM service account in Hybrid Cloud Console; add to User Access group with <strong>Cluster Provisioner</strong> (or equivalent) role</li>
+<li>[ ] Use <code>RHCS_CLIENT_ID</code> + <code>RHCS_CLIENT_SECRET</code> for Terraform and CI/CD — not a personal offline token</li>
+<li>[ ] After cluster creation: add <strong>notification contact</strong> email addresses for service logs</li>
+<li>[ ] After cluster creation: add platform team <strong>users</strong> to User Access groups with appropriate OCM management roles</li>
+<li>[ ] Replace <code>gitops_git_repo_url</code> with your cluster-config repository URL</li>
+<li>[ ] Create matching <code>gitops_git_path</code> directory in cluster-config (<code>&lt;env&gt;/&lt;cluster-name&gt;/</code>)</li>
+<li>[ ] Fork Helm charts; publish to your Helm repository; update <code>helm_repo_url</code></li>
+<li>[ ] Replace hardcoded <code>adGroup: PFAUTHAD</code> in <a href="../../modules/infrastructure/cluster/templates/hub-values.yaml.tftpl">hub-values.yaml.tftpl</a> with your AD/LDAP group</li>
+<li>[ ] Pin OpenShift version (<code>openshift_version</code> in tfvars)</li>
+<li>[ ] Configure KMS, etcd encryption, and FIPS for production</li>
+<li>[ ] Set <code>tags</code> for cost allocation and governance</li>
+<li>[ ] Configure remote state bucket per security policy</li>
+<li>[ ] Set <code>enable_persistent_dns_domain</code> and <code>enable_termination_protection</code> per policy</li>
+<li>[ ] For egress-zero: plan CodeCommit mirroring — <a href="../../guides/egress-zero-gitops/">egress-zero GitOps guide</a> (not fully automated in Terraform yet — tracked in internal <code>docs/TODO.md</code>)</li>
+</ul>
+<hr />
+<h2 id="8-configuration-decision-guide">8. Configuration Decision Guide<a class="headerlink" href="#8-configuration-decision-guide" title="Permanent link">&para;</a></h2>
+<p>Cluster shape is defined entirely by <code>clusters/&lt;name&gt;/terraform.tfvars</code>. Example directories illustrate <strong>variable combinations</strong>, not a single choice from a menu. Network, egress, compute, and fleet settings compose independently.</p>
+<h3 id="network-source-one-choice">Network source (one choice)<a class="headerlink" href="#network-source-one-choice" title="Permanent link">&para;</a></h3>
+<p>This decision applies only to <strong>where the VPC comes from</strong>. It does not preclude egress-zero, AutoNode, ACM, or other options.</p>
+<pre class="mermaid"><code>flowchart TD
+  Start{Existing VPC?}
+  Start --&gt;|Yes| BYO["network_type=existing&lt;br/&gt;+ existing_* IDs"]
+  Start --&gt;|No| TerraformNet{Terraform-managed network}
+  TerraformNet --&gt; EgressQ{zero_egress=true?}
+  EgressQ --&gt;|Yes| PrivModule["network_type=private&lt;br/&gt;module disables NAT"]
+  EgressQ --&gt;|No| ApiQ{private API?}
+  ApiQ --&gt;|Yes| PrivModule
+  ApiQ --&gt;|No| PubModule["network_type=public"]</code></pre>
+<p><code>zero_egress</code> and <code>private</code> are <strong>separate variables</strong> — they can be set on BYO VPC (<code>network_type = "existing"</code>) or Terraform-managed networks. See <a href="../../terraform/01-variables.tf">terraform/01-variables.tf</a>.</p>
+<h3 id="independent-dimensions-combine-freely">Independent dimensions (combine freely)<a class="headerlink" href="#independent-dimensions-combine-freely" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart TB
+  Tfvars[terraform.tfvars]
+
+  Tfvars --&gt; NetDim[Network source&lt;br/&gt;public private existing]
+  Tfvars --&gt; EgressDim[Egress posture&lt;br/&gt;zero_egress private]
+  Tfvars --&gt; AccessDim[Operator access&lt;br/&gt;client_vpn bastion]
+  Tfvars --&gt; ComputeDim[Compute&lt;br/&gt;machine_pools autonode]
+  Tfvars --&gt; FleetDim[Fleet&lt;br/&gt;acm_mode hub spoke]
+  Tfvars --&gt; GitOpsDim[GitOps&lt;br/&gt;repo url path]</code></pre>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Variables</th>
+<th>Combines with</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Terraform-managed public</td>
+<td><code>network_type = "public"</code>, <code>zero_egress = false</code></td>
+<td>AutoNode, ACM, GitOps</td>
+</tr>
+<tr>
+<td>Terraform-managed private</td>
+<td><code>network_type = "private"</code></td>
+<td><code>zero_egress = true</code> for egress-zero</td>
+</tr>
+<tr>
+<td>BYO VPC</td>
+<td><code>network_type = "existing"</code>, <code>existing_*</code></td>
+<td><code>zero_egress = true</code>, AutoNode, GitOps</td>
+</tr>
+<tr>
+<td>Zero egress</td>
+<td><code>zero_egress = true</code></td>
+<td>Any network source; needs VPC endpoints (+ CodeCommit for GitOps)</td>
+</tr>
+<tr>
+<td>AutoNode</td>
+<td><code>enable_autonode = true</code></td>
+<td>Any network/egress combo; check version/region constraints</td>
+</tr>
+<tr>
+<td>ACM hub/spoke</td>
+<td><code>acm_mode</code>, bootstrap target</td>
+<td>Any network/egress combo</td>
+</tr>
+</tbody>
+</table>
+<h3 id="network-building-blocks-reference">Network building blocks (reference)<a class="headerlink" href="#network-building-blocks-reference" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart LR
+  subgraph publicNet [network_type=public]
+    PubIGW[Internet Gateway]
+    PubNAT[NAT Gateway]
+    PubSubnets[Public + Private subnets]
+  end
+
+  subgraph privateNet [network_type=private]
+    PrivPL[PrivateLink API]
+    PrivNAT[NAT optional]
+    PrivSubnets[Private subnets only]
+  end
+
+  subgraph egressOverlay [zero_egress=true overlay]
+    EgressEP[VPC endpoints only]
+    EgressNoNAT[No NAT]
+  end
+
+  subgraph byoNet [network_type=existing]
+    ByoUser[User-managed VPC]
+  end</code></pre>
+<table>
+<thead>
+<tr>
+<th><code>network_type</code></th>
+<th><code>zero_egress</code></th>
+<th>Typical API</th>
+<th>Internet egress</th>
+<th>Operator VPN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>public</code></td>
+<td><code>false</code></td>
+<td>Public</td>
+<td>NAT</td>
+<td>Usually no</td>
+</tr>
+<tr>
+<td><code>private</code></td>
+<td><code>false</code></td>
+<td>PrivateLink</td>
+<td>NAT</td>
+<td>Sometimes</td>
+</tr>
+<tr>
+<td><code>private</code></td>
+<td><code>true</code></td>
+<td>PrivateLink</td>
+<td>VPC endpoints only</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>existing</code></td>
+<td><code>false</code></td>
+<td>Configurable</td>
+<td>User-managed</td>
+<td>Sometimes</td>
+</tr>
+<tr>
+<td><code>existing</code></td>
+<td><code>true</code></td>
+<td>Configurable</td>
+<td>VPC endpoints only</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="multi-team-state-separation-optional">Multi-team state separation (optional)<a class="headerlink" href="#multi-team-state-separation-optional" title="Permanent link">&para;</a></h3>
+<p>For large organizations where network, IAM, and platform teams own separate Terraform state:</p>
+<pre class="mermaid"><code>flowchart TB
+  NetTeam[Network team state] --&gt;|vpc_id subnet_ids| PlatTeam[Platform team state]
+  IamTeam[IAM team state] --&gt;|role ARNs OIDC| PlatTeam
+  PlatTeam --&gt; Cluster[ROSA HCP cluster]</code></pre>
+<p>See <a href="../../README.md#multi-team-scenarios">README.md</a> for composition patterns using <code>TF_VAR_*</code> or shared tfvars.</p>
+<hr />
+<h2 id="9-cicd-and-operational-model">9. CI/CD and Operational Model<a class="headerlink" href="#9-cicd-and-operational-model" title="Permanent link">&para;</a></h2>
+<p>Scripts under <a href="../../scripts/cluster/">scripts/cluster/</a> are CI-friendly — pipelines do not require Make.</p>
+<h3 id="pipeline-stages">Pipeline stages<a class="headerlink" href="#pipeline-stages" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart LR
+  PR[Pull request] --&gt; FmtValidate[fmt validate lint]
+  FmtValidate --&gt; PlanJob[terraform plan]
+  PlanJob --&gt; Approval{Manual approval}
+  Approval --&gt; ApplyJob[terraform apply]
+  ApplyJob --&gt; BootstrapJob[bootstrap-gitops]
+  BootstrapJob --&gt; VerifyJob[verify_cluster.py]</code></pre>
+<p>Bootstrap runs as a <strong>separate job</strong> after apply — it needs cluster API access and Secrets Manager read permissions.</p>
+<h3 id="day-2-change-flows">Day 2 change flows<a class="headerlink" href="#day-2-change-flows" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart LR
+  subgraph gitopsChanges [Kubernetes config]
+    ConfigPR[cluster-config PR] --&gt; ArgoSync[ArgoCD sync] --&gt; ClusterK8s[Cluster resources]
+  end
+
+  subgraph infraChanges [AWS infrastructure]
+    TfPR[terraform PR] --&gt; TfApply[plan and apply] --&gt; ClusterAWS[AWS resources]
+  end</code></pre>
+<ul>
+<li><strong>cluster-config changes</strong> (apps, ingress, cert-manager): merge PR → ArgoCD syncs automatically</li>
+<li><strong>Terraform changes</strong> (VPC, IAM, cluster version): plan → approve → apply</li>
+</ul>
+<p>See <a href="../../guides/ci-cd/">CI/CD guide</a> for GitHub Actions examples and secret configuration.</p>
+<hr />
+<h2 id="10-troubleshooting-and-known-limitations">10. Troubleshooting and Known Limitations<a class="headerlink" href="#10-troubleshooting-and-known-limitations" title="Permanent link">&para;</a></h2>
+<h3 id="troubleshooting-decision-tree">Troubleshooting decision tree<a class="headerlink" href="#troubleshooting-decision-tree" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart TD
+  Failed[Bootstrap failed]
+  Failed --&gt; ReachGit{Can reach Git repos?}
+  ReachGit --&gt;|No| EgressFix[CodeCommit mirror or VPN]
+  ReachGit --&gt;|Yes| WorkersReady{Workers ready?}
+  WorkersReady --&gt;|No| WaitFix[Wait or adjust MIN_READY_WORKERS]
+  WorkersReady --&gt;|Yes| ChartMatch{Chart versions match template?}
+  ChartMatch --&gt;|No| PinFix[Align helm fork with hub-values template]
+  ChartMatch --&gt;|Yes| CheckLogs[Check bootstrap script output and helm list -A]</code></pre>
+<h3 id="common-issues">Common issues<a class="headerlink" href="#common-issues" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Cause</th>
+<th>Workaround</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bootstrap can't reach GitHub</td>
+<td>Egress-zero or no VPC endpoints for Git</td>
+<td>CodeCommit mirroring — <a href="../../guides/egress-zero-gitops/">egress-zero GitOps guide</a></td>
+</tr>
+<tr>
+<td>CMP plugin apps stuck <code>Sync: Unknown</code> (<code>find: command not found</code> or plugin sidecar errors)</td>
+<td>Repo-server CMP image missing tools or wrong/unreachable image</td>
+<td>Use current <code>gitops-tools</code> image; re-host to private registry and set <code>gitops_tools_image</code> / <code>defaultImage</code> in bootstrap templates — <a href="#gitops-cmp-tools-container-image">§3c GitOps CMP tools image</a></td>
+</tr>
+<tr>
+<td>Repo-server can't pull CMP sidecar image</td>
+<td><code>ghcr.io</code> blocked (egress-zero, registry policy)</td>
+<td>Mirror <code>gitops-tools</code> to ECR; update <code>defaultImage</code> in <a href="../../modules/infrastructure/cluster/templates/hub-values.yaml.tftpl">hub-values.yaml.tftpl</a> and <a href="../../modules/infrastructure/cluster/templates/spoke-values.yaml.tftpl">spoke-values.yaml.tftpl</a></td>
+</tr>
+<tr>
+<td><code>gitops_git_target_revision</code> ignored</td>
+<td>Not wired in hub-values template</td>
+<td>Use cluster-config default branch or edit template</td>
+</tr>
+<tr>
+<td>Helm chart version mismatch</td>
+<td>Versions hardcoded in template</td>
+<td>Pin versions in your helm fork to match template</td>
+</tr>
+<tr>
+<td>ACM examples default to <code>noacm</code></td>
+<td><code>acm_mode</code> not in example tfvars</td>
+<td>Set module variable; use <code>bootstrap-spoke</code> target</td>
+</tr>
+<tr>
+<td>Worker nodes not ready</td>
+<td>Bootstrap waits for ≥2 Ready workers on single-AZ (60 min timeout for <code>.metal</code>); long NotReady on bare metal may need <code>default_auto_repair = false</code></td>
+<td>Set in <code>terraform.tfvars</code>; override <code>WORKER_READY_MAX_ATTEMPTS</code> if needed</td>
+</tr>
+<tr>
+<td>Cluster login fails (private)</td>
+<td>No VPN to private API</td>
+<td>Start Client VPN: <code>make cluster.&lt;name&gt;.vpn-start</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="recommended-follow-ups-not-yet-in-terraform">Recommended follow-ups (not yet in Terraform)<a class="headerlink" href="#recommended-follow-ups-not-yet-in-terraform" title="Permanent link">&para;</a></h3>
+<p>These improvements are documented as future work:</p>
+<ul>
+<li>Expose <code>acm_mode</code>, <code>helm_repo_url</code>, and chart version pins at root <code>terraform.tfvars</code></li>
+<li>Wire <code>gitops_git_target_revision</code> into <a href="../../modules/infrastructure/cluster/templates/hub-values.yaml.tftpl">hub-values.yaml.tftpl</a></li>
+<li>Automate CodeCommit repository creation and mirroring (see internal <code>docs/TODO.md</code>)</li>
+</ul>
+<hr />
+<h2 id="11-appendices">11. Appendices<a class="headerlink" href="#11-appendices" title="Permanent link">&para;</a></h2>
+<h3 id="a-gitops-linking-variables">A. GitOps-linking variables<a class="headerlink" href="#a-gitops-linking-variables" title="Permanent link">&para;</a></h3>
+<p><strong>Root module</strong> (<a href="../../terraform/01-variables.tf">terraform/01-variables.tf</a>) — set in <code>clusters/&lt;name&gt;/terraform.tfvars</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enable_gitops_bootstrap</code></td>
+<td>Enable bootstrap outputs and script</td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td><code>gitops_git_repo_url</code></td>
+<td>cluster-config repository URL</td>
+<td><code>https://github.com/&lt;org&gt;/acme-cluster-config.git</code></td>
+</tr>
+<tr>
+<td><code>gitops_git_path</code></td>
+<td>Path under repo root</td>
+<td><code>dev/acme-dev</code></td>
+</tr>
+<tr>
+<td><code>gitops_git_target_revision</code></td>
+<td>Git branch/tag (limited template support)</td>
+<td><code>HEAD</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Cluster module only</strong> (<a href="../../modules/infrastructure/cluster/01-variables.tf">modules/infrastructure/cluster/01-variables.tf</a>) — set via fork or extend root passthrough:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>acm_mode</code></td>
+<td><code>noacm</code></td>
+<td><code>hub</code>, <code>spoke</code>, or <code>noacm</code></td>
+</tr>
+<tr>
+<td><code>helm_repo_url</code></td>
+<td><code>https://rh-mobb.github.io/validated-pattern-helm-charts/</code></td>
+<td>Your published Helm repo</td>
+</tr>
+<tr>
+<td><code>helm_chart_version</code></td>
+<td><code>0.5.15</code></td>
+<td><code>cluster-bootstrap</code> chart version</td>
+</tr>
+<tr>
+<td><code>helm_chart_acm_spoke_version</code></td>
+<td><code>0.6.11</code></td>
+<td><code>cluster-bootstrap-acm-spoke</code> chart version</td>
+</tr>
+<tr>
+<td><code>gitops_tools_image</code></td>
+<td><code>ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:latest</code></td>
+<td>CMP repo-server sidecar image; re-host for egress-zero or registry policy — see <a href="#gitops-cmp-tools-container-image">§3c</a></td>
+</tr>
+<tr>
+<td><code>gitops_csv</code></td>
+<td><code>openshift-gitops-operator.v1.19.2</code></td>
+<td>GitOps operator CSV</td>
+</tr>
+<tr>
+<td><code>hub_credentials_secret_name</code></td>
+<td><code>""</code></td>
+<td>Hub secret for spoke mode</td>
+</tr>
+<tr>
+<td><code>acm_region</code></td>
+<td><code>""</code></td>
+<td>Hub region for spoke mode</td>
+</tr>
+</tbody>
+</table>
+<h3 id="b-terraform-bootstrap-outputs">B. Terraform bootstrap outputs<a class="headerlink" href="#b-terraform-bootstrap-outputs" title="Permanent link">&para;</a></h3>
+<p>From <a href="../../terraform/90-outputs.tf">terraform/90-outputs.tf</a>:</p>
+<table>
+<thead>
+<tr>
+<th>Output</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gitops_bootstrap_enabled</code></td>
+<td>Whether bootstrap is enabled</td>
+</tr>
+<tr>
+<td><code>gitops_bootstrap_acm_mode</code></td>
+<td><code>hub</code>, <code>spoke</code>, or <code>noacm</code></td>
+</tr>
+<tr>
+<td><code>gitops_bootstrap_hub_values</code></td>
+<td>YAML for hub/standalone bootstrap</td>
+</tr>
+<tr>
+<td><code>gitops_bootstrap_spoke_values</code></td>
+<td>YAML for spoke bootstrap</td>
+</tr>
+<tr>
+<td><code>gitops_bootstrap_env_exports</code></td>
+<td>Shell <code>export</code> statements for bootstrap</td>
+</tr>
+<tr>
+<td><code>gitops_bootstrap_script_path</code></td>
+<td>Path to <code>bootstrap-gitops.sh</code></td>
+</tr>
+<tr>
+<td><code>cluster_domain</code></td>
+<td>Cluster domain for Helm values</td>
+</tr>
+</tbody>
+</table>
+<h3 id="c-makefile-quick-reference">C. Makefile quick reference<a class="headerlink" href="#c-makefile-quick-reference" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>make<span class="w"> </span>cluster.&lt;name&gt;.init<span class="w">              </span><span class="c1"># Initialize Terraform</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>make<span class="w"> </span>cluster.&lt;name&gt;.plan<span class="w">              </span><span class="c1"># Plan changes</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>make<span class="w"> </span>cluster.&lt;name&gt;.apply<span class="w">             </span><span class="c1"># Apply infrastructure</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>make<span class="w"> </span>cluster.&lt;name&gt;.bootstrap<span class="w">         </span><span class="c1"># Bootstrap GitOps (hub/standalone)</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>make<span class="w"> </span>cluster.&lt;name&gt;.bootstrap-spoke<span class="w">   </span><span class="c1"># Bootstrap as ACM spoke</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>make<span class="w"> </span>cluster.&lt;name&gt;.teardown-spoke<span class="w">      </span><span class="c1"># Remove spoke from ACM hub</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>make<span class="w"> </span>cluster.&lt;name&gt;.verify<span class="w">            </span><span class="c1"># Verify GitOps deployment</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>make<span class="w"> </span>cluster.&lt;name&gt;.login<span class="w">             </span><span class="c1"># oc login</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>make<span class="w"> </span>cluster.&lt;name&gt;.show-endpoints<span class="w">      </span><span class="c1"># API and console URLs</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>make<span class="w"> </span>cluster.&lt;name&gt;.show-credentials<span class="w">    </span><span class="c1"># Admin credentials</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>make<span class="w"> </span>cluster.&lt;name&gt;.destroy<span class="w">             </span><span class="c1"># Destroy all resources</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>make<span class="w"> </span>cluster.&lt;name&gt;.sleep<span class="w">               </span><span class="c1"># Sleep cluster (preserve DNS/IAM)</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>make<span class="w"> </span>cluster.&lt;name&gt;.vpn-start<span class="w">           </span><span class="c1"># Start Client VPN (private clusters)</span>
+</code></pre></div>
+<h3 id="d-upstream-source-repositories">D. Upstream source repositories<a class="headerlink" href="#d-upstream-source-repositories" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Purpose</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Infrastructure (this repo)</td>
+<td>Your fork of <code>vp-terraform-rosa</code></td>
+</tr>
+<tr>
+<td>cluster-config</td>
+<td>https://github.com/rh-mobb/rosa-cluster-config</td>
+</tr>
+<tr>
+<td>Helm charts</td>
+<td>https://github.com/rh-mobb/validated-pattern-helm-charts</td>
+</tr>
+<tr>
+<td>RHCS Terraform provider</td>
+<td>https://registry.terraform.io/providers/terraform-redhat/rhcs</td>
+</tr>
+<tr>
+<td>ROSA HCP docs</td>
+<td>https://docs.redhat.com/en/documentation/red_hat_openshift_service_on_aws/</td>
+</tr>
+</tbody>
+</table>
+<h3 id="e-related-documentation">E. Related documentation<a class="headerlink" href="#e-related-documentation" title="Permanent link">&para;</a></h3>
+<ul>
+<li><a href="../../README.md">README.md</a> — Project overview and quick start</li>
+<li><a href="../../PLAN.md">PLAN.md</a> — Architecture decisions and implementation plan</li>
+<li><a href="../../clusters/README.md">clusters/README.md</a> — Cluster directory patterns</li>
+<li><a href="../../scripts/cluster/README-bootstrap-gitops.md">scripts/cluster/README-bootstrap-gitops.md</a> — Bootstrap script reference</li>
+<li><a href="../../guides/egress-zero-gitops/">egress-zero GitOps guide</a> — GitOps for zero-egress clusters</li>
+<li><a href="../../guides/ci-cd/">CI/CD guide</a> — Pipeline integration</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
