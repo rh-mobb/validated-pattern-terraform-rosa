@@ -9,7 +9,7 @@ Implementation guide for deploying Red Hat OpenShift Service on AWS (ROSA) with 
 - All three repositories are rehomed into your organization's Git
 - Helm charts are forked and published to an organization-owned chart repository (not the public `rh-mobb` GitHub Pages default)
 
-For a comparison with alternative repository layouts, see [comparison-with-reference.md](comparison-with-reference.md). This pattern favors per-cluster state isolation and composable modules over pre-baked environment stacks.
+For a comparison with alternative repository layouts, see [comparison-with-reference.md](../reference/comparison-with-reference.md). This pattern favors per-cluster state isolation and composable modules over pre-baked environment stacks.
 
 ---
 
@@ -251,7 +251,7 @@ flowchart TD
 
 1. Fork or copy this repository into your organization (GitHub Enterprise, GitLab, Bitbucket, etc.)
 2. Replace example cluster directories under [clusters/](../clusters/) with your naming convention, e.g. `clusters/<org>-<env>/`
-3. Configure remote state (S3 + DynamoDB) — see [clusters/README.md](../clusters/README.md#backend-configuration) and [CI_CD.md](CI_CD.md)
+3. Configure remote state (S3 + DynamoDB) — see [clusters/README.md](../clusters/README.md#backend-configuration) and [CI/CD guide](../guides/ci-cd.md)
 4. Pin provider versions in [terraform/00-providers.tf](../terraform/00-providers.tf)
 5. Modules are already in-repo under [modules/infrastructure/](../modules/infrastructure/) — no external module registry required
 
@@ -418,7 +418,7 @@ flowchart LR
 
 4. Re-run bootstrap (or apply the rendered ArgoCD CR) and hard-refresh plugin-based Applications if the repo-server image changed after initial install.
 
-For zero-egress Git source mirroring (separate from this container image), see [egress-zero-gitops.md](egress-zero-gitops.md).
+For zero-egress Git source mirroring (separate from this container image), see [egress-zero GitOps guide](../guides/egress-zero-gitops.md).
 
 ---
 
@@ -629,7 +629,7 @@ enable_gitops_bootstrap = true
 | Concern | Action |
 |---------|--------|
 | BYO VPC prerequisites | Pre-provision VPC, subnets, endpoints per [byo-vpc/terraform.tfvars](../clusters/byo-vpc/terraform.tfvars) header comments |
-| Zero egress GitOps | CodeCommit mirroring — [egress-zero-gitops.md](egress-zero-gitops.md) |
+| Zero egress GitOps | CodeCommit mirroring — [egress-zero GitOps guide](../guides/egress-zero-gitops.md) |
 | Private API access | `make cluster.<name>.vpn-start` before bootstrap/login |
 | AutoNode | Confirm region/version eligibility; optional `autonode_kubernetes_cluster_tag_id` after first apply |
 | Bootstrap | Standard `make cluster.<name>.bootstrap` unless ACM spoke (then `bootstrap-spoke`) |
@@ -733,7 +733,7 @@ Complete this checklist before your first production deployment:
 - [ ] Set `tags` for cost allocation and governance
 - [ ] Configure remote state bucket per security policy
 - [ ] Set `enable_persistent_dns_domain` and `enable_termination_protection` per policy
-- [ ] For egress-zero: plan CodeCommit mirroring — [egress-zero-gitops.md](egress-zero-gitops.md) (not fully automated in Terraform yet — see [TODO.md](TODO.md))
+- [ ] For egress-zero: plan CodeCommit mirroring — [egress-zero GitOps guide](../guides/egress-zero-gitops.md) (not fully automated in Terraform yet — tracked in internal `docs/TODO.md`)
 
 ---
 
@@ -865,7 +865,7 @@ flowchart LR
 - **cluster-config changes** (apps, ingress, cert-manager): merge PR → ArgoCD syncs automatically
 - **Terraform changes** (VPC, IAM, cluster version): plan → approve → apply
 
-See [CI_CD.md](CI_CD.md) for GitHub Actions examples and secret configuration.
+See [CI/CD guide](../guides/ci-cd.md) for GitHub Actions examples and secret configuration.
 
 ---
 
@@ -889,13 +889,13 @@ flowchart TD
 
 | Issue | Cause | Workaround |
 |-------|-------|------------|
-| Bootstrap can't reach GitHub | Egress-zero or no VPC endpoints for Git | CodeCommit mirroring — [egress-zero-gitops.md](egress-zero-gitops.md) |
+| Bootstrap can't reach GitHub | Egress-zero or no VPC endpoints for Git | CodeCommit mirroring — [egress-zero GitOps guide](../guides/egress-zero-gitops.md) |
 | CMP plugin apps stuck `Sync: Unknown` (`find: command not found` or plugin sidecar errors) | Repo-server CMP image missing tools or wrong/unreachable image | Use current `gitops-tools` image; re-host to private registry and set `gitops_tools_image` / `defaultImage` in bootstrap templates — [§3c GitOps CMP tools image](#gitops-cmp-tools-container-image) |
 | Repo-server can't pull CMP sidecar image | `ghcr.io` blocked (egress-zero, registry policy) | Mirror `gitops-tools` to ECR; update `defaultImage` in [hub-values.yaml.tftpl](../modules/infrastructure/cluster/templates/hub-values.yaml.tftpl) and [spoke-values.yaml.tftpl](../modules/infrastructure/cluster/templates/spoke-values.yaml.tftpl) |
 | `gitops_git_target_revision` ignored | Not wired in hub-values template | Use cluster-config default branch or edit template |
 | Helm chart version mismatch | Versions hardcoded in template | Pin versions in your helm fork to match template |
 | ACM examples default to `noacm` | `acm_mode` not in example tfvars | Set module variable; use `bootstrap-spoke` target |
-| Worker nodes not ready | Bootstrap waits for >=2 Ready workers | Wait for nodes or set `MIN_READY_WORKERS` |
+| Worker nodes not ready | Bootstrap waits for ≥2 Ready workers on single-AZ (60 min timeout for `.metal`); long NotReady on bare metal may need `default_auto_repair = false` | Set in `terraform.tfvars`; override `WORKER_READY_MAX_ATTEMPTS` if needed |
 | Cluster login fails (private) | No VPN to private API | Start Client VPN: `make cluster.<name>.vpn-start` |
 
 ### Recommended follow-ups (not yet in Terraform)
@@ -904,7 +904,7 @@ These improvements are documented as future work:
 
 - Expose `acm_mode`, `helm_repo_url`, and chart version pins at root `terraform.tfvars`
 - Wire `gitops_git_target_revision` into [hub-values.yaml.tftpl](../modules/infrastructure/cluster/templates/hub-values.yaml.tftpl)
-- Automate CodeCommit repository creation and mirroring — [TODO.md](TODO.md)
+- Automate CodeCommit repository creation and mirroring (see internal `docs/TODO.md`)
 
 ---
 
@@ -982,6 +982,6 @@ make cluster.<name>.vpn-start           # Start Client VPN (private clusters)
 - [PLAN.md](../PLAN.md) — Architecture decisions and implementation plan
 - [clusters/README.md](../clusters/README.md) — Cluster directory patterns
 - [scripts/cluster/README-bootstrap-gitops.md](../scripts/cluster/README-bootstrap-gitops.md) — Bootstrap script reference
-- [egress-zero-gitops.md](egress-zero-gitops.md) — GitOps for zero-egress clusters
-- [CI_CD.md](CI_CD.md) — Pipeline integration
-- [comparison-with-reference.md](comparison-with-reference.md) — Pattern comparison
+- [egress-zero GitOps guide](../guides/egress-zero-gitops.md) — GitOps for zero-egress clusters
+- [CI/CD guide](../guides/ci-cd.md) — Pipeline integration
+- [comparison with reference repos](../reference/comparison-with-reference.md) — Pattern comparison
