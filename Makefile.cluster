@@ -23,6 +23,7 @@ check-cluster:
 .PHONY: show-endpoints show-credentials show-timing login verify
 .PHONY: tunnel-start tunnel-stop tunnel-status bastion-connect
 .PHONY: vpn-config vpn-start vpn-stop vpn-status bootstrap bootstrap-spoke teardown-spoke ensure-tunnel
+.PHONY: validate-account validate-network validate-prereqs
 
 help: ## Show this help message
 	@$(SCRIPT_DIR)/utils/get-network-config.sh $(CLUSTER_DIR) >/dev/null 2>&1 || true; \
@@ -305,7 +306,36 @@ bastion-connect: check-cluster
 		aws ssm start-session --target $$BASTION_ID --region $$REGION || \
 		(echo "$(YELLOW)Failed to connect. Check AWS credentials and bastion status.$(NC)" && exit 1)
 
-# Validate
+# Prerequisite validation (distinct from terraform validate below)
+validate-account: check-cluster ## Validate AWS account, ROSA linking, and operator tools
+	@REGION=$$(grep -E '^region\s*=' $(CLUSTER_DIR)/terraform.tfvars 2>/dev/null | sed -E 's/.*=\s*"([^"]+)"|.*=\s*([^"#\s]+).*/\1\2/' | tr -d ' ' || echo "us-east-1"); \
+	$(SCRIPT_DIR)/validate/account.sh --region "$$REGION"
+
+validate-network: check-cluster ## Validate VPC for BYO or Terraform-managed network
+	@REGION=$$(grep -E '^region\s*=' $(CLUSTER_DIR)/terraform.tfvars 2>/dev/null | sed -E 's/.*=\s*"([^"]+)"|.*=\s*([^"#\s]+).*/\1\2/' | tr -d ' ' || echo "us-east-1"); \
+	ZERO=$$(grep -E '^zero_egress\s*=' $(CLUSTER_DIR)/terraform.tfvars 2>/dev/null | sed -E 's/.*=\s*"([^"]+)"|.*=\s*([^"#\s]+).*/\1\2/' | tr -d ' ' || echo "false"); \
+	MULTI=$$(grep -E '^multi_az\s*=' $(CLUSTER_DIR)/terraform.tfvars 2>/dev/null | sed -E 's/.*=\s*"([^"]+)"|.*=\s*([^"#\s]+).*/\1\2/' | tr -d ' ' || echo "true"); \
+	VPC_ID=$$(grep -E '^existing_vpc_id\s*=' $(CLUSTER_DIR)/terraform.tfvars 2>/dev/null | sed -E 's/.*=\s*"([^"]+)".*/\1/' | head -1); \
+	ARGS="--region $$REGION"; \
+	[[ "$$ZERO" == "true" ]] && ARGS="$$ARGS --zero-egress"; \
+	[[ "$$MULTI" == "true" ]] && ARGS="$$ARGS --multi-az" || ARGS="$$ARGS --single-az"; \
+	if [[ -n "$$VPC_ID" ]]; then \
+		ARGS="$$ARGS --vpc-id $$VPC_ID"; \
+	elif [ -d "$(TERRAFORM_DIR)/.terraform" ]; then \
+		TF_VPC=$$(cd $(TERRAFORM_DIR) && terraform output -raw vpc_id 2>/dev/null || true); \
+		[[ -n "$$TF_VPC" && "$$TF_VPC" != "null" ]] && ARGS="$$ARGS --vpc-id $$TF_VPC"; \
+	fi; \
+	if echo "$$ARGS" | grep -q vpc-id; then \
+		$(SCRIPT_DIR)/validate/byo-network.sh $$ARGS; \
+	else \
+		echo "$(YELLOW)No VPC ID available. Set existing_vpc_id in tfvars or run after terraform init/apply.$(NC)"; \
+		exit 1; \
+	fi
+
+validate-prereqs: check-cluster ## Validate account and network prerequisites from terraform.tfvars
+	@$(SCRIPT_DIR)/validate/prereqs.sh $(CLUSTER_NAME)
+
+# Validate (Terraform syntax)
 validate:
 	@cd $(TERRAFORM_DIR) && terraform init -backend=false && terraform validate
 
