@@ -24,7 +24,7 @@ See [Quick Start](docs/getting-started/quick-start.md) and [Account Prerequisite
 export RHCS_CLIENT_ID="..." RHCS_CLIENT_SECRET="..."
 
 # 2. Validate prerequisites
-make cluster.public.validate-account
+make cluster.public.validate
 
 # 3. Deploy
 make cluster.public.init
@@ -81,10 +81,10 @@ Each module is **self-contained** and **reusable**:
 
 Use `make cluster.<name>.<operation>` — see `make help` and [scripts/README.md](scripts/README.md).
 
-Common operations: `init`, `plan`, `apply`, `bootstrap`, `login`, `validate-prereqs`, `validate-account`, `validate-network`, `vpn-config`, `destroy`, `sleep`.
+Common operations: `init`, `plan`, `apply`, `bootstrap`, `login`, `validate`, `validate-account`, `validate-network`, `vpn-config`, `destroy`, `sleep`.
 
 ```bash
-make cluster.egress-zero.validate-prereqs
+make cluster.egress-zero.validate
 make cluster.egress-zero.apply
 make cluster.egress-zero.bootstrap
 ```
@@ -94,7 +94,7 @@ make cluster.egress-zero.bootstrap
 | Topic | Document |
 |-------|----------|
 | Prerequisites (account, full-stack, BYO) | [docs/prerequisites/index.md](docs/prerequisites/index.md) |
-| Enablement (three-repository pattern) | [docs/ENABLEMENT.md](docs/ENABLEMENT.md) |
+| Enablement (three-repository pattern) | [docs/deployment/enablement.md](docs/deployment/enablement.md) |
 | Cluster examples | [clusters/README.md](clusters/README.md) |
 | Module reference | [docs/modules/cluster.md](docs/modules/cluster.md) |
 | Validation scripts | [docs/operations/validation.md](docs/operations/validation.md) |
@@ -111,7 +111,7 @@ Local docs preview: `make docs-preview`
 |----------|------|
 | Documentation home | [docs/index.md](docs/index.md) |
 | Prerequisites | [docs/prerequisites/index.md](docs/prerequisites/index.md) |
-| Enablement guide | [docs/ENABLEMENT.md](docs/ENABLEMENT.md) |
+| Enablement guide | [docs/deployment/enablement.md](docs/deployment/enablement.md) |
 | Module reference | [docs/modules/cluster.md](docs/modules/cluster.md) |
 | Validation scripts | [docs/operations/validation.md](docs/operations/validation.md) |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |

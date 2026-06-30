@@ -100,7 +100,7 @@ See [BYO Network Requirements](../docs/prerequisites/byo/network.md) for full ma
 - **Zero egress (`zero_egress = true`):** no NAT/IGW on private routes; required endpoints S3, STS, ECR API, ECR DKR; EC2/KMS endpoints **not required** for ROSA HCP
 - Security group for interface VPC endpoints (HTTPS 443 from VPC CIDR)
 
-Validate: `make cluster.<name>.validate-prereqs`
+Validate: `make cluster.<name>.validate`
 
 **Usage with `rosa create network`:**
 

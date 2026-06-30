@@ -28,7 +28,7 @@ See [Authentication](authentication.md) for details.
 ## 2. Validate prerequisites (recommended)
 
 ```bash
-make cluster.public.validate-account
+make cluster.public.validate
 ```
 
 ## 3. Initialize, plan, apply

@@ -37,7 +37,7 @@ Terraform still creates IAM, KMS, and the cluster.
 **Validation:**
 
 ```bash
-make cluster.<name>.validate-prereqs
+make cluster.<name>.validate
 # Or network only:
 make cluster.<name>.validate-network --vpc-id vpc-xxx
 ```
@@ -80,7 +80,7 @@ flowchart TD
 5. Validate and deploy:
 
    ```bash
-   make cluster.my-byo.validate-prereqs
+   make cluster.my-byo.validate
    make cluster.my-byo.init
    make cluster.my-byo.apply
    ```

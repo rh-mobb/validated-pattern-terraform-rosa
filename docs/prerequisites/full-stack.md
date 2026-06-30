@@ -23,7 +23,7 @@ You provide `clusters/<name>/terraform.tfvars` and RHCS/AWS credentials.
 2. Run validation:
 
    ```bash
-   make cluster.<name>.validate-account
+   make cluster.<name>.validate
    ```
 
 3. Choose a cluster profile (copy an example tfvars)
@@ -55,7 +55,7 @@ Terraform's `network-private` module with `zero_egress = true`:
 export RHCS_CLIENT_ID="..."      # or RHCS_TOKEN for dev
 export RHCS_CLIENT_SECRET="..."
 
-make cluster.<name>.validate-account
+make cluster.<name>.validate
 make cluster.<name>.init
 make cluster.<name>.plan
 make cluster.<name>.apply

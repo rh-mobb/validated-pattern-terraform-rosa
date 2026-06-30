@@ -27,7 +27,7 @@
 # 4. Security group for interface VPC endpoints: inbound HTTPS (443) from VPC CIDR
 #
 # Validate before apply:
-#   make cluster.<name>.validate-prereqs
+#   make cluster.<name>.validate
 #
 # Quick start: rosa create network (ROSA CLI v1.2.48+) — then adjust for zero egress if needed.
 # See: https://access.redhat.com/articles/7096266

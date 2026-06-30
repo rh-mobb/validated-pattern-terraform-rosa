@@ -51,9 +51,10 @@ markdown_extensions:
   - toc:
       permalink: true
 
-# Internal tracking doc — not published on the site.
+# Internal / contributor docs — not published on the site.
 exclude_docs: |
   TODO.md
+  comparison-with-reference.md
 
 validation:
   nav:
@@ -103,4 +104,3 @@ nav:
       - Validation: operations/validation.md
   - Reference:
       - Changelog: reference/changelog.md
-      - Comparison with Reference Repos: reference/comparison-with-reference.md

@@ -57,7 +57,7 @@ rosa login --token="$RHCS_TOKEN"
 rosa whoami
 ```
 
-See [Account Prerequisites](../prerequisites/account.md) for OCM role, user role, and Marketplace linking.
+See [Account Prerequisites](../prerequisites/account.md) for OCM role and Marketplace linking.
 
 ## Admin password
 

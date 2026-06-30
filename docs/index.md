@@ -58,10 +58,14 @@ Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ## Related repositories
 
-This infrastructure repo is one part of a three-repository pattern:
+This infrastructure repo is one part of the **three-repository pattern** for ROSA HCP + GitOps:
 
-1. **Infrastructure** (this repo) — Terraform Day 0
-2. **cluster-config** — GitOps configuration for Argo CD
-3. **validated-pattern-helm-charts** — Bootstrap and app-of-apps Helm charts
+| # | Repository | Role | Upstream |
+|---|------------|------|----------|
+| 1 | **Infrastructure** | Terraform Day 0 — VPC, IAM, cluster, bootstrap orchestration | [rh-mobb/vp-terraform-rosa](https://github.com/rh-mobb/vp-terraform-rosa) (this repo) |
+| 2 | **cluster-config** | GitOps configuration consumed by Argo CD after bootstrap | [rh-mobb/rosa-cluster-config](https://github.com/rh-mobb/rosa-cluster-config) |
+| 3 | **Helm charts** | Bootstrap and app-of-apps charts (`cluster-bootstrap`, etc.) | [rh-mobb/validated-pattern-helm-charts](https://github.com/rh-mobb/validated-pattern-helm-charts) |
 
-See the [Enablement Guide](deployment/enablement.md) for the full adoption path.
+Published Helm repo (default in example tfvars): [https://rh-mobb.github.io/validated-pattern-helm-charts/](https://rh-mobb.github.io/validated-pattern-helm-charts/)
+
+See the [Enablement Guide](deployment/enablement.md) for forking, publishing charts, and the full adoption path.
