@@ -172,9 +172,6 @@ module "iam" {
   enable_control_plane_log_forwarding         = var.enable_control_plane_log_forwarding
   control_plane_log_cloudwatch_enabled        = var.control_plane_log_cloudwatch_enabled
   control_plane_log_cloudwatch_log_group_name = var.control_plane_log_cloudwatch_log_group_name
-
-  # Note: cluster_credentials_secret_arn is no longer passed as a variable
-  # The IAM module looks up the secret by name (${cluster_name}-credentials) to avoid circular dependency
 }
 
 module "cluster" {

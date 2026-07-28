@@ -6,40 +6,23 @@
 # IMPORTANT: The OIDC endpoint URL must NOT include the "https://" prefix when used in IAM trust policies.
 # Reference: Red Hat documentation shows stripping https:// from the OIDC endpoint URL
 #
-# SECURITY: This implementation uses explicit secret ARN lists instead of wildcards for maximum security.
-# Only explicitly listed secrets are accessible via GetSecretValue. ListSecrets requires "*" but actual
-# secret access is restricted by the explicit ARN list.
+# SECURITY: Explicit secret ARN list only — no wildcards for GetSecretValue.
+# Cluster credentials ({cluster}-credentials) are intentionally NOT included: that secret is for
+# bootstrap/oc login only. AVP must list app secrets via var.additional_secrets (least privilege).
+# Relates to #39.
 
-# Data source for cluster credentials secret (lookup by name to avoid circular dependency)
-# Secret name follows pattern: ${cluster_name}-credentials
-data "aws_secretsmanager_secret" "cluster_credentials" {
-  count = local.persists_through_sleep && var.enable_secrets_manager_iam ? 1 : 0
-  name  = "${var.cluster_name}-credentials"
-}
-
-# Data sources for additional secrets (if provided)
-# Lookup secrets by name to get exact ARNs for the IAM policy
+# Data sources for AVP-allowlisted secrets (lookup by name for exact ARNs)
 data "aws_secretsmanager_secret" "additional" {
   for_each = local.persists_through_sleep && var.enable_secrets_manager_iam && var.additional_secrets != null ? toset(var.additional_secrets) : toset([])
   name     = each.value
 }
 
-# Build list of all secret ARNs (default + additional)
 locals {
-  # Default secret ARN (cluster credentials - from data source lookup)
-  default_secret_arn = local.persists_through_sleep && var.enable_secrets_manager_iam && length(data.aws_secretsmanager_secret.cluster_credentials) > 0 ? data.aws_secretsmanager_secret.cluster_credentials[0].arn : null
-
-  # Additional secret ARNs from data source lookups
-  additional_secret_arns = local.persists_through_sleep && var.enable_secrets_manager_iam && var.additional_secrets != null ? [
+  # AVP allowlist: only secrets explicitly named in additional_secrets
+  all_secret_arns = local.persists_through_sleep && var.enable_secrets_manager_iam && var.additional_secrets != null ? [
     for secret_name in var.additional_secrets :
     data.aws_secretsmanager_secret.additional[secret_name].arn
   ] : []
-
-  # Combine all secret ARNs (filter out nulls)
-  all_secret_arns = compact(concat(
-    local.default_secret_arn != null ? [local.default_secret_arn] : [],
-    local.additional_secret_arns
-  ))
 }
 
 # IAM Policy for Secrets Manager
@@ -75,6 +58,13 @@ resource "aws_iam_policy" "secrets_manager" {
       }
     ]
   })
+
+  lifecycle {
+    precondition {
+      condition     = length(local.all_secret_arns) > 0
+      error_message = "enable_secrets_manager_iam requires additional_secrets to list at least one secret name for AVP. Cluster credentials ({cluster}-credentials) are not included automatically — they are for bootstrap/oc login only."
+    }
+  }
 
   tags = merge(local.common_tags, {
     Name      = "${var.cluster_name}-rosa-secretsmanager-policy"

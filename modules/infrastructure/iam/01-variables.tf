@@ -164,7 +164,7 @@ variable "aws_private_ca_arn" {
 }
 
 variable "additional_secrets" {
-  description = "Additional Secrets Manager secret names for IAM policy (optional)"
+  description = "Secrets Manager secret names to grant ArgoCD Vault Plugin (AVP) GetSecretValue access. Looked up by name for exact ARNs. Required (non-empty) when enable_secrets_manager_iam is true. Cluster credentials ({cluster}-credentials) are not included — list only secrets applications need via AVP."
   type        = list(string)
   default     = null
   nullable    = true
