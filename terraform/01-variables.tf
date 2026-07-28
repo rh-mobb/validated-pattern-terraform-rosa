@@ -659,14 +659,14 @@ variable "enable_cloudwatch_logging" {
 }
 
 variable "enable_secrets_manager_iam" {
-  description = "Enable IAM role and policy for ArgoCD Vault Plugin to access AWS Secrets Manager. When enabled, creates IAM role for openshift-gitops:vplugin service account. Secrets access is restricted to explicit ARN list for security."
+  description = "Enable IAM role and policy for ArgoCD Vault Plugin to access AWS Secrets Manager. When enabled, creates IAM role for openshift-gitops:vplugin and requires additional_secrets (non-empty allowlist). Cluster credentials are not granted to AVP."
   type        = bool
   default     = false
   nullable    = false
 }
 
 variable "additional_secrets" {
-  description = "Optional list of additional secret names to grant access to via Secrets Manager IAM. Secrets are looked up by name to get exact ARNs. The cluster credentials secret is always included automatically. Example: [\"my-secret-1\", \"my-secret-2\"]"
+  description = "Secrets Manager secret names to grant ArgoCD Vault Plugin (AVP) access when enable_secrets_manager_iam is true. Looked up by name for exact ARNs. Required (non-empty) when SM IAM is enabled. Cluster credentials ({cluster}-credentials) are not included — they are for bootstrap/oc login only. Example: [\"my-app-secret-1\", \"my-app-secret-2\"]"
   type        = list(string)
   default     = null
   nullable    = true

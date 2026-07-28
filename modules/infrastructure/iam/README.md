@@ -55,10 +55,8 @@ module "iam" {
   enable_cert_manager_iam     = true
   enable_secrets_manager_iam  = true
   aws_private_ca_arn         = "arn:aws:acm-pca:region:account:certificate-authority/..."
-  additional_secrets          = ["my-secret-1", "my-secret-2"]
-
-  # Cluster credentials secret ARN (from cluster module, for Secrets Manager IAM)
-  cluster_credentials_secret_arn = module.cluster.cluster_credentials_secret_arn
+  # Explicit AVP allowlist only (cluster credentials are NOT included — bootstrap/oc login only)
+  additional_secrets          = ["my-app-secret-1", "my-app-secret-2"]
 
   tags = {
     Environment = "production"
@@ -102,8 +100,7 @@ module "iam" {
 | enable_cert_manager_iam | Enable cert-manager IAM resources | `bool` | `false` | no |
 | enable_secrets_manager_iam | Enable Secrets Manager IAM resources | `bool` | `false` | no |
 | aws_private_ca_arn | AWS Private CA ARN for cert-manager (optional) | `string` | `null` | no |
-| additional_secrets | Additional Secrets Manager secret names for IAM policy (optional) | `list(string)` | `null` | no |
-| cluster_credentials_secret_arn | ARN of cluster credentials secret (for Secrets Manager IAM policy) | `string` | `null` | no |
+| additional_secrets | Secrets Manager secret names for AVP GetSecretValue (required non-empty when enable_secrets_manager_iam is true; cluster credentials not included) | `list(string)` | `null` | no |
 | rosa_permissions_boundary_arn | ARN of the permission boundary policy for ROSA managed IAM roles (account + operator roles). If null, no boundary is applied | `string` | `null` | no |
 | custom_permissions_boundary_arn | ARN of the permission boundary policy for custom IAM roles (EFS CSI, CloudWatch, Secrets Manager, cert-manager, etc.). If null, no boundary is applied | `string` | `null` | no |
 
@@ -213,7 +210,8 @@ The module creates an IAM role for ArgoCD Vault Plugin to access AWS Secrets Man
 
 - **Secrets Manager Role**: IAM role for ArgoCD Vault Plugin (`openshift-gitops:vplugin`)
 - Uses explicit secret ARN lists for maximum security (no wildcards for GetSecretValue)
-- Requires `cluster_credentials_secret_arn` from cluster module (set after cluster is created)
+- Allowlist is **only** `additional_secrets` (looked up by name). Cluster credentials (`{cluster}-credentials`) are not included — that secret is for bootstrap/`oc login` only
+- When `enable_secrets_manager_iam` is true, `additional_secrets` must list at least one secret name
 
 ## Dependencies
 
