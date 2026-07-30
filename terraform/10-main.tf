@@ -214,10 +214,10 @@ module "cluster" {
   availability_zones = local.network.private_subnet_azs
   fips               = var.fips
 
-  # Identity provider configuration
-  enable_identity_provider     = var.persists_through_sleep
+  # Break-glass HTPasswd (optional). Bootstrap uses module.bootstrap_admin instead (#29).
+  enable_identity_provider     = var.enable_cluster_admin && var.persists_through_sleep
   admin_username               = var.admin_username
-  admin_password_for_bootstrap = var.admin_password_override != null ? var.admin_password_override : random_password.admin_password[0].result
+  admin_password_for_bootstrap = var.enable_cluster_admin ? (var.admin_password_override != null ? var.admin_password_override : random_password.admin_password[0].result) : null
 
   # KMS keys from IAM module
   kms_key_arn      = module.iam.ebs_kms_key_arn
@@ -352,11 +352,9 @@ module "cluster_timing" {
   dependency_ids = [module.cluster.cluster_id]
 }
 
-# Admin Password Management
-# Generate random password if override is not provided
-# Store password in AWS Secrets Manager for secure access
+# Break-glass admin password (only when enable_cluster_admin). Bootstrap uses module.bootstrap_admin (#29).
 resource "random_password" "admin_password" {
-  count = var.admin_password_override == null ? 1 : 0
+  count = var.enable_cluster_admin && var.admin_password_override == null ? 1 : 0
 
   length           = 20
   special          = true
@@ -364,30 +362,13 @@ resource "random_password" "admin_password" {
   lower            = true
   numeric          = true
   override_special = "@#&*-_"
-
-  # Ensure password meets ROSA requirements:
-  # - 14+ characters (we use 20)
-  # - Contains uppercase letter (upper = true)
-  # - Contains symbol or number (special = true, numeric = true)
 }
 
-# AWS Secrets Manager secret for admin password
-# Stores either the override password or the generated random password
-#
-# Admin Password Secret (stored in AWS Secrets Manager)
-# This secret persists through sleep operations to preserve credentials for cluster restart.
-# Recovery window is set to 0 to disable the 7-30 day recovery period.
-# This allows immediate deletion and recreation of secrets with the same name if needed.
 resource "aws_secretsmanager_secret" "admin_password" {
-  # Always create secret (persists through sleep for easy cluster restart)
-  # Secret persists even when persists_through_sleep=false (sleep operation)
-  count = 1
+  count = var.enable_cluster_admin ? 1 : 0
 
-  name        = "rosa-hcp-${var.cluster_name}-admin-password"
-  description = "Admin password for ROSA HCP cluster ${var.cluster_name} (persists through sleep)"
-
-  # Set recovery window to 0 to disable the recovery period (default is 30 days)
-  # This allows immediate deletion and recreation of secrets with the same name
+  name                    = "rosa-hcp-${var.cluster_name}-admin-password"
+  description             = "Break-glass admin password for ROSA HCP cluster ${var.cluster_name} (persists through sleep)"
   recovery_window_in_days = 0
 
   tags = merge(local.tags, {
@@ -399,15 +380,12 @@ resource "aws_secretsmanager_secret" "admin_password" {
   })
 }
 
-# Store the password in the secret
-# Only create/update secret version when cluster exists (not during sleep)
 resource "aws_secretsmanager_secret_version" "admin_password" {
-  count = var.persists_through_sleep ? 1 : 0
+  count = var.enable_cluster_admin && var.persists_through_sleep ? 1 : 0
 
   secret_id     = aws_secretsmanager_secret.admin_password[0].id
   secret_string = var.admin_password_override != null ? var.admin_password_override : random_password.admin_password[0].result
 
-  # Allow secret to be updated manually if password changes
   lifecycle {
     ignore_changes = [
       secret_string
@@ -415,7 +393,19 @@ resource "aws_secretsmanager_secret_version" "admin_password" {
   }
 }
 
-# Identity provider is now created in the cluster module
+# Short-lived bootstrap HTPasswd admin (#29). Toggled by bootstrap scripts with -target.
+# cluster_id comes from var (set by bootstrap-admin.sh), NOT module.cluster — so
+# terraform apply -target=module.bootstrap_admin does not pull in the cluster module
+# and attempt to reconcile immutable attributes (e.g. tags) when TF_VAR_tags differs.
+module "bootstrap_admin" {
+  source = "../modules/infrastructure/bootstrap-admin"
+
+  enabled    = var.enable_bootstrap_admin_user
+  cluster_id = var.bootstrap_admin_cluster_id
+  password   = var.bootstrap_admin_password
+}
+
+# Break-glass identity provider is created in the cluster module when enable_cluster_admin is true
 # See modules/infrastructure/cluster/30-identity-provider.tf
 
 # Bastion Host (optional, for development/demo use only)
