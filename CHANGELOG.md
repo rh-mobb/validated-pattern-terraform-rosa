@@ -13,8 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **IAM role name 64-character limit**: Applied `substr(..., 0, 64)` to all custom IAM role names and string-literal role references, matching the upstream RHCS module pattern. Also fixed two string references in `12-storage-iam.tf` that used `var.cluster_name` instead of the correct prefix locals, and corrected the `operator_role_arns` output to use actual upstream naming conventions.
 
 ### Changed
-- **GitOps Helm chart pins (#43)**: Default `cluster-bootstrap` to `0.5.18`, `cluster-bootstrap-acm-spoke` to `0.6.13`, and bootstrap `app-of-apps-infrastructure` `targetRevision` to `0.2.3` (aligned with validated-pattern-helm-charts release after AVP/ESO work).
+- **GitOps Helm chart pins (#43)**: Default `cluster-bootstrap` to `0.5.19`, `cluster-bootstrap-acm-spoke` to `0.6.14`, and bootstrap `app-of-apps-infrastructure` `targetRevision` to `0.2.3` (aligned with validated-pattern-helm-charts release after AVP/ESO work).
 - **Wire `gitops_git_target_revision` (#43)**: Hub bootstrap values now emit `gitTargetRevision` for cluster-bootstrap (>= `0.5.18`) so Argo CD can sync cluster-config from a branch/tag instead of hardcoded `HEAD`.
+- **Disable AVP CMP by default (#43)**: Hub/spoke bootstrap values set `argocd.plugin.enabled: false` so the Vault Plugin sidecar is not deployed when cluster-config uses native Helm + ESO.
 - **Secrets Manager IRSA for ESO (#43)**: Secrets Manager IAM role trusts External Secrets Operator service account (`external-secrets-operator:external-secrets-sa`) in addition to temporary AVP `vplugin`; documentation now prefers ESO over Argo CD Vault Plugin.
 - **Replaced scottwinkler/shell provider with null_resource**: Termination protection now uses `null_resource` with `local-exec` provisioners instead of the third-party `scottwinkler/shell` provider, removing the external provider dependency.
 
