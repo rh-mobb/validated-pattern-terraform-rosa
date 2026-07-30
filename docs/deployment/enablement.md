@@ -360,7 +360,15 @@ Align your fork with these versions, or update the template in your infrastructu
 
 ### GitOps CMP tools container image
 
-The `cluster-bootstrap` and `cluster-bootstrap-acm-spoke` charts configure an Argo CD repo-server **ConfigManagementPlugin (CMP) sidecar** named `avp`. That sidecar runs `helm`, `argocd-vault-plugin`, `find`, `git`, and related tools so Argo CD can render Application sources marked `plugin: true` in cluster-config (for example AutoNode charts that use AVP with AWS Secrets Manager).
+**Default secrets path:** AWS Secrets Manager integration uses External Secrets Operator (ESO), not AVP. Standard flow is:
+
+1. Terraform creates IAM role access for Secrets Manager (`enable_secrets_manager_iam = true`)
+2. ESO uses `external-secrets-operator:external-secrets-sa` IRSA
+3. `ClusterSecretStore` + `ExternalSecret` sync remote values into Kubernetes `Secret` objects
+
+See the `external-secrets-operator` chart in your cluster-config infrastructure applications and the Terraform toggle `enable_secrets_manager_iam`.
+
+The `gitops_tools_image` setting is now **optional CMP tooling** for clusters that still run Argo CD Applications with `plugin: true` during migration. It is not required for ESO-based Secrets Manager sync.
 
 **Upstream image** (multi-arch, built from [hack/docker/gitops-tools/](../../hack/docker/gitops-tools/)):
 
@@ -368,7 +376,7 @@ The `cluster-bootstrap` and `cluster-bootstrap-acm-spoke` charts configure an Ar
 ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:<tag>
 ```
 
-CI publishes `:latest` and `:sha` tags on merge to main. Pin a digest or SHA tag in production rather than floating `:latest`.
+CI publishes `:latest` and `:sha` tags on merge to main. Pin a digest or SHA tag in production rather than floating `:latest` when CMP plugin mode is enabled.
 
 **When to re-host:** Mirror this image into **your private registry** when any of the following apply:
 
@@ -918,7 +926,7 @@ These improvements are documented as future work:
 | `helm_repo_url` | `https://rh-mobb.github.io/validated-pattern-helm-charts/` | Your published Helm repo |
 | `helm_chart_version` | `0.5.15` | `cluster-bootstrap` chart version |
 | `helm_chart_acm_spoke_version` | `0.6.11` | `cluster-bootstrap-acm-spoke` chart version |
-| `gitops_tools_image` | `ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:latest` | CMP repo-server sidecar image; re-host for egress-zero or registry policy — see [§3c](#gitops-cmp-tools-container-image) |
+| `gitops_tools_image` | `ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:latest` | Optional CMP repo-server sidecar tooling image (used when `plugin: true`); re-host for egress-zero or registry policy — see [§3c](#gitops-cmp-tools-container-image) |
 | `gitops_csv` | `openshift-gitops-operator.v1.19.2` | GitOps operator CSV |
 | `hub_credentials_secret_name` | `""` | Hub secret for spoke mode |
 | `acm_region` | `""` | Hub region for spoke mode |
