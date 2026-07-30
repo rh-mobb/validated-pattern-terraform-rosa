@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **IAM role name 64-character limit**: Applied `substr(..., 0, 64)` to all custom IAM role names and string-literal role references, matching the upstream RHCS module pattern. Also fixed two string references in `12-storage-iam.tf` that used `var.cluster_name` instead of the correct prefix locals, and corrected the `operator_role_arns` output to use actual upstream naming conventions.
 
 ### Changed
+- **GitOps bootstrap chart versions (#43)**: Default `cluster-bootstrap` to `0.5.17` and `cluster-bootstrap-acm-spoke` to `0.6.13` (AVP CMP gated behind `argocd.plugin.enabled`; ESO preferred for Secrets Manager).
 - **Secrets Manager IRSA for ESO (#43)**: Secrets Manager IAM role trusts External Secrets Operator service account (`external-secrets-operator:external-secrets-sa`) in addition to temporary AVP `vplugin`; documentation now prefers ESO over Argo CD Vault Plugin.
 - **Replaced scottwinkler/shell provider with null_resource**: Termination protection now uses `null_resource` with `local-exec` provisioners instead of the third-party `scottwinkler/shell` provider, removing the external provider dependency.
 
