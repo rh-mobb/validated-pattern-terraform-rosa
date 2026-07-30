@@ -130,7 +130,7 @@ See [cluster/README-bootstrap-gitops.md](cluster/README-bootstrap-gitops.md) for
 
 ### Utility Scripts
 
-- **`get-admin-password.sh`**: Get break-glass admin password from AWS Secrets Manager (`admin_password_secret_arn`)
+- **`get-admin-password.sh`**: Get break-glass admin password from the cluster credentials Secrets Manager secret (`cluster_credentials_secret_arn` → JSON `.password`)
 - **`get-k8s-token.sh`**: Extract Kubernetes token via `oc login` with retry logic
 - **`get-infra-outputs.sh`**: Extract infrastructure outputs and export as TF_VAR_* environment variables
 - **`check-cluster.sh`**: Validate cluster directory exists

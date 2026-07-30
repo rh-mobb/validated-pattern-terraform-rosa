@@ -14,12 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **BREAKING — identity defaults (#29)**: Cluster HTPasswd / credentials secret are no longer created by default. Set `enable_cluster_admin = true` for a persistent break-glass admin. Bootstrap no longer requires `CREDENTIALS_SECRET` for the primary cluster login.
-- **Cluster break-glass IDP via shared module (#29)**: `30-identity-provider.tf` calls `htpasswd-idp` (Secrets Manager stays in the cluster module); `moved` blocks preserve existing break-glass state.
+- **Cluster break-glass IDP via shared module (#29)**: `30-identity-provider.tf` calls `htpasswd-idp`; break-glass credentials use the single `{cluster_name}-credentials` JSON secret (#28), gated by `enable_cluster_admin` (no duplicate root plain-password secret); `moved` blocks preserve existing break-glass IDP state.
 
 ### Fixed
+- **Ignore `.superpowers/`**: Local Superpowers brainstorm session state is gitignored; keep `docs/superpowers/` tracked.
 - **Bootstrap login poll aborted on first failure (macOS bash 3.2)**: `poll_oc_login` used `set +e` around `oc login`, but Bash 3.2 still fires the script `ERR` trap, so the first HTPasswd propagation miss aborted bootstrap instead of retrying. Capture failure with `oc login ... || login_result=$?` (#29).
 - **`make cluster.<name>.login` no longer runs terraform init**: Validates `.terraform` and `api_url` output instead of re-initializing on every login.
-- **`make cluster.<name>.login` checks break-glass outputs first**: If `admin_password_secret_arn` / `admin_user_created` are empty, exits with instructions to set `enable_cluster_admin = true` instead of attempting `oc login`.
+- **`make cluster.<name>.login` checks break-glass outputs first**: If `admin_user_created` is false, exits with instructions to set `enable_cluster_admin = true` instead of attempting `oc login` (uses `cluster_credentials_secret_arn`).
 - **Docs updated for bootstrap vs break-glass identity**: Enablement, quick-start, authentication, CI/CD, scripts README, and bootstrap-gitops README document short-lived bootstrap HTPasswd, opt-in `enable_cluster_admin` (examples set `true`), and `TF_VAR_admin_password_override`.
 - **Default machine pool version pinning**: Added `version` and `upgrade_acknowledgements_for` attributes to `rhcs_hcp_machine_pool.default` resource. Previously the default machine pool's OpenShift version was unmanaged by Terraform, preventing explicit version control and minor version upgrade orchestration. The `upgrade_acknowledgements_for` variable is passed from root module through to the cluster module.
 - **Separate default machine pool version variable**: Added `default_machine_pool_version` variable (default null) so the default machine pool version is managed independently from the control plane `openshift_version`. This enables staged upgrades: upgrade the control plane first, wait for completion, then set the worker version.
@@ -466,6 +467,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated provider configuration to match rh-mobb reference implementation
 
 ### Fixed
+- **Duplicate admin password secrets (#28)**: Removed root `aws_secretsmanager_secret.admin_password` (`rosa-hcp-{cluster}-admin-password`). Admin credentials now use only the cluster module secret `{cluster_name}-credentials` (JSON: user/password/url). `get-admin-password.sh` reads that secret (with legacy ARN/plain-string fallback). Root outputs: `cluster_credentials_secret_arn` / `cluster_credentials_secret_name`; `admin_password_secret_arn` is a deprecated alias. Follow-up for IDP-only/dynamic passwords: #29.
 - **GitOps CMP tools image missing `find`**: UBI9 minimal lacked `findutils`, causing CMP plugin discover to fail (`find: command not found`) and plugin apps (e.g. `cluster-config-autonode`) to stay `Sync: Unknown`. Added `findutils` and `git` (for `helm dependency update` on git-based chart deps); also bundle `kubectl` from the OC client tarball.
 - **ROSA default SG race on first apply**: EFS and AutoNode resources failed when `{cluster_id}-default-sg` was not yet tagged in AWS after `rhcs_cluster_rosa_hcp` became ready. Added `time_sleep` delay and shared `data.aws_security_groups.cluster_default` lookup (no local-exec).
 

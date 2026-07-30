@@ -417,17 +417,18 @@ variable "admin_username" {
 variable "admin_password_override" {
   description = <<EOF
   Optional override for break-glass admin password when enable_cluster_admin is true.
-  If not set, a random password is generated and stored in AWS Secrets Manager.
+  If not set, a random password is generated and stored in the cluster credentials secret
+  ({cluster_name}-credentials) in AWS Secrets Manager as JSON {"user","password","url"}.
   Password must be 14 characters or more, contain one uppercase letter and a symbol or number.
 
   Can be provided via:
   - terraform.tfvars file (not recommended for production)
   - Environment variable: TF_VAR_admin_password_override
 
-  Note: The password is never output by Terraform. Use AWS CLI to retrieve it:
-    aws secretsmanager get-secret-value --secret-id <secret_arn> --query SecretString --output text
+  Note: The password is never output by Terraform. Retrieve it with:
+    aws secretsmanager get-secret-value --secret-id <secret_arn> --query SecretString --output text | jq -r .password
 
-  Not used for GitOps bootstrap (bootstrap uses module.bootstrap_admin outputs).
+  Not used for GitOps bootstrap (bootstrap uses module.bootstrap_admin / bootstrap-admin.sh).
   EOF
   type        = string
   sensitive   = true

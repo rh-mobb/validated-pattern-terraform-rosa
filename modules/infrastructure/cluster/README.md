@@ -168,7 +168,7 @@ module "cluster" {
 
 ### Identity Provider
 
-When `enable_identity_provider = true` (root `enable_cluster_admin`), the module creates a long-lived HTPasswd break-glass admin via `modules/infrastructure/htpasswd-idp` and stores credentials in AWS Secrets Manager. GitOps bootstrap uses a separate short-lived `module.bootstrap_admin` (also `htpasswd-idp`, different IDP/user names) — both can coexist (#29). Bootstrap does not require the break-glass secret.
+When `enable_identity_provider = true` (root `enable_cluster_admin`), the module creates a long-lived HTPasswd break-glass admin via `modules/infrastructure/htpasswd-idp` and stores credentials once in AWS Secrets Manager as `{cluster_name}-credentials` (JSON: `user`, `password`, `url`). That secret is the single source of truth for `make login` / `show-credentials` (no separate plain-password secret; Fixes #28). GitOps bootstrap uses a separate short-lived `module.bootstrap_admin` (also `htpasswd-idp`, different IDP/user names) — both can coexist (#29). Bootstrap does not require the break-glass secret.
 
 ## Outputs
 
@@ -178,15 +178,13 @@ When `enable_identity_provider = true` (root `enable_cluster_admin`), the module
 | cluster_name | Name of the ROSA HCP cluster |
 | api_url | API URL of the cluster |
 | console_url | Console URL of the cluster |
-| kubeconfig | Kubernetes configuration file (sensitive) |
-| cluster_admin_password | Cluster admin password (sensitive) |
 | state | State of the cluster |
 | identity_provider_id | ID of the HTPasswd identity provider (null if enable_identity_provider is false) |
 | identity_provider_name | Name of the identity provider (null if enable_identity_provider is false) |
 | admin_username | Username of the admin user |
 | admin_group | Group the admin user belongs to |
-| cluster_credentials_secret_name | Name of AWS Secrets Manager secret containing cluster credentials |
-| cluster_credentials_secret_arn | ARN of AWS Secrets Manager secret containing cluster credentials |
+| cluster_credentials_secret_name | Name of AWS Secrets Manager secret containing cluster credentials JSON |
+| cluster_credentials_secret_arn | ARN of AWS Secrets Manager secret containing cluster credentials JSON |
 | efs_file_system_id | ID of the EFS file system (null if enable_efs is false) |
 | efs_file_system_arn | ARN of the EFS file system (null if enable_efs is false) |
 | aws_account_id | AWS account ID where the cluster is deployed |

@@ -946,7 +946,7 @@ From [terraform/90-outputs.tf](../../terraform/90-outputs.tf):
 | `gitops_bootstrap_env_exports` | Shell `export` statements for bootstrap |
 | `gitops_bootstrap_script_path` | Path to `bootstrap-gitops.sh` |
 | `admin_user_created` | Whether break-glass HTPasswd admin IDP exists |
-| `admin_password_secret_arn` | Secrets Manager ARN for break-glass password (null if disabled) |
+| `cluster_credentials_secret_arn` | Secrets Manager ARN for break-glass credentials JSON (null if disabled) |
 | `cluster_domain` | Cluster domain for Helm values |
 
 ### C. Makefile quick reference

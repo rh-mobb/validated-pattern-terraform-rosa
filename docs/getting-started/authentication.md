@@ -66,7 +66,7 @@ Two separate HTPasswd paths share `modules/infrastructure/htpasswd-idp`:
 | Path | When | User / IDP | Secrets Manager | Used by |
 |------|------|------------|-----------------|---------|
 | **Bootstrap** | Only during `make cluster.<name>.bootstrap` | `bootstrap` | No | GitOps `oc login` (created then destroyed automatically) |
-| **Break-glass** | When `enable_cluster_admin = true` | `admin` | Yes | `make cluster.<name>.login` / `show-credentials` |
+| **Break-glass** | When `enable_cluster_admin = true` | `admin` | Yes (`{cluster_name}-credentials` JSON) | `make cluster.<name>.login` / `show-credentials` |
 
 **GitOps bootstrap** does not need break-glass credentials. `bootstrap-admin.sh` generates a password, creates a short-lived HTPasswd user, polls until `oc login` works, runs GitOps, then tears the user down (password is not stored in Secrets Manager).
 
@@ -78,9 +78,25 @@ enable_cluster_admin = true
 # optional: admin_password_override / TF_VAR_admin_password_override
 ```
 
+```bash
+# Optional password override (otherwise Terraform generates one)
+export TF_VAR_admin_password_override="your-secure-password-at-least-14-chars"
+```
+
 - Variable **default** is `false` (no long-lived HTPasswd admin).
 - Example cluster `terraform.tfvars` in this repo set `enable_cluster_admin = true` so `make cluster.<name>.login` works after apply.
+- Credentials live in a single Secrets Manager secret `{cluster_name}-credentials` (JSON: `user`, `password`, `url`) — not a separate plain-password secret.
 - Without break-glass, `make login` exits with instructions — it does not use the bootstrap user (that user is already destroyed).
+
+Retrieve the break-glass password after apply:
+
+```bash
+aws secretsmanager get-secret-value \
+  --secret-id "$(cd terraform && terraform output -raw cluster_credentials_secret_arn)" \
+  --query SecretString --output text | jq -r .password
+```
+
+Or use `make cluster.<name>.show-credentials` / `scripts/utils/get-admin-password.sh`.
 
 ## Post-creation: notification contacts
 
