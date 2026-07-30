@@ -638,7 +638,7 @@ variable "helm_chart" {
 variable "helm_chart_version" {
   description = "Helm chart version for cluster bootstrap"
   type        = string
-  default     = "0.5.18"
+  default     = "0.5.19"
   nullable    = false
 }
 
@@ -758,7 +758,7 @@ variable "helm_chart_acm_spoke" {
 variable "helm_chart_acm_spoke_version" {
   description = "Helm chart version for ACM spoke cluster bootstrap"
   type        = string
-  default     = "0.6.13"
+  default     = "0.6.14"
   nullable    = false
 }
 
