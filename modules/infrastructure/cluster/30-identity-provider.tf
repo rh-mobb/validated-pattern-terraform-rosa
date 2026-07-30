@@ -1,12 +1,16 @@
 # Identity Providers and Group Memberships
 # Break-glass HTPasswd via shared modules/infrastructure/htpasswd-idp.
 # Bootstrap uses a separate instance (module.bootstrap_admin → htpasswd-idp) — both can coexist (#29).
+# Single credentials secret in this module (Fixes #28) — no duplicate root plain-password secret.
 # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/05-identity.tf
 
 locals {
   break_glass_enabled    = var.enable_identity_provider && local.persists_through_sleep
   break_glass_password   = var.admin_password_for_bootstrap != null ? var.admin_password_for_bootstrap : "CHANGE_ME_PASSWORD_NOT_SET"
   break_glass_cluster_id = length(rhcs_cluster_rosa_hcp.main) > 0 ? one(rhcs_cluster_rosa_hcp.main[*].id) : null
+  # Create credentials secret when break-glass password is supplied (enable_cluster_admin at root).
+  # Survives sleep even when enable_identity_provider is false (IDP torn down with persists_through_sleep).
+  create_credentials_secret = var.admin_password_for_bootstrap != null
 }
 
 module "break_glass_htpasswd" {
@@ -35,7 +39,7 @@ moved {
   to   = module.break_glass_htpasswd.rhcs_group_membership.this[0]
 }
 
-# Break-glass cluster credentials (enable_identity_provider / enable_cluster_admin).
+# Break-glass cluster credentials — single source of truth (Fixes #28).
 # GitOps bootstrap does NOT use this secret — it uses module.bootstrap_admin (#29).
 # Format for login/show-credentials scripts:
 # {
@@ -44,7 +48,7 @@ moved {
 #   "url": "https://api.cluster.example.com:6443"
 # }
 resource "aws_secretsmanager_secret" "cluster_credentials" {
-  count = var.enable_identity_provider ? 1 : 0
+  count = local.create_credentials_secret ? 1 : 0
 
   name                    = "${var.cluster_name}-credentials"
   description             = "Break-glass cluster credentials for ROSA HCP cluster ${var.cluster_name} (persists through sleep)"
@@ -62,7 +66,7 @@ resource "aws_secretsmanager_secret" "cluster_credentials" {
 }
 
 resource "aws_secretsmanager_secret_version" "cluster_credentials" {
-  count = var.enable_identity_provider && local.persists_through_sleep ? 1 : 0
+  count = local.create_credentials_secret && local.persists_through_sleep ? 1 : 0
 
   secret_id = aws_secretsmanager_secret.cluster_credentials[0].id
   secret_string = jsonencode({

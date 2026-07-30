@@ -353,6 +353,10 @@ module "cluster_timing" {
 }
 
 # Break-glass admin password (only when enable_cluster_admin). Bootstrap uses module.bootstrap_admin (#29).
+# Generate random password if override is not provided, then pass it to the cluster module.
+# Single source of truth in AWS Secrets Manager is the cluster credentials secret
+# ({cluster_name}-credentials) created in modules/infrastructure/cluster/30-identity-provider.tf.
+# Fixes #28: previously a duplicate rosa-hcp-{cluster}-admin-password secret was also created here.
 resource "random_password" "admin_password" {
   count = var.enable_cluster_admin && var.admin_password_override == null ? 1 : 0
 
@@ -362,35 +366,8 @@ resource "random_password" "admin_password" {
   lower            = true
   numeric          = true
   override_special = "@#&*-_"
-}
 
-resource "aws_secretsmanager_secret" "admin_password" {
-  count = var.enable_cluster_admin ? 1 : 0
-
-  name                    = "rosa-hcp-${var.cluster_name}-admin-password"
-  description             = "Break-glass admin password for ROSA HCP cluster ${var.cluster_name} (persists through sleep)"
-  recovery_window_in_days = 0
-
-  tags = merge(local.tags, {
-    Name                   = "rosa-hcp-${var.cluster_name}-admin-password"
-    Cluster                = var.cluster_name
-    ManagedBy              = "Terraform"
-    Purpose                = "ClusterAdminPassword"
-    persists_through_sleep = "true"
-  })
-}
-
-resource "aws_secretsmanager_secret_version" "admin_password" {
-  count = var.enable_cluster_admin && var.persists_through_sleep ? 1 : 0
-
-  secret_id     = aws_secretsmanager_secret.admin_password[0].id
-  secret_string = var.admin_password_override != null ? var.admin_password_override : random_password.admin_password[0].result
-
-  lifecycle {
-    ignore_changes = [
-      secret_string
-    ]
-  }
+  # ROSA HTPasswd: 14+ chars, uppercase, symbol or number
 }
 
 # Short-lived bootstrap HTPasswd admin (#29). Toggled by bootstrap scripts with -target.
@@ -405,8 +382,8 @@ module "bootstrap_admin" {
   password   = var.bootstrap_admin_password
 }
 
-# Break-glass identity provider is created in the cluster module when enable_cluster_admin is true
-# See modules/infrastructure/cluster/30-identity-provider.tf
+# Break-glass identity provider + cluster credentials secret are created in the cluster module
+# when enable_cluster_admin is true. See modules/infrastructure/cluster/30-identity-provider.tf
 
 # Bastion Host (optional, for development/demo use only)
 # WARNING: This bastion is provided for development and demonstration purposes only.

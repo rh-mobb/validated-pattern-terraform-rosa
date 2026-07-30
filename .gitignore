@@ -66,6 +66,9 @@ Thumbs.db
 # Scratch directory for temporary files
 scratch/
 
+# Superpowers local session state (brainstorm TUI, logs, pids). Keep docs/superpowers/ tracked.
+.superpowers/
+
 # Generated bootstrap values (Terraform output, same dir as tfvars)
 clusters/*/cluster-bootstrap-values.yaml
 

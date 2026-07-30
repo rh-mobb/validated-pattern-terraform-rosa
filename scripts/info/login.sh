@@ -82,7 +82,11 @@ fi
 # Break-glass admin is opt-in. Gate on terraform outputs — a password override
 # cannot help if the HTPasswd admin IDP was never created.
 ADMIN_USER_CREATED=$(terraform output -no-color -raw admin_user_created 2>/dev/null | tr -d '\n\r' || echo "false")
-ADMIN_SECRET_ARN=$(terraform output -raw admin_password_secret_arn 2>/dev/null || echo "")
+# Prefer #28 cluster credentials ARN; fall back to deprecated admin_password_secret_arn alias.
+ADMIN_SECRET_ARN=$(terraform output -raw cluster_credentials_secret_arn 2>/dev/null || echo "")
+if [ -z "$ADMIN_SECRET_ARN" ] || [ "$ADMIN_SECRET_ARN" = "null" ]; then
+	ADMIN_SECRET_ARN=$(terraform output -raw admin_password_secret_arn 2>/dev/null || echo "")
+fi
 
 if [ "$ADMIN_USER_CREATED" != "true" ]; then
 	error "No break-glass cluster admin is available (admin_user_created=${ADMIN_USER_CREATED:-false})."
