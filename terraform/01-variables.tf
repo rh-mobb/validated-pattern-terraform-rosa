@@ -378,8 +378,37 @@ variable "tags_override" {
   nullable    = true
 }
 
+variable "enable_cluster_admin" {
+  description = "Create a long-lived HTPasswd break-glass cluster admin and store credentials in AWS Secrets Manager. Default false. Not used by GitOps bootstrap (see enable_bootstrap_admin_user). Relates to #29."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "enable_bootstrap_admin_user" {
+  description = "Create short-lived HTPasswd bootstrap admin (module.bootstrap_admin). Default false. Bootstrap scripts set this true via targeted apply, then false to tear down. Relates to #29."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "bootstrap_admin_cluster_id" {
+  description = "ROSA cluster ID for module.bootstrap_admin. Set by bootstrap-admin.sh from terraform output so -target=module.bootstrap_admin does not depend on module.cluster (avoids reconciling immutable cluster tags). Leave null for normal applies."
+  type        = string
+  nullable    = true
+  default     = null
+}
+
+variable "bootstrap_admin_password" {
+  description = "Optional password for module.bootstrap_admin. When null, the module generates a random password. bootstrap-admin.sh always sets this so GitOps login does not need terraform outputs. Relates to #29."
+  type        = string
+  sensitive   = true
+  nullable    = true
+  default     = null
+}
+
 variable "admin_username" {
-  description = "Admin username for cluster authentication"
+  description = "Break-glass admin username when enable_cluster_admin is true"
   type        = string
   default     = "admin"
   nullable    = false
@@ -387,7 +416,8 @@ variable "admin_username" {
 
 variable "admin_password_override" {
   description = <<EOF
-  Optional override for admin password. If not set, a random password will be generated and stored in AWS Secrets Manager.
+  Optional override for break-glass admin password when enable_cluster_admin is true.
+  If not set, a random password is generated and stored in AWS Secrets Manager.
   Password must be 14 characters or more, contain one uppercase letter and a symbol or number.
 
   Can be provided via:
@@ -396,6 +426,8 @@ variable "admin_password_override" {
 
   Note: The password is never output by Terraform. Use AWS CLI to retrieve it:
     aws secretsmanager get-secret-value --secret-id <secret_arn> --query SecretString --output text
+
+  Not used for GitOps bootstrap (bootstrap uses module.bootstrap_admin outputs).
   EOF
   type        = string
   sensitive   = true
