@@ -490,9 +490,9 @@ Expected: infrastructure apps show `helm:` values, not `plugin:`.
 - Consumes: Task 7 success
 - Produces: AVP-free bootstrap; ESO-only IRSA trust
 
-- [ ] **Step 1: Default `argocd.plugin.enabled` to `false` in bootstrap charts; remove templates in a subsequent minor if desired**
+- [x] **Step 1: Default `argocd.plugin.enabled` to `false` in bootstrap charts; remove templates in a subsequent minor if desired** (done in chart 0.5.19 / 0.6.14; templates remain gated)
 
-- [ ] **Step 2: Narrow IAM trust to ESO SA only**
+- [x] **Step 2: Narrow IAM trust to ESO SA only**
 
 ```hcl
 Condition = {
@@ -502,9 +502,9 @@ Condition = {
 }
 ```
 
-- [ ] **Step 3: `make tf-fmt-check tf-validate` + chart `helm template`**
+- [x] **Step 3: `make tf-fmt-check tf-validate` + chart `helm template`**
 
-- [ ] **Step 4: Close #39 with comment pointing to #43 completion (or mark duplicate/obsolete)**
+- [x] **Step 4: Close #39 with comment pointing to #43 completion (or mark duplicate/obsolete)**
 
 ```bash
 gh issue comment 39 --body "Superseded by #43: AVP allowlisting is moot once AVP is removed. Closing in favor of ESO."
@@ -513,7 +513,7 @@ gh issue close 39 --reason "not planned"
 
 Only close #39 when AVP is actually removed, not during dual-trust.
 
-- [ ] **Step 5: Commit + CHANGELOG**
+- [x] **Step 5: Commit + CHANGELOG**
 
 ```markdown
 ### Removed

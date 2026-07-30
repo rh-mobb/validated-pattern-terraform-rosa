@@ -211,7 +211,7 @@ output "cloudwatch_logging_role_arn" {
 }
 
 output "secrets_manager_role_arn" {
-  description = "ARN of the IAM role for External Secrets Operator IRSA and temporary AVP vplugin trust to access AWS Secrets Manager (null if enable_secrets_manager_iam is false)"
+  description = "ARN of the IAM role for External Secrets Operator IRSA to access AWS Secrets Manager (null if enable_secrets_manager_iam is false)"
   value       = module.iam.secrets_manager_role_arn
   sensitive   = false
 }

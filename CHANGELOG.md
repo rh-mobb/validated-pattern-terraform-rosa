@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Argo CD Vault Plugin IRSA trust (#43)**: Secrets Manager IAM role trusts only External Secrets Operator (`external-secrets-operator:external-secrets-sa`) after AVP removal from the IRSA trust policy.
+
 ### Fixed
 - **Default machine pool version pinning**: Added `version` and `upgrade_acknowledgements_for` attributes to `rhcs_hcp_machine_pool.default` resource. Previously the default machine pool's OpenShift version was unmanaged by Terraform, preventing explicit version control and minor version upgrade orchestration. The `upgrade_acknowledgements_for` variable is passed from root module through to the cluster module.
 - **Separate default machine pool version variable**: Added `default_machine_pool_version` variable (default null) so the default machine pool version is managed independently from the control plane `openshift_version`. This enables staged upgrades: upgrade the control plane first, wait for completion, then set the worker version.
@@ -16,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GitOps Helm chart pins (#43)**: Default `cluster-bootstrap` to `0.5.19`, `cluster-bootstrap-acm-spoke` to `0.6.14`, and bootstrap `app-of-apps-infrastructure` `targetRevision` to `0.2.3` (aligned with validated-pattern-helm-charts release after AVP/ESO work).
 - **Wire `gitops_git_target_revision` (#43)**: Hub bootstrap values now emit `gitTargetRevision` for cluster-bootstrap (>= `0.5.18`) so Argo CD can sync cluster-config from a branch/tag instead of hardcoded `HEAD`.
 - **Disable AVP CMP by default (#43)**: Hub/spoke bootstrap values set `argocd.plugin.enabled: false` so the Vault Plugin sidecar is not deployed when cluster-config uses native Helm + ESO.
-- **Secrets Manager IRSA for ESO (#43)**: Secrets Manager IAM role trusts External Secrets Operator service account (`external-secrets-operator:external-secrets-sa`) in addition to temporary AVP `vplugin`; documentation now prefers ESO over Argo CD Vault Plugin.
+- **Secrets Manager IRSA for ESO (#43)**: Secrets Manager IAM role trusts External Secrets Operator (`external-secrets-operator:external-secrets-sa`); documentation prefers ESO over Argo CD Vault Plugin.
 - **Replaced scottwinkler/shell provider with null_resource**: Termination protection now uses `null_resource` with `local-exec` provisioners instead of the third-party `scottwinkler/shell` provider, removing the external provider dependency.
 
 ### Added
