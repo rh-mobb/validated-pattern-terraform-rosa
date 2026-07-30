@@ -360,13 +360,13 @@ Align your fork with these versions, or update the template in your infrastructu
 
 ### GitOps CMP tools container image
 
-**Default secrets path:** AWS Secrets Manager integration uses External Secrets Operator (ESO), not AVP. Standard flow is:
+**Default secrets path:** AWS Secrets Manager integration uses the Red Hat External Secrets Operator (ESO), not AVP. Standard flow is:
 
-1. Terraform creates IAM role access for Secrets Manager (`enable_secrets_manager_iam = true`)
+1. Terraform creates IAM role access for Secrets Manager ([`enable_secrets_manager_iam = true`](../../terraform/01-variables.tf))
 2. ESO uses `external-secrets-operator:external-secrets-sa` IRSA
 3. `ClusterSecretStore` + `ExternalSecret` sync remote values into Kubernetes `Secret` objects
 
-See the `external-secrets-operator` chart in your cluster-config infrastructure applications and the Terraform toggle `enable_secrets_manager_iam`.
+See the [`external-secrets-operator` chart](https://github.com/rh-mobb/validated-pattern-helm-charts/tree/main/charts/external-secrets-operator) in your cluster-config infrastructure applications and the Terraform toggle [`enable_secrets_manager_iam`](../../terraform/01-variables.tf).
 
 The `gitops_tools_image` setting is now **optional CMP tooling** for clusters that still run Argo CD Applications with `plugin: true` during migration. It is not required for ESO-based Secrets Manager sync.
 
