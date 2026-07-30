@@ -638,7 +638,7 @@ variable "helm_chart" {
 variable "helm_chart_version" {
   description = "Helm chart version for cluster bootstrap"
   type        = string
-  default     = "0.5.17"
+  default     = "0.5.18"
   nullable    = false
 }
 
@@ -664,7 +664,7 @@ variable "gitops_git_repo_url" {
 }
 
 variable "gitops_git_target_revision" {
-  description = "Git target revision (branch/tag/commit) for cluster-config repository used by ArgoCD value source. Defaults to HEAD (default branch). Set to a branch like 'autonode' to test preview config."
+  description = "Git target revision (branch/tag/commit) for cluster-config repository used by Argo CD ApplicationSet values source. Emitted as gitTargetRevision in hub bootstrap values (cluster-bootstrap >= 0.5.18). Defaults to HEAD (default branch). Set to a branch like 'feature/43-replace-avp-with-eso' to test preview config."
   type        = string
   default     = "HEAD"
   nullable    = false

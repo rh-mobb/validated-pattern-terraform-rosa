@@ -889,7 +889,7 @@ flowchart TD
 | Bootstrap can't reach GitHub | Egress-zero or no VPC endpoints for Git | CodeCommit mirroring — [egress-zero GitOps guide](../guides/egress-zero-gitops.md) |
 | CMP plugin apps stuck `Sync: Unknown` (`find: command not found` or plugin sidecar errors) | Repo-server CMP image missing tools or wrong/unreachable image | Use current `gitops-tools` image; re-host to private registry and set `gitops_tools_image` / `defaultImage` in bootstrap templates — [§3c GitOps CMP tools image](#gitops-cmp-tools-container-image) |
 | Repo-server can't pull CMP sidecar image | `ghcr.io` blocked (egress-zero, registry policy) | Mirror `gitops-tools` to ECR; update `defaultImage` in [hub-values.yaml.tftpl](../../modules/infrastructure/cluster/templates/hub-values.yaml.tftpl) and [spoke-values.yaml.tftpl](../../modules/infrastructure/cluster/templates/spoke-values.yaml.tftpl) |
-| `gitops_git_target_revision` ignored | Not wired in hub-values template | Use cluster-config default branch or edit template |
+| Wrong cluster-config branch synced | `gitops_git_target_revision` still `HEAD` or chart older than `0.5.18` | Set `gitops_git_target_revision` in tfvars and use `cluster-bootstrap` >= `0.5.18` |
 | Helm chart version mismatch | Versions hardcoded in template | Pin versions in your helm fork to match template |
 | ACM examples default to `noacm` | `acm_mode` not in example tfvars | Set module variable; use `bootstrap-spoke` target |
 | Worker nodes not ready | Bootstrap waits for ≥2 Ready workers on single-AZ (60 min timeout for `.metal`); long NotReady on bare metal may need `default_auto_repair = false` | Set in `terraform.tfvars`; override `WORKER_READY_MAX_ATTEMPTS` if needed |
@@ -900,7 +900,6 @@ flowchart TD
 These improvements are documented as future work:
 
 - Expose `acm_mode`, `helm_repo_url`, and chart version pins at root `terraform.tfvars`
-- Wire `gitops_git_target_revision` into [hub-values.yaml.tftpl](../../modules/infrastructure/cluster/templates/hub-values.yaml.tftpl)
 - Automate CodeCommit repository creation and mirroring (see internal `docs/TODO.md`)
 
 ---
@@ -916,7 +915,7 @@ These improvements are documented as future work:
 | `enable_gitops_bootstrap` | Enable bootstrap outputs and script | `true` |
 | `gitops_git_repo_url` | cluster-config repository URL | `https://github.com/<org>/acme-cluster-config.git` |
 | `gitops_git_path` | Path under repo root | `dev/acme-dev` |
-| `gitops_git_target_revision` | Git branch/tag (limited template support) | `HEAD` |
+| `gitops_git_target_revision` | Git branch/tag/commit for cluster-config values source (`gitTargetRevision`) | `HEAD` or `feature/my-branch` |
 
 **Cluster module only** ([modules/infrastructure/cluster/01-variables.tf](../../modules/infrastructure/cluster/01-variables.tf)) — set via fork or extend root passthrough:
 
@@ -924,7 +923,7 @@ These improvements are documented as future work:
 |----------|---------|-------------|
 | `acm_mode` | `noacm` | `hub`, `spoke`, or `noacm` |
 | `helm_repo_url` | `https://rh-mobb.github.io/validated-pattern-helm-charts/` | Your published Helm repo |
-| `helm_chart_version` | `0.5.17` | `cluster-bootstrap` chart version |
+| `helm_chart_version` | `0.5.18` | `cluster-bootstrap` chart version |
 | `helm_chart_acm_spoke_version` | `0.6.13` | `cluster-bootstrap-acm-spoke` chart version |
 | `gitops_tools_image` | `ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:latest` | Optional CMP repo-server sidecar tooling image (used when `plugin: true`); re-host for egress-zero or registry policy — see [§3c](#gitops-cmp-tools-container-image) |
 | `gitops_csv` | `openshift-gitops-operator.v1.19.2` | GitOps operator CSV |

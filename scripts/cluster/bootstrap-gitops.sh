@@ -294,7 +294,7 @@ setup_helm_repo() {
 # --- Install GitOps for hub/standalone cluster ---
 install_gitops_hub() {
 	local chart_name="${HELM_CHART:-cluster-bootstrap}"
-	local chart_version="${HELM_CHART_VERSION:-0.5.17}"
+	local chart_version="${HELM_CHART_VERSION:-0.5.18}"
 	local namespace="${HELM_NAMESPACE:-openshift-operators}"
 	local helm_timeout="${HELM_TIMEOUT:-15m}"
 
