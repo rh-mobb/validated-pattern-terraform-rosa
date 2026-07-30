@@ -54,8 +54,7 @@ if [[ -z "$BACKEND_REF" ]]; then
 fi
 
 case "$BACKEND_REF" in
-*"/${EXPECTED_STATE_SUFFIX}" | "${EXPECTED_STATE_SUFFIX}")
-	;;
+*"/${EXPECTED_STATE_SUFFIX}" | "${EXPECTED_STATE_SUFFIX}") ;;
 *)
 	error "Terraform backend is not pointed at this cluster's state."
 	error "  expected suffix: ${EXPECTED_STATE_SUFFIX}"
