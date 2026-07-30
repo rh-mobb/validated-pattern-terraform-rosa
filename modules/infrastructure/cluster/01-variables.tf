@@ -678,7 +678,7 @@ variable "ecr_account" {
 }
 
 variable "gitops_tools_image" {
-  description = "Container image for the Argo CD repo-server CMP sidecar (avp-helm). Re-host in your private registry for egress-zero or registry policy requirements; mirrored URL is passed as defaultImage in GitOps bootstrap Helm values."
+  description = "Container image for the optional Argo CD repo-server CMP sidecar tooling. Re-host in your private registry for egress-zero or registry policy requirements; mirrored URL is passed as defaultImage in GitOps bootstrap Helm values when CMP plugin mode is enabled."
   type        = string
   default     = "ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:latest"
   nullable    = false
