@@ -618,7 +618,7 @@ variable "gitops_git_repo_url" {
 }
 
 variable "gitops_git_target_revision" {
-  description = "Git target revision (branch/tag/commit) for cluster-config repository used by ArgoCD value source. Defaults to HEAD (default branch)."
+  description = "Git target revision (branch/tag/commit) for cluster-config repository used by Argo CD ApplicationSet values source. Passed through to cluster-bootstrap gitTargetRevision (chart >= 0.5.18). Defaults to HEAD (default branch)."
   type        = string
   default     = "HEAD"
   nullable    = false

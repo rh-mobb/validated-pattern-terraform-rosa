@@ -6,6 +6,7 @@ domain: ${cluster_domain}
 csv: ${gitops_csv}
 aws_region: ${aws_region}
 defaultImage: ${gitops_tools_image}
+gitTargetRevision: ${git_target_revision}
 %{if git_path != ""}
 gitPath: ${git_path}
 %{endif}
