@@ -660,7 +660,7 @@ variable "enable_cloudwatch_logging" {
 }
 
 variable "enable_secrets_manager_iam" {
-  description = "Enable IAM role and policy for ArgoCD Vault Plugin to access AWS Secrets Manager. When enabled, creates IAM role for openshift-gitops:vplugin service account. Secrets access is restricted to explicit ARN list for security."
+  description = "Enable IAM role and policy for External Secrets Operator to access AWS Secrets Manager, with temporary trust for ArgoCD Vault Plugin (openshift-gitops:vplugin) during migration. Secrets access is restricted to explicit ARN list for security."
   type        = bool
   default     = false
   nullable    = false

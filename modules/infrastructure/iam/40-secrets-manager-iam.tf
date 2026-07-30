@@ -1,7 +1,8 @@
 # Secrets Manager IAM Configuration
 # Reference: ./reference/pfoster/rosa-hcp-dedicated-vpc/terraform/3.secrets.tf
-# This configuration creates an IAM role and policy for ArgoCD to access AWS Secrets Manager via OIDC.
-# The role uses OIDC federation to allow the ArgoCD Vault Plugin service account to assume the role.
+# This configuration creates an IAM role and policy for in-cluster secret consumers to access AWS
+# Secrets Manager via OIDC. External Secrets Operator (primary) and ArgoCD Vault Plugin (temporary)
+# can assume the same role during migration.
 #
 # IMPORTANT: The OIDC endpoint URL must NOT include the "https://" prefix when used in IAM trust policies.
 # Reference: Red Hat documentation shows stripping https:// from the OIDC endpoint URL
@@ -84,8 +85,11 @@ resource "aws_iam_policy" "secrets_manager" {
 }
 
 # IAM Role for Secrets Manager
-# Uses OIDC federation to allow the ArgoCD Vault Plugin service account to assume this role
-# Service account: system:serviceaccount:openshift-gitops:vplugin
+# Uses OIDC federation to allow both:
+# - External Secrets Operator service account (primary):
+#   system:serviceaccount:external-secrets-operator:external-secrets-sa
+# - ArgoCD Vault Plugin service account (temporary):
+#   system:serviceaccount:openshift-gitops:vplugin
 resource "aws_iam_role" "secrets_manager" {
   count = local.persists_through_sleep && var.enable_secrets_manager_iam ? 1 : 0
 
@@ -102,8 +106,11 @@ resource "aws_iam_role" "secrets_manager" {
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
-          StringEquals = {
-            "${local.oidc_endpoint_url_normalized}:sub" = "system:serviceaccount:openshift-gitops:vplugin"
+          "ForAnyValue:StringEquals" = {
+            "${local.oidc_endpoint_url_normalized}:sub" = [
+              "system:serviceaccount:openshift-gitops:vplugin",
+              "system:serviceaccount:external-secrets-operator:external-secrets-sa",
+            ]
           }
         }
       }
