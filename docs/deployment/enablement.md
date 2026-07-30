@@ -347,7 +347,7 @@ flowchart LR
 
 | Chart | Pinned version |
 |-------|----------------|
-| `app-of-apps-infrastructure` | `0.2.2` |
+| `app-of-apps-infrastructure` | `0.2.3` |
 | `app-of-apps-application` | `1.5.8` |
 | `app-of-apps-acm-team-onboarding` | `0.4.1` |
 
