@@ -865,7 +865,7 @@ GitOps bootstrap is integrated into the cluster module. After cluster deployment
 ## Architecture Decisions
 
 ### ESO Replaces AVP for Secrets Manager
-- **Decision**: Use External Secrets Operator (ESO) as the default integration path for AWS Secrets Manager instead of Argo CD Vault Plugin (AVP).
+- **Decision**: Use the Red Hat External Secrets Operator (ESO) as the default integration path for AWS Secrets Manager instead of Argo CD Vault Plugin (AVP).
 - **Status**: Accepted.
 - **Consequences**:
   - Cluster-config defaults should use native Helm rendering (`plugin: false`) and ESO resources (`ClusterSecretStore` + `ExternalSecret`) for secret sync.
