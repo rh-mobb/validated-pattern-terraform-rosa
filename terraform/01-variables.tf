@@ -638,6 +638,23 @@ variable "gitops_csv" {
   nullable    = false
 }
 
+variable "acm_mode" {
+  description = <<-EOF
+    ACM (Advanced Cluster Management) mode for GitOps bootstrap values selection.
+    - "noacm": Standalone cluster (default)
+    - "hub": ACM hub cluster (uses app-of-apps-acm-team-onboarding)
+    - "spoke": ACM spoke cluster (use make cluster.<name>.bootstrap-spoke)
+  EOF
+  type        = string
+  default     = "noacm"
+  nullable    = false
+
+  validation {
+    condition     = contains(["hub", "spoke", "noacm"], var.acm_mode)
+    error_message = "acm_mode must be one of: hub, spoke, noacm."
+  }
+}
+
 variable "enable_cert_manager_iam" {
   description = "Enable IAM role creation for cert-manager to use AWS Private CA"
   type        = bool

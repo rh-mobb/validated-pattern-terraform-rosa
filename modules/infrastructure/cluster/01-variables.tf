@@ -664,7 +664,7 @@ variable "gitops_git_repo_url" {
 }
 
 variable "gitops_git_target_revision" {
-  description = "Git target revision (branch/tag/commit) for cluster-config repository used by Argo CD ApplicationSet values source. Emitted as gitTargetRevision in hub bootstrap values (cluster-bootstrap >= 0.5.18). Defaults to HEAD (default branch). Set to a branch like 'feature/43-replace-avp-with-eso' to test preview config."
+  description = "Git target revision (branch/tag/commit) for cluster-config repository used by Argo CD ApplicationSet values source. Emitted as gitTargetRevision in hub bootstrap values (cluster-bootstrap >= 0.5.18). Defaults to HEAD (default branch). Override with a branch or tag when testing preview cluster-config."
   type        = string
   default     = "HEAD"
   nullable    = false
@@ -772,7 +772,7 @@ variable "helm_chart_acm_hub_registration" {
 variable "helm_chart_acm_hub_registration_version" {
   description = "Helm chart version for ACM hub registration"
   type        = string
-  default     = "0.2.1"
+  default     = "0.2.2"
   nullable    = false
 }
 
@@ -786,7 +786,7 @@ variable "helm_chart_awspca" {
 variable "helm_chart_awspca_version" {
   description = "Helm chart version for AWS Private CA Issuer"
   type        = string
-  default     = "1.5.7"
+  default     = "1.6.1"
   nullable    = false
 }
 
