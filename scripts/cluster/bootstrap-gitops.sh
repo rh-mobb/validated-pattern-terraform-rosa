@@ -499,7 +499,7 @@ install_gitops_spoke() {
 	else
 		# Deploy hub registration chart
 		local hub_chart_name="${HELM_CHART_ACM_HUB_REGISTRATION:-cluster-bootstrap-acm-hub-registration}"
-		local hub_chart_version="${HELM_CHART_ACM_HUB_REGISTRATION_VERSION:-0.1.0}"
+		local hub_chart_version="${HELM_CHART_ACM_HUB_REGISTRATION_VERSION:-0.2.2}"
 
 		echo "Deploying ${hub_chart_name} chart to hub..."
 		# shellcheck disable=SC2046
@@ -600,7 +600,7 @@ install_aws_privateca_issuer() {
 	fi
 
 	local chart_name="${HELM_CHART_AWSPCA:-aws-privateca-issuer}"
-	local chart_version="${HELM_CHART_AWSPCA_VERSION:-1.5.7}"
+	local chart_version="${HELM_CHART_AWSPCA_VERSION:-1.6.1}"
 	local namespace="${AWSPCA_NAMESPACE:-cert-manager-operator}"
 	local awspca_csv="${AWSPCA_CSV:-cert-manager-operator.v1.17.0}"
 	local awspca_issuer="${AWSPCA_ISSUER:-${ZONE_NAME:-}}"

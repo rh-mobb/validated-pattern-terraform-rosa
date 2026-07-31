@@ -350,6 +350,10 @@ flowchart LR
 | `app-of-apps-infrastructure` | `0.2.3` |
 | `app-of-apps-application` | `1.5.8` |
 | `app-of-apps-acm-team-onboarding` | `0.4.1` |
+| `cluster-bootstrap` | `0.5.19` (module / script default) |
+| `cluster-bootstrap-acm-spoke` | `0.6.14` (module / script default) |
+| `cluster-bootstrap-acm-hub-registration` | `0.2.2` (module / script default) |
+| `aws-privateca-issuer` | `1.6.1` (module / script default) |
 
 Align your fork with these versions, or update the template in your infrastructure fork.
 
@@ -925,6 +929,8 @@ These improvements are documented as future work:
 | `helm_repo_url` | `https://rh-mobb.github.io/validated-pattern-helm-charts/` | Your published Helm repo |
 | `helm_chart_version` | `0.5.19` | `cluster-bootstrap` chart version |
 | `helm_chart_acm_spoke_version` | `0.6.14` | `cluster-bootstrap-acm-spoke` chart version |
+| `helm_chart_acm_hub_registration_version` | `0.2.2` | `cluster-bootstrap-acm-hub-registration` chart version |
+| `helm_chart_awspca_version` | `1.6.1` | `aws-privateca-issuer` chart version |
 | `gitops_tools_image` | `ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:latest` | Optional CMP repo-server sidecar tooling image (used when `plugin: true`); re-host for egress-zero or registry policy — see [§3c](#gitops-cmp-tools-container-image) |
 | `gitops_csv` | `openshift-gitops-operator.v1.19.2` | GitOps operator CSV |
 | `hub_credentials_secret_name` | `""` | Hub secret for spoke mode |
