@@ -117,29 +117,7 @@ sleep: check-cluster
 # GitOps operations
 bootstrap: init ensure-tunnel
 	@echo "$(BLUE)Bootstrapping GitOps operator for $(CLUSTER_NAME)...$(NC)"
-	@cd $(TERRAFORM_DIR) && \
-		if ! terraform output -no-color gitops_bootstrap_enabled 2>/dev/null | grep -q "true"; then \
-			echo "$(YELLOW)Warning: GitOps bootstrap is not enabled for this cluster.$(NC)"; \
-			echo "$(YELLOW)Set enable_gitops_bootstrap=true in terraform.tfvars and run terraform apply.$(NC)"; \
-			exit 1; \
-		fi && \
-		SCRIPT_PATH=$$(terraform output -no-color -raw gitops_bootstrap_script_path 2>/dev/null | tr -d '\n\r' | sed 's/[[:space:]]*$$//') && \
-		if [ -z "$$SCRIPT_PATH" ] || [ "$$SCRIPT_PATH" = "null" ]; then \
-			echo "$(YELLOW)Error: GitOps bootstrap script path not found. Run terraform apply first.$(NC)"; \
-			exit 1; \
-		fi && \
-		ACM_MODE=$$(terraform output -no-color -raw gitops_bootstrap_acm_mode 2>/dev/null | tr -d '\n\r') && \
-		VALUES_OUTPUT=$$([ "$$ACM_MODE" = "spoke" ] && echo "gitops_bootstrap_spoke_values" || echo "gitops_bootstrap_hub_values") && \
-		echo "$(BLUE)Writing Helm values to clusters/$(CLUSTER_NAME)/cluster-bootstrap-values.yaml...$(NC)" && \
-		mkdir -p "../clusters/$(CLUSTER_NAME)" && \
-		terraform output -no-color -raw "$$VALUES_OUTPUT" > "../clusters/$(CLUSTER_NAME)/cluster-bootstrap-values.yaml" && \
-		export BOOTSTRAP_VALUES_FILE="$$PWD/../clusters/$(CLUSTER_NAME)/cluster-bootstrap-values.yaml" && \
-		echo "$(BLUE)Exporting environment variables from Terraform outputs...$(NC)" && \
-		eval $$(terraform output -no-color -raw gitops_bootstrap_env_exports 2>/dev/null) && \
-		echo "$(BLUE)Running GitOps bootstrap script: $$SCRIPT_PATH$(NC)" && \
-		bash "$$SCRIPT_PATH" || \
-		(echo "$(YELLOW)GitOps bootstrap failed. Check the output above for details.$(NC)" && exit 1)
-	@echo "$(GREEN)GitOps bootstrap completed for $(CLUSTER_NAME)$(NC)"
+	@$(SCRIPT_DIR)/cluster/run-gitops-bootstrap.sh $(CLUSTER_NAME)
 
 # GitOps spoke bootstrap - registers cluster with ACM hub
 # Requires: HUB_CREDENTIALS_SECRET and ACM_REGION passed on the command line
@@ -285,11 +263,7 @@ vpn-status: check-cluster
 
 # Ensure tunnel is started when Client VPN is deployed (deprecated: sshuttle no longer auto-started)
 ensure-tunnel: check-cluster
-	@cd $(TERRAFORM_DIR) && \
-		VPN_DEPLOYED=$$(terraform output -no-color -raw client_vpn_deployed 2>/dev/null | tr -d '\n\r' | sed 's/[[:space:]]*$$//') && \
-		if [ "$$VPN_DEPLOYED" = "true" ]; then \
-			cd - >/dev/null && $(SCRIPT_DIR)/vpn/start.sh $(CLUSTER_NAME); \
-		fi
+	@$(SCRIPT_DIR)/cluster/ensure-tunnel.sh $(CLUSTER_NAME)
 
 # Bastion operations
 bastion-connect: check-cluster

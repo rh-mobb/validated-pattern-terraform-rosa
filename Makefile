@@ -27,9 +27,11 @@ cluster.%:
 		exit 1; \
 	fi; \
 	if [ -z "$$OPERATION" ]; then \
+		echo "$(YELLOW)Note: prefer ./bin/rosactl cluster up $$CLUSTER_NAME (Make cluster targets will be deprecated)$(NC)"; \
 		echo "$(BLUE)No operation specified. Running default: apply then bootstrap$(NC)"; \
 		$(MAKE) -f Makefile.cluster CLUSTER_NAME=$$CLUSTER_NAME apply bootstrap; \
 	else \
+		echo "$(YELLOW)Note: prefer ./bin/rosactl cluster $$OPERATION $$CLUSTER_NAME$(NC)"; \
 		$(MAKE) -f Makefile.cluster CLUSTER_NAME=$$CLUSTER_NAME $$OPERATION; \
 	fi
 
@@ -39,7 +41,14 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(GREEN)Usage:$(NC) make cluster.<type>.<operation> [CLUSTER=<cluster-name>]"
 	@echo ""
-	@echo "$(GREEN)Unified Cluster Management (Recommended):$(NC)"
+	@echo "$(GREEN)Cluster lifecycle (recommended):$(NC)"
+	@echo "  ./bin/rosactl cluster up public              Apply + bootstrap (human-friendly progress)"
+	@echo "  ./bin/rosactl cluster plan public            Plan infrastructure"
+	@echo "  ./bin/rosactl cluster apply public           Apply infrastructure"
+	@echo "  ./bin/rosactl cluster bootstrap public       Bootstrap GitOps"
+	@echo "  ./bin/rosactl --robot cluster up public      Full logs (CI / non-interactive)"
+	@echo ""
+	@echo "$(GREEN)Cluster management via Make (deprecated, still supported):$(NC)"
 	@echo "  make cluster.public                            Apply and bootstrap cluster (default)"
 	@echo "  make cluster.public.init                     Initialize public cluster"
 	@echo "  make cluster.public.plan                     Plan public cluster"
