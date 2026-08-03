@@ -1,0 +1,821 @@
+#!/usr/bin/env python3
+"""rosactl — human-friendly cluster lifecycle CLI for this repository.
+
+Stdlib only. Orchestrates existing scripts under scripts/cluster and scripts/info.
+See docs/superpowers/specs/2026-07-29-rosactl-design.md
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import signal
+import shutil
+import subprocess
+import sys
+import threading
+import time
+from collections import deque
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Iterable, List, Optional, Sequence
+
+LOG_VIEWPORT = 8
+# Exit code conventionally used for SIGINT
+EXIT_SIGINT = 130
+# Quarter-circle spinner — same family as the static ◐ glyph
+SPINNER_FRAMES = "◐◓◑◒"
+SPINNER_INTERVAL_S = 0.15
+
+
+def _terminate_process_group(proc: subprocess.Popen, log_fh=None) -> int:
+    """Forward Ctrl+C to the child process group so Terraform can release state locks."""
+    if proc.poll() is not None:
+        return int(proc.returncode or 0)
+
+    def _log(msg: str) -> None:
+        if log_fh is not None:
+            log_fh.write(msg + "\n")
+            log_fh.flush()
+
+    _log("# interrupted — sending SIGINT to child process group")
+    try:
+        os.killpg(proc.pid, signal.SIGINT)
+    except (ProcessLookupError, PermissionError):
+        try:
+            proc.send_signal(signal.SIGINT)
+        except ProcessLookupError:
+            return int(proc.returncode or EXIT_SIGINT)
+
+    try:
+        return int(proc.wait(timeout=45))
+    except subprocess.TimeoutExpired:
+        _log("# child did not exit after SIGINT — sending SIGTERM")
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            proc.terminate()
+        try:
+            return int(proc.wait(timeout=10))
+        except subprocess.TimeoutExpired:
+            _log("# child still running — sending SIGKILL")
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                proc.kill()
+            return int(proc.wait())
+
+
+def project_root() -> Path:
+    env = os.environ.get("ROSACTL_ROOT")
+    if env:
+        return Path(env).resolve()
+    return Path(__file__).resolve().parent.parent
+
+
+def use_color(stream=None) -> bool:
+    if os.environ.get("NO_COLOR"):
+        return False
+    if os.environ.get("TERM") == "dumb":
+        return False
+    target = stream or sys.stdout
+    return hasattr(target, "isatty") and bool(target.isatty())
+
+
+def c(code: str, text: str, enabled: bool) -> str:
+    if not enabled:
+        return text
+    return f"\033[{code}m{text}\033[0m"
+
+
+def is_robot_mode(robot_flag: bool) -> bool:
+    if robot_flag:
+        return True
+    if os.environ.get("CI", "").lower() in ("1", "true", "yes"):
+        return True
+    if not sys.stdout.isatty():
+        return True
+    return False
+
+
+def format_duration(seconds: float) -> str:
+    seconds = int(seconds)
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes, secs = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes}m {secs:02d}s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes:02d}m {secs:02d}s"
+
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI CSI sequences so width math matches what the user sees."""
+    out: list[str] = []
+    i = 0
+    while i < len(text):
+        if text[i] == "\033" and i + 1 < len(text) and text[i + 1] == "[":
+            i += 2
+            while i < len(text) and text[i] not in "ABCDEFGHJKSTfminsu":
+                i += 1
+            i += 1
+            continue
+        out.append(text[i])
+        i += 1
+    return "".join(out)
+
+
+def truncate_for_terminal(text: str, columns: Optional[int] = None) -> str:
+    """Keep a line to one terminal row so ANSI cursor-up math stays correct."""
+    if columns is None:
+        columns = shutil.get_terminal_size((80, 24)).columns
+    # Leave a little margin; never go below a usable width
+    width = max(20, columns - 1)
+    plain = strip_ansi(text).replace("\t", " ")
+    if len(plain) <= width:
+        return plain
+    if width <= 3:
+        return plain[:width]
+    return plain[: width - 3] + "..."
+
+
+def iter_process_lines(stream) -> Iterable[str]:
+    """Yield logical lines from a process stream, treating both \\n and \\r as delimiters.
+
+    Terraform progress often rewrites the same row with \\r; we keep the latest
+    segment so the viewport sees one update per refresh, not a concatenated mess.
+    """
+    buf = ""
+    while True:
+        chunk = stream.read(256)
+        if not chunk:
+            if buf:
+                yield buf
+            break
+        if isinstance(chunk, (bytes, bytearray)):
+            chunk = chunk.decode("utf-8", errors="replace")
+        buf += chunk
+        while True:
+            n_idx = buf.find("\n")
+            r_idx = buf.find("\r")
+            if n_idx < 0 and r_idx < 0:
+                break
+            if n_idx < 0:
+                idx, delim_len = r_idx, 1
+            elif r_idx < 0:
+                idx, delim_len = n_idx, 1
+            elif r_idx < n_idx:
+                # \r or \r\n
+                if n_idx == r_idx + 1:
+                    idx, delim_len = r_idx, 2
+                else:
+                    idx, delim_len = r_idx, 1
+            else:
+                idx, delim_len = n_idx, 1
+            line = buf[:idx]
+            buf = buf[idx + delim_len :]
+            # Skip empty frames from \r\n or repeated \r
+            if line:
+                yield line
+
+
+def log_paths(root: Path, cluster: str, verb: str) -> tuple[Path, Path]:
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+    log_dir = root / "clusters" / cluster / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / f"{ts}-{verb}.log"
+    latest = log_dir / "latest.log"
+    return log_file, latest
+
+
+def list_clusters(root: Path) -> List[str]:
+    clusters = root / "clusters"
+    if not clusters.is_dir():
+        return []
+    return sorted(p.name for p in clusters.iterdir() if p.is_dir() and not p.name.startswith("."))
+
+
+def require_cluster(root: Path, name: str) -> Path:
+    path = root / "clusters" / name
+    if not path.is_dir():
+        available = list_clusters(root)
+        lines = "\n".join(f"  - {n}" for n in available) if available else "  (none)"
+        raise SystemExit(
+            f"Error: Cluster directory 'clusters/{name}' does not exist\nAvailable clusters:\n{lines}"
+        )
+    return path
+
+
+@dataclass
+class Step:
+    name: str
+    argv: Sequence[str]
+    cwd: Optional[Path] = None
+    env: Optional[dict] = None
+
+
+@dataclass
+class RunResult:
+    ok: bool
+    log_file: Path
+    failed_step: Optional[str] = None
+    interrupted: bool = False
+
+
+class StepRunner:
+    """Runs steps with tee'd logs; human mode keeps a rolling ~8 line viewport."""
+
+    def __init__(
+        self,
+        *,
+        root: Path,
+        cluster: str,
+        verb: str,
+        robot: bool,
+        verbose: bool,
+        color: bool,
+    ) -> None:
+        self.root = root
+        self.cluster = cluster
+        self.verb = verb
+        self.robot = robot
+        self.verbose = verbose
+        self.color = color
+        self.log_file, self.latest = log_paths(root, cluster, verb)
+        self._viewport: deque[str] = deque(maxlen=LOG_VIEWPORT)
+        self._viewport_rows = 0
+        self._step_start = 0.0
+        self._step_label = ""
+        self._step_index = 0
+        self._step_total = 0
+        self._spinner_idx = 0
+        self._io_lock = threading.Lock()
+        self._spinner_stop = threading.Event()
+        self._spinner_thread: Optional[threading.Thread] = None
+        # Rolling viewport needs a capable TTY; otherwise append-only / robot stream.
+        # Note: NO_COLOR disables colors but must not disable the viewport.
+        self._human_viewport = (
+            (not robot)
+            and (not verbose)
+            and sys.stdout.isatty()
+            and os.environ.get("TERM") != "dumb"
+        )
+
+    def run_steps(self, steps: Sequence[Step]) -> RunResult:
+        self._step_total = len(steps)
+        with open(self.log_file, "w", encoding="utf-8") as log_fh:
+            log_fh.write(f"# rosactl cluster {self.verb} {self.cluster}\n")
+            log_fh.write(f"# started {datetime.now(timezone.utc).isoformat()}\n")
+            log_fh.flush()
+            self._link_latest()
+
+            try:
+                for idx, step in enumerate(steps, start=1):
+                    self._step_index = idx
+                    self._begin_step(step.name)
+                    code = self._run_one(step, log_fh)
+                    elapsed = time.monotonic() - self._step_start
+                    if code != 0:
+                        interrupted = code == EXIT_SIGINT
+                        self._end_step(failed=True, elapsed=elapsed)
+                        self._print_failure_hint(interrupted=interrupted)
+                        return RunResult(
+                            ok=False,
+                            log_file=self.log_file,
+                            failed_step=step.name,
+                            interrupted=interrupted,
+                        )
+                    self._end_step(failed=False, elapsed=elapsed)
+            except KeyboardInterrupt:
+                elapsed = time.monotonic() - self._step_start if self._step_start else 0
+                self._end_step(failed=True, elapsed=elapsed)
+                self._print_failure_hint(interrupted=True)
+                return RunResult(
+                    ok=False,
+                    log_file=self.log_file,
+                    failed_step=self._step_label or "interrupted",
+                    interrupted=True,
+                )
+
+        print(c("32", "✓ Done", self.color) + f"  {self.verb} · {self.cluster}")
+        print(f"  Full log: {self._rel(self.log_file)}")
+        return RunResult(ok=True, log_file=self.log_file)
+
+    def _link_latest(self) -> None:
+        try:
+            if self.latest.is_symlink() or self.latest.exists():
+                self.latest.unlink()
+            self.latest.symlink_to(self.log_file.name)
+        except OSError:
+            shutil.copy2(self.log_file, self.latest)
+
+    def _rel(self, path: Path) -> str:
+        try:
+            return str(path.relative_to(self.root))
+        except ValueError:
+            return str(path)
+
+    def _begin_step(self, name: str) -> None:
+        self._stop_spinner()
+        self._step_label = name
+        self._step_start = time.monotonic()
+        self._viewport.clear()
+        self._viewport_rows = 0
+        self._spinner_idx = 0
+        with self._io_lock:
+            print(self._format_header(elapsed=0, running=True), flush=True)
+        self._start_spinner()
+
+    def _format_header(self, *, elapsed: float, running: bool, failed: bool = False) -> str:
+        if failed:
+            icon, color = "✗", "31"
+        elif running:
+            icon, color = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)], "36"
+        else:
+            icon, color = "✓", "32"
+        label = f"{icon} {self._step_label}"
+        meta = f"{self._step_index}/{self._step_total} · {format_duration(elapsed)}"
+        return f"{c(color, label, self.color)}  {c('90', meta, self.color)}"
+
+    def _start_spinner(self) -> None:
+        """Animate the step header so long quiet stretches still show progress."""
+        if not self._human_viewport:
+            return
+        self._spinner_stop.clear()
+
+        def _spin() -> None:
+            while not self._spinner_stop.wait(SPINNER_INTERVAL_S):
+                with self._io_lock:
+                    self._spinner_idx += 1
+                    self._rewrite_header_locked()
+
+        self._spinner_thread = threading.Thread(target=_spin, name="rosactl-spinner", daemon=True)
+        self._spinner_thread.start()
+
+    def _stop_spinner(self) -> None:
+        self._spinner_stop.set()
+        thread = self._spinner_thread
+        self._spinner_thread = None
+        if thread is not None:
+            thread.join(timeout=1.0)
+
+    def _rewrite_header_locked(self) -> None:
+        """Refresh header (+ viewport) in place. Caller must hold _io_lock."""
+        rows = self._viewport_rows + 1
+        sys.stdout.write(f"\033[{rows}A\r\033[2K")
+        elapsed = time.monotonic() - self._step_start
+        sys.stdout.write(self._format_header(elapsed=elapsed, running=True) + "\n")
+        cols = shutil.get_terminal_size((80, 24)).columns
+        for row in self._viewport:
+            sys.stdout.write(f"\033[2K{truncate_for_terminal(row, cols)}\n")
+        sys.stdout.flush()
+
+    def _end_step(self, *, failed: bool, elapsed: float) -> None:
+        self._stop_spinner()
+        with self._io_lock:
+            if self._human_viewport:
+                # Clear rolling viewport, rewrite header as final status
+                if self._viewport_rows:
+                    sys.stdout.write(f"\033[{self._viewport_rows}A\033[J")
+                sys.stdout.write("\033[1A\r\033[2K")
+                print(self._format_header(elapsed=elapsed, running=False, failed=failed), flush=True)
+                if failed:
+                    for line in self._viewport:
+                        print(c("90", f"  {truncate_for_terminal(line)}", self.color))
+            else:
+                # Append-only / robot: print final status line
+                print(self._format_header(elapsed=elapsed, running=False, failed=failed), flush=True)
+                if failed and self._viewport:
+                    for line in list(self._viewport)[-LOG_VIEWPORT:]:
+                        print(c("90", f"  {truncate_for_terminal(line)}", self.color))
+            self._viewport_rows = 0
+            self._viewport.clear()
+
+    def _redraw_viewport(self) -> None:
+        """Redraw the last N log lines under the step header (one terminal row each)."""
+        with self._io_lock:
+            if self._viewport_rows:
+                sys.stdout.write(f"\033[{self._viewport_rows}A")
+            sys.stdout.write("\033[J")
+            cols = shutil.get_terminal_size((80, 24)).columns
+            for row in self._viewport:
+                # Clear each row then write a truncated line so wraps can't break cursor math
+                display = truncate_for_terminal(row, cols)
+                sys.stdout.write(f"\033[2K{display}\n")
+            self._viewport_rows = len(self._viewport)
+            sys.stdout.flush()
+
+    def _emit_line(self, line: str) -> None:
+        # Always keep a short ring buffer for failure snippets
+        with self._io_lock:
+            self._viewport.append(line)
+        if self.robot or self.verbose or not self._human_viewport:
+            print(line, flush=True)
+            return
+        self._redraw_viewport()
+
+    def _run_one(self, step: Step, log_fh) -> int:
+        env = os.environ.copy()
+        # Prefer plain, machine-friendly Terraform logs when we're capturing output
+        env.setdefault("TF_IN_AUTOMATION", "1")
+        env.setdefault("TF_INPUT", "false")
+        if step.env:
+            env.update(step.env)
+        log_fh.write(f"\n## {step.name}\n$ {' '.join(step.argv)}\n")
+        log_fh.flush()
+
+        try:
+            proc = subprocess.Popen(
+                list(step.argv),
+                cwd=str(step.cwd or self.root),
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                # Binary + bufsize=0 so Terraform \\r progress updates aren't block-buffered
+                bufsize=0,
+                # Own process group so Ctrl+C can be forwarded to Terraform (releases state lock)
+                start_new_session=True,
+            )
+        except FileNotFoundError as exc:
+            msg = f"Executable not found: {step.argv[0]} ({exc})"
+            log_fh.write(msg + "\n")
+            self._emit_line(msg)
+            return 127
+
+        assert proc.stdout is not None
+        try:
+            for line in iter_process_lines(proc.stdout):
+                log_fh.write(line + "\n")
+                log_fh.flush()
+                self._emit_line(line)
+            return int(proc.wait())
+        except KeyboardInterrupt:
+            _terminate_process_group(proc, log_fh)
+            # Drain any remaining output so the pipe doesn't leave zombies mid-write
+            try:
+                if proc.stdout:
+                    for line in iter_process_lines(proc.stdout):
+                        log_fh.write(line + "\n")
+                        log_fh.flush()
+            except Exception:  # noqa: BLE001 — best-effort drain on interrupt
+                pass
+            return EXIT_SIGINT
+
+    def _print_failure_hint(self, *, interrupted: bool = False) -> None:
+        rel = self._rel(self.log_file)
+        print(flush=True)
+        if interrupted:
+            print(c("33", "Interrupted.", self.color), flush=True)
+            print(
+                c(
+                    "90",
+                    "If the next run fails with a state lock, wait a few seconds for Terraform to exit,",
+                    self.color,
+                ),
+                flush=True,
+            )
+            print(
+                c(
+                    "90",
+                    "or run: cd terraform && terraform force-unlock <LOCK_ID>",
+                    self.color,
+                ),
+                flush=True,
+            )
+        else:
+            print(c("31", "Failed.", self.color), flush=True)
+        print(f"Full log: {rel}", flush=True)
+        print(f"  less {rel}", flush=True)
+
+
+def script(root: Path, *parts: str) -> str:
+    return str(root.joinpath(*parts))
+
+
+def steps_for(
+    root: Path,
+    verb: str,
+    cluster: str,
+    *,
+    no_bootstrap: bool = False,
+) -> List[Step]:
+    def sh(*parts: str) -> str:
+        return script(root, *parts)
+
+    init = Step("Terraform Init", ["bash", sh("scripts", "cluster", "init-infrastructure.sh"), cluster])
+    plan = Step("Terraform Plan", ["bash", sh("scripts", "cluster", "plan-infrastructure.sh"), cluster])
+    apply = Step("Terraform Apply", ["bash", sh("scripts", "cluster", "apply-infrastructure.sh"), cluster])
+    tunnel = Step("Ensure tunnel", ["bash", sh("scripts", "cluster", "ensure-tunnel.sh"), cluster])
+    bootstrap = Step("Bootstrap GitOps", ["bash", sh("scripts", "cluster", "run-gitops-bootstrap.sh"), cluster])
+    # AUTO_APPROVE: confirmation is handled by rosactl (script prompts hang under our pipe)
+    destroy = Step(
+        "Destroy infrastructure",
+        ["bash", sh("scripts", "cluster", "destroy-infrastructure.sh"), cluster],
+        env={"AUTO_APPROVE": "true"},
+    )
+    sleep = Step(
+        "Sleep cluster",
+        ["bash", sh("scripts", "cluster", "cleanup-infrastructure.sh"), cluster],
+        env={"AUTO_APPROVE": "true"},
+    )
+    login = Step("Login", ["bash", sh("scripts", "info", "login.sh"), cluster])
+    endpoints = Step("Show endpoints", ["bash", sh("scripts", "info", "show-endpoints.sh"), cluster])
+    creds = Step("Show credentials", ["bash", sh("scripts", "info", "show-credentials.sh"), cluster])
+
+    mapping = {
+        "plan": [init, plan],
+        "apply": [init, plan, apply],
+        "bootstrap": [init, tunnel, bootstrap],
+        "up": [init, plan, apply] + ([] if no_bootstrap else [tunnel, bootstrap]),
+        "destroy": [init, destroy],
+        "sleep": [sleep],
+        "login": [init, tunnel, login],
+        "show-endpoints": [init, endpoints],
+        "show-credentials": [init, endpoints, creds],
+    }
+    if verb not in mapping:
+        raise SystemExit(f"Error: unknown verb '{verb}'")
+    return mapping[verb]
+
+
+PASSTHROUGH = {
+    "vpn-start": ("scripts", "vpn", "start.sh"),
+    "vpn-stop": ("scripts", "vpn", "stop.sh"),
+    "vpn-status": ("scripts", "vpn", "status.sh"),
+    "vpn-config": ("scripts", "vpn", "config.sh"),
+    "tunnel-start": ("scripts", "tunnel", "start.sh"),
+    "tunnel-stop": ("scripts", "tunnel", "stop.sh"),
+    "tunnel-status": ("scripts", "tunnel", "status.sh"),
+    "validate": ("scripts", "validate", "prereqs.sh"),
+    "validate-account": ("scripts", "validate", "account.sh"),
+    "validate-network": ("scripts", "validate", "byo-network.sh"),
+}
+
+# Cobra-style command metadata: short help + longer description for per-verb --help
+CLUSTER_VERBS: dict[str, dict[str, str]] = {
+    "up": {
+        "help": "Apply infrastructure then bootstrap GitOps (default happy path)",
+        "description": "Run init → plan → apply, then ensure-tunnel → GitOps bootstrap.",
+        "epilog": "Steps: Terraform Init → Plan → Apply → Ensure tunnel → Bootstrap GitOps\n"
+        "Example: rosactl cluster up public\n"
+        "         rosactl --robot cluster up public\n"
+        "         rosactl cluster up public --no-bootstrap",
+    },
+    "plan": {
+        "help": "Initialize Terraform and create a plan",
+        "description": "Run terraform init and plan for the cluster.",
+        "epilog": "Steps: Terraform Init → Terraform Plan\nExample: rosactl cluster plan public",
+    },
+    "apply": {
+        "help": "Initialize, plan, and apply infrastructure",
+        "description": "Run terraform init, plan, and apply (no GitOps bootstrap).",
+        "epilog": "Steps: Terraform Init → Plan → Apply\nExample: rosactl cluster apply public",
+    },
+    "bootstrap": {
+        "help": "Bootstrap OpenShift GitOps on an existing cluster",
+        "description": "Ensure VPN tunnel (if Client VPN is deployed), then run GitOps bootstrap.",
+        "epilog": "Steps: Terraform Init → Ensure tunnel → Bootstrap GitOps\n"
+        "Example: rosactl cluster bootstrap public",
+    },
+    "destroy": {
+        "help": "Destroy cluster infrastructure",
+        "description": "Initialize Terraform and destroy all managed resources for the cluster.",
+        "epilog": "Prompts for confirmation on a TTY unless --yes is set.\n"
+        "Example: rosactl cluster destroy public\n"
+        "         rosactl cluster destroy public --yes",
+    },
+    "sleep": {
+        "help": "Sleep cluster (destroy with preserved resources)",
+        "description": "Destroy the cluster while keeping selected resources (DNS, IAM, secrets, etc.).",
+        "epilog": "Example: rosactl cluster sleep public",
+    },
+    "login": {
+        "help": "Log in to the cluster with oc",
+        "description": "Ensure tunnel if needed, then run the cluster login script.",
+        "epilog": "Example: rosactl cluster login public",
+    },
+    "show-endpoints": {
+        "help": "Show API and console URLs",
+        "description": "Print cluster API and console endpoints from Terraform outputs.",
+        "epilog": "Example: rosactl cluster show-endpoints public",
+    },
+    "show-credentials": {
+        "help": "Show admin credentials and endpoints",
+        "description": "Print endpoints and admin credentials for the cluster.",
+        "epilog": "Example: rosactl cluster show-credentials public",
+    },
+    "vpn-start": {
+        "help": "Start OpenVPN Client VPN tunnel",
+        "description": "Start the OpenVPN tunnel for clusters with Client VPN deployed.",
+        "epilog": "Example: rosactl cluster vpn-start public",
+    },
+    "vpn-stop": {
+        "help": "Stop OpenVPN Client VPN tunnel",
+        "description": "Stop the OpenVPN tunnel.",
+        "epilog": "Example: rosactl cluster vpn-stop public",
+    },
+    "vpn-status": {
+        "help": "Check OpenVPN tunnel status",
+        "description": "Report whether the OpenVPN tunnel is running.",
+        "epilog": "Example: rosactl cluster vpn-status public",
+    },
+    "vpn-config": {
+        "help": "Show VPN config path and connection instructions",
+        "description": "Print the .ovpn path and how to connect.",
+        "epilog": "Example: rosactl cluster vpn-config public",
+    },
+    "tunnel-start": {
+        "help": "Start sshuttle tunnel via bastion (deprecated)",
+        "description": "Start the legacy sshuttle tunnel (prefer Client VPN / vpn-start).",
+        "epilog": "Example: rosactl cluster tunnel-start public",
+    },
+    "tunnel-stop": {
+        "help": "Stop sshuttle tunnel",
+        "description": "Stop the legacy sshuttle tunnel.",
+        "epilog": "Example: rosactl cluster tunnel-stop public",
+    },
+    "tunnel-status": {
+        "help": "Check sshuttle tunnel status",
+        "description": "Report whether the sshuttle tunnel is running.",
+        "epilog": "Example: rosactl cluster tunnel-status public",
+    },
+    "validate": {
+        "help": "Validate account and network prerequisites",
+        "description": "Run prerequisite checks from the cluster terraform.tfvars.",
+        "epilog": "Example: rosactl cluster validate public",
+    },
+    "validate-account": {
+        "help": "Validate account / tools / OCM role only",
+        "description": "Run account-level prerequisite validation.",
+        "epilog": "Example: rosactl cluster validate-account public",
+    },
+    "validate-network": {
+        "help": "Validate VPC / subnets / endpoints only",
+        "description": "Run network prerequisite validation for BYO / existing VPC setups.",
+        "epilog": "Example: rosactl cluster validate-network public",
+    },
+}
+
+
+def run_passthrough(root: Path, verb: str, cluster: str, robot: bool, verbose: bool, color: bool) -> int:
+    parts = PASSTHROUGH[verb]
+    step = Step(verb, ["bash", script(root, *parts), cluster])
+    runner = StepRunner(root=root, cluster=cluster, verb=verb, robot=robot, verbose=verbose, color=color)
+    result = runner.run_steps([step])
+    if result.ok:
+        return 0
+    return EXIT_SIGINT if result.interrupted else 1
+
+
+def _global_flags_parent() -> argparse.ArgumentParser:
+    """Shared flags so they work before or after the verb (cobra-like)."""
+    parent = argparse.ArgumentParser(add_help=False)
+    parent.add_argument(
+        "--robot",
+        action="store_true",
+        help="Full log stream (CI / non-interactive)",
+    )
+    parent.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Stream all log lines on a TTY",
+    )
+    return parent
+
+
+def build_parser() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
+    globals_parent = _global_flags_parent()
+    parser = argparse.ArgumentParser(
+        prog="rosactl",
+        description="Human-friendly ROSA cluster lifecycle CLI (wraps repo scripts).",
+        parents=[globals_parent],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+    resources = parser.add_subparsers(dest="resource", required=False, metavar="RESOURCE")
+    cluster = resources.add_parser(
+        "cluster",
+        help="Cluster lifecycle operations",
+        description="Manage a cluster directory under clusters/<name>.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+    verbs = cluster.add_subparsers(dest="verb", required=False, metavar="VERB")
+    for name, meta in CLUSTER_VERBS.items():
+        verb_parser = verbs.add_parser(
+            name,
+            parents=[globals_parent],
+            help=meta["help"],
+            description=meta["description"],
+            epilog=meta["epilog"],
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+        verb_parser.add_argument("name", help="Cluster directory name under clusters/")
+        if name == "up":
+            verb_parser.add_argument(
+                "--no-bootstrap",
+                action="store_true",
+                help="Stop after apply (skip GitOps bootstrap)",
+            )
+        if name == "destroy":
+            verb_parser.add_argument(
+                "--yes",
+                "-y",
+                action="store_true",
+                help="Skip interactive confirmation (required in --robot / CI)",
+            )
+
+    return parser, cluster
+
+
+def confirm_destroy(cluster: str, *, yes: bool, robot: bool, color: bool) -> bool:
+    """Confirm destroy in rosactl (not the bash script — prompts hang under our stdout pipe)."""
+    if yes:
+        return True
+    if robot or not sys.stdin.isatty():
+        print(
+            c(
+                "31",
+                "Error: destroy requires confirmation. Re-run with --yes "
+                "(or run interactively on a TTY).",
+                color,
+            ),
+            file=sys.stderr,
+        )
+        return False
+    print(c("33", "WARNING: This will destroy the infrastructure!", color))
+    print(c("33", "AWS resources (cluster, VPC, IAM roles, etc.) will be deleted.", color))
+    print(f"Cluster: {cluster}")
+    try:
+        answer = input("Type 'yes' to continue: ").strip()
+    except EOFError:
+        return False
+    if answer != "yes":
+        print("Destroy cancelled.")
+        return False
+    return True
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    argv_list = list(sys.argv[1:] if argv is None else argv)
+    parser, cluster_parser = build_parser()
+
+    # No args → help (not a missing-argument error)
+    if not argv_list:
+        parser.print_help()
+        return 0
+
+    args = parser.parse_args(argv_list)
+
+    if not args.resource:
+        parser.print_help()
+        return 0
+
+    if args.resource != "cluster":
+        parser.error("Only 'cluster' resource is supported in v1")
+
+    if not getattr(args, "verb", None):
+        cluster_parser.print_help()
+        return 0
+
+    root = project_root()
+    color = use_color()
+    verbose = bool(getattr(args, "verbose", False))
+    robot_flag = bool(getattr(args, "robot", False))
+    # --verbose: step headers + full live stream (no rolling viewport)
+    # --robot / CI / non-TTY: full stream like Make
+    robot_stream = is_robot_mode(robot_flag) and not verbose
+    no_bootstrap = bool(getattr(args, "no_bootstrap", False))
+
+    require_cluster(root, args.name)
+
+    if args.verb == "destroy":
+        if not confirm_destroy(
+            args.name,
+            yes=bool(getattr(args, "yes", False)),
+            robot=robot_stream or robot_flag,
+            color=color,
+        ):
+            return 1
+
+    if args.verb in PASSTHROUGH:
+        return run_passthrough(root, args.verb, args.name, robot_stream, verbose, color)
+
+    steps = steps_for(root, args.verb, args.name, no_bootstrap=no_bootstrap)
+    runner = StepRunner(
+        root=root,
+        cluster=args.name,
+        verb=args.verb,
+        robot=robot_stream,
+        verbose=verbose,
+        color=color,
+    )
+    result = runner.run_steps(steps)
+    if result.ok:
+        return 0
+    return EXIT_SIGINT if result.interrupted else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

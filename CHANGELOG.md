@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`rosactl` cluster CLI (first pass)**: Stdlib-only `bin/rosactl` orchestrates existing cluster scripts with step progress (`N/M`), a rolling ~8-line log viewport on TTY, full log tee under `clusters/<name>/logs/`, and `--robot` / CI / non-TTY full-stream mode. Extracted `scripts/cluster/ensure-tunnel.sh` and `run-gitops-bootstrap.sh` from Make. Spec: `docs/superpowers/specs/2026-07-29-rosactl-design.md`.
+
 ### Fixed
+- **`run-gitops-bootstrap.sh` script path resolution**: Resolve Terraform's terraform-relative `gitops_bootstrap_script_path` from `terraform/` instead of the project root (regression from the Make → helper extraction).
+- **KMS policy `count` on computed ARNs**: Derive `create_kms_policy` from inputs only so plan/import is not blocked when key ARNs are still unknown.
 - **Default machine pool version pinning**: Added `version` and `upgrade_acknowledgements_for` attributes to `rhcs_hcp_machine_pool.default` resource. Previously the default machine pool's OpenShift version was unmanaged by Terraform, preventing explicit version control and minor version upgrade orchestration. The `upgrade_acknowledgements_for` variable is passed from root module through to the cluster module.
 - **Separate default machine pool version variable**: Added `default_machine_pool_version` variable (default null) so the default machine pool version is managed independently from the control plane `openshift_version`. This enables staged upgrades: upgrade the control plane first, wait for completion, then set the worker version.
 - **IAM role name 64-character limit**: Applied `substr(..., 0, 64)` to all custom IAM role names and string-literal role references, matching the upstream RHCS module pattern. Also fixed two string references in `12-storage-iam.tf` that used `var.cluster_name` instead of the correct prefix locals, and corrected the `operator_role_arns` output to use actual upstream naming conventions.

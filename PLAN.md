@@ -427,7 +427,7 @@ terraform {
 }
 ```
 
-**Note**: GitOps bootstrap is integrated into the cluster module. The bootstrap script is run manually after cluster deployment using `make cluster.<name>.bootstrap` or by sourcing Terraform outputs and running the script directly.
+**Note**: GitOps bootstrap is integrated into the cluster module. Prefer `./bin/rosactl cluster bootstrap <name>` (or `./bin/rosactl cluster up <name>` for apply+bootstrap). `make cluster.<name>.bootstrap` still works but is deprecated in favor of `rosactl`. See `docs/superpowers/specs/2026-07-29-rosactl-design.md`.
 
 **Infrastructure Variables** (`clusters/public/terraform.tfvars`):
 
