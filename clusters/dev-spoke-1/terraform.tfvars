@@ -28,10 +28,12 @@ default_instance_type = "m5.xlarge" # EC2 instance type for default worker nodes
 # Break-glass HTPasswd admin for make cluster.<name>.login (module default is false)
 enable_cluster_admin = true
 
-enable_gitops_bootstrap = true # Enable GitOps operator installation after cluster creation
-gitops_git_repo_url     = "https://github.com/rh-mobb/rosa-cluster-config.git"
-gitops_git_path         = "dev/dev-spoke-1" # Path to cluster configuration directory in Git repo
-gitops_csv              = "openshift-gitops-operator.v1.19.2"
+enable_gitops_bootstrap    = true # Enable GitOps operator installation after cluster creation
+gitops_git_repo_url        = "https://github.com/rh-mobb/rosa-cluster-config.git"
+gitops_git_path            = "dev/dev-spoke-1" # Path to cluster configuration directory in Git repo
+gitops_git_target_revision = "HEAD"            # Default branch of cluster-config repo
+gitops_csv                 = "openshift-gitops-operator.v1.19.2"
+acm_mode                   = "spoke"
 
 # Additional Machine Pools
 # Create custom machine pools beyond the default pool

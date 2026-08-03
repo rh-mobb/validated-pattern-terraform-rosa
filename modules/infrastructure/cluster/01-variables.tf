@@ -226,6 +226,18 @@ variable "channel_group" {
   nullable    = false
 }
 
+variable "channel" {
+  description = "Y-stream specific channel for the cluster version (e.g., 'stable-4.16'). This parameter specifies the upgrade path for the cluster. Cannot be used together with 'channel_group'."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.channel == null || can(regex("^(stable|fast|candidate|eus)-\\d+\\.\\d+$", var.channel))
+    error_message = "The 'channel' parameter must follow the format '<channel_group>-<version>' (e.g., 'stable-4.16')"
+  }
+}
+
 variable "openshift_version" {
   description = "OpenShift version to pin (optional)"
   type        = string
@@ -638,7 +650,7 @@ variable "helm_chart" {
 variable "helm_chart_version" {
   description = "Helm chart version for cluster bootstrap"
   type        = string
-  default     = "0.5.16"
+  default     = "0.5.19"
   nullable    = false
 }
 
@@ -664,7 +676,7 @@ variable "gitops_git_repo_url" {
 }
 
 variable "gitops_git_target_revision" {
-  description = "Git target revision (branch/tag/commit) for cluster-config repository used by ArgoCD value source. Defaults to HEAD (default branch). Set to a branch like 'autonode' to test preview config."
+  description = "Git target revision (branch/tag/commit) for cluster-config repository used by Argo CD ApplicationSet values source. Emitted as gitTargetRevision in hub bootstrap values (cluster-bootstrap >= 0.5.18). Defaults to HEAD (default branch). Override with a branch or tag when testing preview cluster-config."
   type        = string
   default     = "HEAD"
   nullable    = false
@@ -678,7 +690,7 @@ variable "ecr_account" {
 }
 
 variable "gitops_tools_image" {
-  description = "Container image for the Argo CD repo-server CMP sidecar (avp-helm). Re-host in your private registry for egress-zero or registry policy requirements; mirrored URL is passed as defaultImage in GitOps bootstrap Helm values."
+  description = "Container image for the optional Argo CD repo-server CMP sidecar tooling. Re-host in your private registry for egress-zero or registry policy requirements; mirrored URL is passed as defaultImage in GitOps bootstrap Helm values when CMP plugin mode is enabled."
   type        = string
   default     = "ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:latest"
   nullable    = false
@@ -758,7 +770,7 @@ variable "helm_chart_acm_spoke" {
 variable "helm_chart_acm_spoke_version" {
   description = "Helm chart version for ACM spoke cluster bootstrap"
   type        = string
-  default     = "0.6.11"
+  default     = "0.6.14"
   nullable    = false
 }
 
@@ -772,7 +784,7 @@ variable "helm_chart_acm_hub_registration" {
 variable "helm_chart_acm_hub_registration_version" {
   description = "Helm chart version for ACM hub registration"
   type        = string
-  default     = "0.2.1"
+  default     = "0.2.2"
   nullable    = false
 }
 
@@ -786,7 +798,7 @@ variable "helm_chart_awspca" {
 variable "helm_chart_awspca_version" {
   description = "Helm chart version for AWS Private CA Issuer"
   type        = string
-  default     = "1.5.7"
+  default     = "1.6.1"
   nullable    = false
 }
 
