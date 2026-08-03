@@ -259,6 +259,7 @@ module "cluster" {
   gitops_git_repo_url        = var.gitops_git_repo_url
   gitops_csv                 = var.gitops_csv
   gitops_git_target_revision = var.gitops_git_target_revision
+  acm_mode                   = var.acm_mode
 
   # Termination Protection (IAM resources are in IAM module)
   enable_termination_protection = var.enable_termination_protection
@@ -266,6 +267,7 @@ module "cluster" {
   # GitOps bootstrap configuration - IAM role ARNs from IAM module
   aws_private_ca_arn           = var.aws_private_ca_arn
   cert_manager_role_arn        = module.iam.cert_manager_role_arn
+  channel                      = var.channel
   openshift_version            = var.openshift_version
   upgrade_acknowledgements_for = var.upgrade_acknowledgements_for
   default_machine_pool_version = var.default_machine_pool_version
@@ -320,6 +322,7 @@ module "cluster" {
   #   "10.0.0.0/32",      # Example: Specific IP (e.g., bastion host via SSM Session Manager)
   #   "192.168.1.0/24"   # Example: VPN range or Transit Gateway connected VPC CIDR
   # ]
+  api_endpoint_allowed_cidrs = var.api_endpoint_allowed_cidrs
 
   enable_autonode       = var.enable_autonode
   autonode_iam_role_arn = module.iam.autonode_role_arn

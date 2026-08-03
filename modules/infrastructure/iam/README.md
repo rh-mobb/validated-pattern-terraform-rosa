@@ -20,7 +20,7 @@ This module creates the IAM roles, OIDC configuration, and KMS keys required for
 - **CloudWatch Audit Logging IAM** (legacy, deprecated - for SIEM audit log forwarding)
 - **CloudWatch Logging IAM** (for OpenShift Logging Operator)
 - **Cert Manager IAM** (for AWS Private CA integration)
-- **Secrets Manager IAM** (for ArgoCD Vault Plugin)
+- **Secrets Manager IAM** (for External Secrets Operator IRSA)
 - Role prefixing for uniqueness across clusters
 
 ## Usage
@@ -92,7 +92,7 @@ module "iam" {
 | ebs_kms_key_arn | External KMS key ARN for EBS volume encryption. Takes precedence over internal key | `string` | `null` | no |
 | efs_kms_key_arn | External KMS key ARN for EFS encryption. Takes precedence over internal key | `string` | `null` | no |
 | etcd_kms_key_arn | External KMS key ARN for etcd encryption. Takes precedence over internal key | `string` | `null` | no |
-| etcd_encryption | Enable etcd encryption (requires etcd KMS key via ARN or create_kms_keys) | `bool` | `false` | no |
+| etcd_encryption | Enable etcd encryption. When true, automatically creates an internal KMS key if no external etcd_kms_key_arn is provided (does not require enable_storage or create_kms_keys) | `bool` | `false` | no |
 | kms_key_deletion_window | KMS key deletion window in days (only used when create_kms_keys is true) | `number` | `10` | no |
 | enable_control_plane_log_forwarding | Enable control plane log forwarding IAM resources (new ROSA managed log forwarder). Replaces legacy audit logging | `bool` | `false` | no |
 | control_plane_log_cloudwatch_enabled | Enable CloudWatch destination for control plane log forwarding. Default disabled for cost; S3 is more cost-effective | `bool` | `false` | no |
@@ -100,9 +100,9 @@ module "iam" {
 | enable_audit_logging | [DEPRECATED] Enable CloudWatch audit logging IAM resources (legacy implementation). Use enable_control_plane_log_forwarding instead | `bool` | `false` | no |
 | enable_cloudwatch_logging | Enable CloudWatch logging IAM resources | `bool` | `false` | no |
 | enable_cert_manager_iam | Enable cert-manager IAM resources | `bool` | `false` | no |
-| enable_secrets_manager_iam | Enable Secrets Manager IAM resources | `bool` | `false` | no |
+| enable_secrets_manager_iam | Enable Secrets Manager IAM resources for External Secrets Operator IRSA (`external-secrets-operator:external-secrets-sa`) | `bool` | `false` | no |
 | aws_private_ca_arn | AWS Private CA ARN for cert-manager (optional) | `string` | `null` | no |
-| additional_secrets | Additional Secrets Manager secret names for IAM policy (optional) | `list(string)` | `null` | no |
+| additional_secrets | Additional Secrets Manager secret names for External Secrets Operator IAM policy (optional) | `list(string)` | `null` | no |
 | cluster_credentials_secret_arn | ARN of cluster credentials secret (for Secrets Manager IAM policy) | `string` | `null` | no |
 | rosa_permissions_boundary_arn | ARN of the permission boundary policy for ROSA managed IAM roles (account + operator roles). If null, no boundary is applied | `string` | `null` | no |
 | custom_permissions_boundary_arn | ARN of the permission boundary policy for custom IAM roles (EFS CSI, CloudWatch, Secrets Manager, cert-manager, etc.). If null, no boundary is applied | `string` | `null` | no |
@@ -128,6 +128,7 @@ module "iam" {
 | cloudwatch_audit_logging_role_arn | [DEPRECATED] ARN of the CloudWatch audit logging IAM role (null if enable_audit_logging is false). Use control_plane_log_forwarding_role_arn instead |
 | cloudwatch_logging_role_arn | ARN of the CloudWatch logging IAM role (null if enable_cloudwatch_logging is false) |
 | secrets_manager_role_arn | ARN of the Secrets Manager IAM role (null if enable_secrets_manager_iam is false) |
+| external_secrets_role_arn | Alias of `secrets_manager_role_arn` for External Secrets Operator IRSA (null if enable_secrets_manager_iam is false) |
 | cert_manager_role_arn | ARN of the cert-manager IAM role (null if enable_cert_manager_iam is false) |
 
 ## Account Roles
@@ -169,15 +170,17 @@ This ensures multiple clusters can coexist in the same AWS account without role 
 KMS keys can be provided in two ways:
 
 1. **External ARNs (recommended)**: Pass `ebs_kms_key_arn`, `efs_kms_key_arn`, and/or `etcd_kms_key_arn` via tfvars. External ARNs always take precedence.
-2. **Internal creation**: Set `create_kms_keys = true` to create keys within the module. Internal keys are only created when no external ARN is provided for that key type.
+2. **Internal creation**: Set `create_kms_keys = true` to create EBS/EFS keys within the module. Internal keys are only created when no external ARN is provided for that key type.
 
-By default (`create_kms_keys = false` and no external ARNs), no KMS encryption is applied.
+By default (`create_kms_keys = false` and no external ARNs), no KMS encryption is applied for EBS/EFS.
+
+**ETCD KMS key** is handled independently: setting `etcd_encryption = true` automatically creates an internal KMS key if no `etcd_kms_key_arn` is provided. This does not require `enable_storage` or `create_kms_keys` to be set.
 
 **Important**: External KMS keys must be tagged with `red-hat = "true"` for the ROSA KMS provider operator to access them. Without this tag, etcd encryption will fail during cluster installation.
 
-- **EBS KMS Key**: Used for EBS root volume encryption on worker nodes
-- **EFS KMS Key**: Used for EFS file system encryption (used by cluster module)
-- **ETCD KMS Key**: Used for etcd data-at-rest encryption (requires `etcd_encryption = true`)
+- **EBS KMS Key**: Used for EBS root volume encryption on worker nodes (requires `enable_storage` and `create_kms_keys`)
+- **EFS KMS Key**: Used for EFS file system encryption (requires `enable_storage` and `create_kms_keys`)
+- **ETCD KMS Key**: Used for etcd data-at-rest encryption (created automatically when `etcd_encryption = true`)
 
 Internally created KMS keys persist through sleep operations (tagged with `persists_through_sleep = "true"`).
 
@@ -209,11 +212,19 @@ The module creates an IAM role for cert-manager to use AWS Private CA:
 
 ## Secrets Manager IAM
 
-The module creates an IAM role for ArgoCD Vault Plugin to access AWS Secrets Manager:
+The module creates an IAM role for External Secrets Operator to access AWS Secrets Manager:
 
-- **Secrets Manager Role**: IAM role for ArgoCD Vault Plugin (`openshift-gitops:vplugin`)
+- Trusts only External Secrets Operator (`external-secrets-operator:external-secrets-sa`)
 - Uses explicit secret ARN lists for maximum security (no wildcards for GetSecretValue)
-- Requires `cluster_credentials_secret_arn` from cluster module (set after cluster is created)
+- Enable by setting `enable_secrets_manager_iam = true`
+
+For External Secrets Operator integration, use the alias output and service account annotation:
+
+- Service account annotation:
+  - `eks.amazonaws.com/role-arn: <external_secrets_role_arn>`
+- Helm values path:
+  - `external-secrets-operator.serviceAccount.roleArn`
+- `external_secrets_role_arn` is an alias of `secrets_manager_role_arn` for cluster-config clarity.
 
 ## Dependencies
 
