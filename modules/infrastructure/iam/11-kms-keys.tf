@@ -90,5 +90,9 @@ locals {
   etcd_kms_key_arn_resolved = var.etcd_kms_key_arn != null ? var.etcd_kms_key_arn : try(aws_kms_key.etcd[0].arn, null)
 
   kms_key_arns_for_policy = compact([local.ebs_kms_key_arn_resolved, local.efs_kms_key_arn_resolved])
-  create_kms_policy       = length(local.kms_key_arns_for_policy) > 0
+  # Count/for_each must not depend on computed key ARNs (blocks import/plan when keys
+  # are still unknown). Derive from inputs only; policy docs still use resolved ARNs.
+  create_kms_policy = var.enable_storage && (
+    var.create_kms_keys || var.ebs_kms_key_arn != null || var.efs_kms_key_arn != null
+  )
 }
