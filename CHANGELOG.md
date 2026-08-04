@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Replaced scottwinkler/shell provider with null_resource**: Termination protection now uses `null_resource` with `local-exec` provisioners instead of the third-party `scottwinkler/shell` provider, removing the external provider dependency.
 
 ### Added
+- **VPC Route Server module** (`modules/infrastructure/route-server/`): New module for AWS VPC Route Server BGP integration with the CUDN BGP routing operator. Creates a Route Server with configurable ASN, 2 endpoints per private subnet, route propagation to all route tables (private and public), and an IRSA IAM role/policy for the operator. Enabled per-cluster via `enable_route_server = true` and `route_server_asn` in terraform.tfvars.
+- **Route Server variables**: Added `enable_route_server` (bool, default false), `route_server_asn` (number, default 64512), and `route_server_persist_routes` (string, default "disable") to root module variables.
+- **Route Server outputs**: Added `route_server_id`, `route_server_asn`, `route_server_deployed`, `route_server_endpoint_ips`, and `bgp_operator_role_arn` to root module outputs.
+- **Network module subnet ID outputs**: Added `private_subnet_ids` and `public_subnet_ids` outputs to both `network-public` and `network-private` modules for use by the route-server module.
 - **Permission boundary support**: Added `rosa_permissions_boundary_arn` and `custom_permissions_boundary_arn` optional variables for applying IAM permission boundaries. `rosa_permissions_boundary_arn` applies to ROSA account and operator roles; `custom_permissions_boundary_arn` applies to all custom IAM roles (EFS CSI, CloudWatch, cert-manager, Secrets Manager, autonode, bastion, VPC flow log). Both default to null (no boundary applied).
 - **MkDocs documentation site**: Material-themed site with GitHub Pages deployment (`.github/workflows/docs.yml`), local preview via `make docs-preview`, strict build in PR checks
 - **Layered prerequisites docs** (`docs/prerequisites/`): account, full-stack, BYO network/IAM handoff, customer intake, and validation script documentation
