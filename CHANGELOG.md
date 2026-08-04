@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Argo CD Vault Plugin IRSA trust (#43)**: Secrets Manager IAM role trusts only External Secrets Operator (`external-secrets-operator:external-secrets-sa`) after AVP removal from the IRSA trust policy.
 
 ### Fixed
+- **Ignore local ops logs and Python bytecode**: Gitignore `clusters/*/logs/` and `__pycache__/` / `*.py[cod]`.
 - **Spoke ACM import reliability (#45)**: `bootstrap-gitops.sh` uses process-local ephemeral `KUBECONFIG`s (not `~/.kube/config`), asserts spoke/hub API servers before apply/skip, polls for ACM CRDs **and** `ocm-webhook` endpoints on the hub before hub-registration (CRDs alone are insufficient), polls for the ACM import secret instead of `sleep 45`, keeps import YAML in memory, and fails unless `ManagedClusterJoined=True`. Spoke mode requires hub break-glass `HUB_CREDENTIALS_SECRET` (interim until #48). Missing `ocm-webhook` Endpoints no longer aborts the wait loop under `pipefail` (treat as zero endpoints and keep polling).
 - **HTPasswd IDP greenfield plan (`Invalid count argument`)**: `htpasswd-idp` `count` now keys only on `enabled`, not `cluster_id`, so break-glass / bootstrap IDP can plan when the cluster ID is `(known after apply)`.
 - **Per-cluster Terraform data dir**: Scripts and `Makefile.cluster` set `TF_DATA_DIR=clusters/<name>/.terraform` so init/plan/apply/destroy for different clusters can run concurrently from one checkout (no git worktree). State remains `clusters/<name>/infrastructure.tfstate` (or S3).
