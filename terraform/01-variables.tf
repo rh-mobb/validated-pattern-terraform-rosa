@@ -390,8 +390,37 @@ variable "tags_override" {
   nullable    = true
 }
 
+variable "enable_cluster_admin" {
+  description = "Create a long-lived HTPasswd break-glass cluster admin and store credentials in AWS Secrets Manager. Default false. Not used by GitOps bootstrap (see enable_bootstrap_admin_user). Relates to #29."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "enable_bootstrap_admin_user" {
+  description = "Create short-lived HTPasswd bootstrap admin (module.bootstrap_admin). Default false. Bootstrap scripts set this true via targeted apply, then false to tear down. Relates to #29."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "bootstrap_admin_cluster_id" {
+  description = "ROSA cluster ID for module.bootstrap_admin. Set by bootstrap-admin.sh from terraform output so -target=module.bootstrap_admin does not depend on module.cluster (avoids reconciling immutable cluster tags). Leave null for normal applies."
+  type        = string
+  nullable    = true
+  default     = null
+}
+
+variable "bootstrap_admin_password" {
+  description = "Optional password for module.bootstrap_admin. When null, the module generates a random password. bootstrap-admin.sh always sets this so GitOps login does not need terraform outputs. Relates to #29."
+  type        = string
+  sensitive   = true
+  nullable    = true
+  default     = null
+}
+
 variable "admin_username" {
-  description = "Admin username for cluster authentication"
+  description = "Break-glass admin username when enable_cluster_admin is true"
   type        = string
   default     = "admin"
   nullable    = false
@@ -399,9 +428,10 @@ variable "admin_username" {
 
 variable "admin_password_override" {
   description = <<EOF
-  Optional override for admin password. If not set, a random password will be generated and stored in the
-  cluster credentials secret ({cluster_name}-credentials) in AWS Secrets Manager as JSON
-  {"user","password","url"}. Password must be 14 characters or more, contain one uppercase letter and a symbol or number.
+  Optional override for break-glass admin password when enable_cluster_admin is true.
+  If not set, a random password is generated and stored in the cluster credentials secret
+  ({cluster_name}-credentials) in AWS Secrets Manager as JSON {"user","password","url"}.
+  Password must be 14 characters or more, contain one uppercase letter and a symbol or number.
 
   Can be provided via:
   - terraform.tfvars file (not recommended for production)
@@ -409,6 +439,8 @@ variable "admin_password_override" {
 
   Note: The password is never output by Terraform. Retrieve it with:
     aws secretsmanager get-secret-value --secret-id <secret_arn> --query SecretString --output text | jq -r .password
+
+  Not used for GitOps bootstrap (bootstrap uses module.bootstrap_admin / bootstrap-admin.sh).
   EOF
   type        = string
   sensitive   = true
@@ -630,7 +662,7 @@ variable "gitops_git_repo_url" {
 }
 
 variable "gitops_git_target_revision" {
-  description = "Git target revision (branch/tag/commit) for cluster-config repository used by ArgoCD value source. Defaults to HEAD (default branch)."
+  description = "Git target revision (branch/tag/commit) for cluster-config repository used by Argo CD ApplicationSet values source. Passed through to cluster-bootstrap gitTargetRevision (chart >= 0.5.18). Defaults to HEAD (default branch)."
   type        = string
   default     = "HEAD"
   nullable    = false
@@ -648,6 +680,23 @@ variable "gitops_csv" {
   type        = string
   default     = "openshift-gitops-operator.v1.19.2"
   nullable    = false
+}
+
+variable "acm_mode" {
+  description = <<-EOF
+    ACM (Advanced Cluster Management) mode for GitOps bootstrap values selection.
+    - "noacm": Standalone cluster (default)
+    - "hub": ACM hub cluster (uses app-of-apps-acm-team-onboarding)
+    - "spoke": ACM spoke cluster (use make cluster.<name>.bootstrap-spoke)
+  EOF
+  type        = string
+  default     = "noacm"
+  nullable    = false
+
+  validation {
+    condition     = contains(["hub", "spoke", "noacm"], var.acm_mode)
+    error_message = "acm_mode must be one of: hub, spoke, noacm."
+  }
 }
 
 variable "enable_cert_manager_iam" {
@@ -672,7 +721,7 @@ variable "enable_cloudwatch_logging" {
 }
 
 variable "enable_secrets_manager_iam" {
-  description = "Enable IAM role and policy for ArgoCD Vault Plugin to access AWS Secrets Manager. When enabled, creates IAM role for openshift-gitops:vplugin service account. Secrets access is restricted to explicit ARN list for security."
+  description = "Enable IAM role and policy for External Secrets Operator to access AWS Secrets Manager (IRSA for external-secrets-operator:external-secrets-sa). Secrets access is restricted to an explicit ARN list for security."
   type        = bool
   default     = false
   nullable    = false

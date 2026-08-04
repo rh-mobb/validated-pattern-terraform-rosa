@@ -650,7 +650,7 @@ variable "helm_chart" {
 variable "helm_chart_version" {
   description = "Helm chart version for cluster bootstrap"
   type        = string
-  default     = "0.5.16"
+  default     = "0.5.19"
   nullable    = false
 }
 
@@ -676,7 +676,7 @@ variable "gitops_git_repo_url" {
 }
 
 variable "gitops_git_target_revision" {
-  description = "Git target revision (branch/tag/commit) for cluster-config repository used by ArgoCD value source. Defaults to HEAD (default branch). Set to a branch like 'autonode' to test preview config."
+  description = "Git target revision (branch/tag/commit) for cluster-config repository used by Argo CD ApplicationSet values source. Emitted as gitTargetRevision in hub bootstrap values (cluster-bootstrap >= 0.5.18). Defaults to HEAD (default branch). Override with a branch or tag when testing preview cluster-config."
   type        = string
   default     = "HEAD"
   nullable    = false
@@ -690,7 +690,7 @@ variable "ecr_account" {
 }
 
 variable "gitops_tools_image" {
-  description = "Container image for the Argo CD repo-server CMP sidecar (avp-helm). Re-host in your private registry for egress-zero or registry policy requirements; mirrored URL is passed as defaultImage in GitOps bootstrap Helm values."
+  description = "Container image for the optional Argo CD repo-server CMP sidecar tooling. Re-host in your private registry for egress-zero or registry policy requirements; mirrored URL is passed as defaultImage in GitOps bootstrap Helm values when CMP plugin mode is enabled."
   type        = string
   default     = "ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:latest"
   nullable    = false
@@ -770,7 +770,7 @@ variable "helm_chart_acm_spoke" {
 variable "helm_chart_acm_spoke_version" {
   description = "Helm chart version for ACM spoke cluster bootstrap"
   type        = string
-  default     = "0.6.11"
+  default     = "0.6.14"
   nullable    = false
 }
 
@@ -784,7 +784,7 @@ variable "helm_chart_acm_hub_registration" {
 variable "helm_chart_acm_hub_registration_version" {
   description = "Helm chart version for ACM hub registration"
   type        = string
-  default     = "0.2.1"
+  default     = "0.2.2"
   nullable    = false
 }
 
@@ -798,7 +798,7 @@ variable "helm_chart_awspca" {
 variable "helm_chart_awspca_version" {
   description = "Helm chart version for AWS Private CA Issuer"
   type        = string
-  default     = "1.5.7"
+  default     = "1.6.1"
   nullable    = false
 }
 
@@ -810,21 +810,21 @@ variable "rerun_bootstrap" {
 }
 
 variable "enable_identity_provider" {
-  description = "Enable HTPasswd identity provider for admin user. If false, no identity provider will be created."
+  description = "Enable long-lived HTPasswd break-glass identity provider (root enable_cluster_admin). GitOps bootstrap uses module.bootstrap_admin instead (#29)."
   type        = bool
-  default     = true
+  default     = false
   nullable    = false
 }
 
 variable "admin_username" {
-  description = "Admin username for cluster credentials secret and identity provider (used by GitOps bootstrap). Default: 'admin'"
+  description = "Break-glass admin username for identity provider and credentials secret. Default: 'admin'"
   type        = string
   default     = "admin"
   nullable    = false
 }
 
 variable "admin_password_for_bootstrap" {
-  description = "Admin password for cluster credentials secret and identity provider (used by GitOps bootstrap). If not provided, secret will be created with placeholder that must be updated manually."
+  description = "Break-glass admin password for identity provider and credentials secret. Not used for GitOps bootstrap (#29)."
   type        = string
   default     = null
   nullable    = true

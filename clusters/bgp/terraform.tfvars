@@ -92,9 +92,13 @@ additional_machine_pools = {
 }
 
 # GitOps Bootstrap - installs OpenShift Virtualization via ArgoCD
-enable_gitops_bootstrap = true
-gitops_git_repo_url     = "https://github.com/rh-mobb/rosa-cluster-config.git"
-gitops_git_path         = "dev/bgp"
+# Break-glass HTPasswd admin for make cluster.bgp.login (module default is false)
+enable_cluster_admin = true
+
+enable_gitops_bootstrap    = true
+gitops_git_repo_url        = "https://github.com/rh-mobb/rosa-cluster-config.git"
+gitops_git_path            = "dev/bgp"
+gitops_git_target_revision = "HEAD"
 
 # DNS
 enable_persistent_dns_domain = true

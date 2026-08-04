@@ -24,16 +24,16 @@ output "console_url" {
 
 # Note: kubeconfig and cluster_admin_password are not available as direct outputs
 
-# Identity Provider Outputs
+# Identity Provider Outputs (break-glass via module.break_glass_htpasswd → htpasswd-idp)
 output "identity_provider_id" {
   description = "ID of the HTPasswd identity provider (null if enable_identity_provider is false or persists_through_sleep is false)"
-  value       = length(rhcs_identity_provider.admin) > 0 ? one(rhcs_identity_provider.admin[*].id) : null
+  value       = module.break_glass_htpasswd.identity_provider_id
   sensitive   = false
 }
 
 output "identity_provider_name" {
   description = "Name of the identity provider (null if enable_identity_provider is false or persists_through_sleep is false)"
-  value       = length(rhcs_identity_provider.admin) > 0 ? one(rhcs_identity_provider.admin[*].name) : null
+  value       = module.break_glass_htpasswd.idp_name
   sensitive   = false
 }
 
@@ -113,19 +113,20 @@ output "cluster_domain" {
 output "gitops_bootstrap_hub_values" {
   description = "Helm values YAML for cluster-bootstrap chart (hub/standalone mode)"
   value = var.enable_gitops_bootstrap ? templatefile("${path.module}/templates/hub-values.yaml.tftpl", {
-    cluster_name       = var.cluster_name
-    cluster_domain     = local.cluster_domain
-    gitops_csv         = var.gitops_csv
-    aws_region         = var.region
-    git_path           = var.git_path != null ? var.git_path : ""
-    aws_account_id     = local.aws_account_id
-    ecr_account        = var.ecr_account != null ? var.ecr_account : ""
-    aws_kms_key_ebs    = var.kms_key_arn != null ? var.kms_key_arn : ""
-    efs_file_system_id = var.efs_file_system_id != null ? var.efs_file_system_id : (length(aws_efs_file_system.main) > 0 ? aws_efs_file_system.main[0].id : "")
-    git_repo_url       = var.gitops_git_repo_url != null ? var.gitops_git_repo_url : ""
-    helm_repo_url      = var.helm_repo_url
-    acm_mode           = var.acm_mode
-    gitops_tools_image = var.gitops_tools_image
+    cluster_name        = var.cluster_name
+    cluster_domain      = local.cluster_domain
+    gitops_csv          = var.gitops_csv
+    aws_region          = var.region
+    git_path            = var.git_path != null ? var.git_path : ""
+    git_target_revision = var.gitops_git_target_revision
+    aws_account_id      = local.aws_account_id
+    ecr_account         = var.ecr_account != null ? var.ecr_account : ""
+    aws_kms_key_ebs     = var.kms_key_arn != null ? var.kms_key_arn : ""
+    efs_file_system_id  = var.efs_file_system_id != null ? var.efs_file_system_id : (length(aws_efs_file_system.main) > 0 ? aws_efs_file_system.main[0].id : "")
+    git_repo_url        = var.gitops_git_repo_url != null ? var.gitops_git_repo_url : ""
+    helm_repo_url       = var.helm_repo_url
+    acm_mode            = var.acm_mode
+    gitops_tools_image  = var.gitops_tools_image
   }) : null
   sensitive = false
 }
@@ -155,11 +156,12 @@ output "gitops_bootstrap_acm_mode" {
 
 # GitOps Bootstrap: Shell export statements for bootstrap script env vars.
 # Makefile writes values file and sets BOOTSTRAP_VALUES_FILE; eval this for the rest.
+# CREDENTIALS_SECRET is optional (break-glass only). Bootstrap login uses bootstrap-admin outputs (#29).
 output "gitops_bootstrap_env_exports" {
   description = "Shell export statements for GitOps bootstrap script env vars. Run: eval $(terraform output -raw gitops_bootstrap_env_exports). Makefile sets BOOTSTRAP_VALUES_FILE after writing values from gitops_bootstrap_hub_values or gitops_bootstrap_spoke_values."
-  value = var.enable_gitops_bootstrap && length(aws_secretsmanager_secret.cluster_credentials) > 0 ? join("\n", compact([
+  value = var.enable_gitops_bootstrap ? join("\n", compact([
     "export CLUSTER_NAME='${var.cluster_name}'",
-    "export CREDENTIALS_SECRET='${aws_secretsmanager_secret.cluster_credentials[0].name}'",
+    length(aws_secretsmanager_secret.cluster_credentials) > 0 ? "export CREDENTIALS_SECRET='${aws_secretsmanager_secret.cluster_credentials[0].name}'" : "",
     "export AWS_REGION='${var.region}'",
     "export ACM_MODE='${var.acm_mode}'",
     "export HELM_REPO_NAME='${var.helm_repo_name}'",
