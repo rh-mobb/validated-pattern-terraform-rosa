@@ -1277,6 +1277,108 @@ make test            # Run all tests (recommended before commit)
 - Document all operator roles created
 - Use least privilege principles
 
+## Long-running cluster operations — 2-minute status updates
+
+**MANDATORY for AI operators:** When you start (or inherit) a long-running cluster operation — `apply`, `destroy` / `destroy_force`, `bootstrap`, `bootstrap-spoke`, ROSA cluster create/delete, or any wait that can exceed ~5 minutes — you must:
+
+1. **Start a 2-minute status loop** immediately (shell `while true; do sleep 120; …; done` with `notify_on_output`, or equivalent), and give the user a concise status on each tick.
+2. **Each update** should include: UTC time, which cluster(s)/op, newest log path, latest meaningful progress (`Still creating` / `Still destroying` elapsed, Helm/bootstrap step, exit markers), and whether procs are still running.
+3. **Stop the loop** when all tracked ops reach a terminal state (`*_EXIT:0`, hard failure, or user cancel). Kill the loop PID; do not leave orphaned tickers.
+4. **Log exit markers** in `clusters/<name>/logs/` (`HUB_APPLY_EXIT:0`, `SPOKE_DESTROY_EXIT:0`, etc.) so status checks and coordinators can wait reliably. Capture the exit code with `bash -lc` + `EC=$?` after `make` (or process substitution `> >(tee …)`), **not** `${PIPESTATUS[0]}` in zsh — that produced empty `*_EXIT:` markers during e2e.
+5. Prefer **brief** updates (a few lines). Escalate only on errors, stalls (no log progress for multiple ticks), or completion.
+
+Do not go silent for long applies/destroys/bootstraps — operators need periodic proof of life.
+
+## Parallel Hub + Spoke Test Deployments (same checkout)
+
+Use this for live ACM hub/spoke validation when you want hub and spoke(s) to **apply or destroy in parallel**. Serial also works; parallel saves wall-clock time (~30–45+ min per cluster). Follow the **2-minute status updates** rule above while these run.
+
+### Per-cluster isolation (no git worktree)
+
+Config lives in shared `terraform/`, but each cluster has:
+
+| Artifact | Path |
+|----------|------|
+| State | `clusters/<name>/infrastructure.tfstate` (or S3 key) |
+| Plan | `clusters/<name>/terraform.tfplan` |
+| TF data dir | `clusters/<name>/.terraform` via `TF_DATA_DIR` |
+
+`use_cluster_tf_data_dir` in `scripts/common.sh` and `export TF_DATA_DIR` in `Makefile.cluster` set the data dir. Concurrent `make cluster.<a>.apply` and `make cluster.<b>.apply` (or `destroy` / `destroy_force`) from **one checkout** is supported. Do **not** use git worktrees for this.
+
+### Prerequisites
+
+- Hub tfvars: `acm_mode = "hub"`, `enable_cluster_admin = true` (spoke bootstrap needs hub break-glass `HUB_CREDENTIALS_SECRET` until #48)
+- Spoke tfvars: `acm_mode = "spoke"` (or rely on `make cluster.<spoke>.bootstrap-spoke` setting `ACM_MODE=spoke`)
+- Auth: AWS + RHCS credentials available in the shells that start the panes
+
+### Layout (1 hub + N spokes)
+
+```text
+tmux session (e.g. vp-rosa-fleet) — all panes in the same repo checkout
+  pane 0  →  make cluster.<hub>.apply
+  pane 1  →  make cluster.<spoke-1>.apply
+  pane 2  →  make cluster.<spoke-2>.apply   # optional
+  pane N  →  coordinator: wait for applies → hub bootstrap → spoke bootstraps
+```
+
+### Parallel apply (log exit markers)
+
+```bash
+REPO="$(pwd)"
+HUB=dev-hub-1
+SPOKE=dev-spoke-1
+SESSION=vp-rosa-fleet
+
+tmux new-session -d -s "${SESSION}" -n deploy
+tmux split-window -h -t "${SESSION}:deploy"
+# optional coordinator: tmux split-window -v -t "${SESSION}:deploy.0"
+
+# Pane 0 — hub (use bash: zsh has no PIPESTATUS; empty EXIT: markers break coordinators)
+mkdir -p "clusters/${HUB}/logs"
+LOG="clusters/${HUB}/logs/$(date -u +%Y%m%dT%H%M%SZ)-apply.log"
+bash -lc "set +e; make cluster.${HUB}.apply > >(tee -a '${LOG}') 2>&1; EC=\$?; set -e; echo \"HUB_APPLY_EXIT:\${EC}\" | tee -a '${LOG}'; exit \${EC}"
+
+# Pane 1 — spoke (same checkout)
+mkdir -p "clusters/${SPOKE}/logs"
+LOG="clusters/${SPOKE}/logs/$(date -u +%Y%m%dT%H%M%SZ)-apply.log"
+bash -lc "set +e; make cluster.${SPOKE}.apply > >(tee -a '${LOG}') 2>&1; EC=\$?; set -e; echo \"SPOKE_APPLY_EXIT:\${EC}\" | tee -a '${LOG}'; exit \${EC}"
+```
+
+Do **not** rely on `${PIPESTATUS[0]}` in interactive zsh panes — it leaves `HUB_APPLY_EXIT:` / `SPOKE_APPLY_EXIT:` empty and coordinators treat that as failure.
+
+### After applies: bootstrap in order
+
+```bash
+# After HUB_APPLY_EXIT:0
+make "cluster.${HUB}.bootstrap"
+
+# After SPOKE_APPLY_EXIT:0 and hub bootstrap succeeded
+make "cluster.${SPOKE}.bootstrap-spoke" \
+  HUB_CREDENTIALS_SECRET="${HUB}-credentials" \
+  ACM_REGION="<region>"
+```
+
+**Order matters:** hub bootstrap first (ACM installs asynchronously). Spoke bootstrap waits for ManagedCluster CRDs **and** `ocm-webhook` endpoints before hub-registration.
+
+### Parallel destroy
+
+`destroy` / `destroy_force` may also run concurrently for independent clusters (same `TF_DATA_DIR` isolation). If the spoke is still ACM-registered, prefer `teardown-spoke` before destroying the hub.
+
+```bash
+# Optional: unregister spoke first
+make "cluster.${SPOKE}.teardown-spoke" \
+  HUB_CREDENTIALS_SECRET="${HUB}-credentials" \
+  ACM_REGION="<region>"
+
+# Then parallel destroy (two panes, same checkout)
+make "cluster.${HUB}.destroy_force"
+make "cluster.${SPOKE}.destroy_force"
+```
+
+### Coordinator pane (optional)
+
+Poll newest `*-apply.log` / `*-destroy.log` for `*_EXIT:0`, then run bootstrap or report failure. Keep helpers under `clusters/<hub>/logs/` or `/tmp` for the session.
+
 ## Checklist for New Code
 
 When writing new Terraform code, ensure:
