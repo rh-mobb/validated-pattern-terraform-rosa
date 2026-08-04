@@ -5,7 +5,10 @@
 # Relates to #29 / docs/superpowers/specs/2026-07-29-dynamic-bootstrap-htpasswd-design.md
 
 locals {
-  create = var.enabled && var.cluster_id != null && var.cluster_id != ""
+  # count must be known at plan time. Gate only on var.enabled — not cluster_id —
+  # otherwise greenfield apply fails with "Invalid count argument" when cluster_id
+  # is (known after apply). Resource.cluster still depends on cluster_id / depends_on.
+  create = var.enabled
   # Prefer caller-supplied password; otherwise use generated random_password.
   password = local.create ? (
     var.password != null ? var.password : random_password.this[0].result
