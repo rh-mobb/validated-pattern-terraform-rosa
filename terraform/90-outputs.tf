@@ -59,9 +59,21 @@ output "security_group_id" {
 }
 
 output "admin_user_created" {
-  description = "Whether admin user was created"
+  description = "Whether break-glass admin identity provider was created (enable_cluster_admin)"
   value       = module.cluster.identity_provider_id != null
   sensitive   = false
+}
+
+output "bootstrap_admin_username" {
+  description = "Short-lived bootstrap HTPasswd username (null when enable_bootstrap_admin_user is false)"
+  value       = module.bootstrap_admin.username
+  sensitive   = false
+}
+
+output "bootstrap_admin_password" {
+  description = "Short-lived bootstrap HTPasswd password (null when disabled). For GitOps bootstrap, prefer BOOTSTRAP_PASSWORD from bootstrap-admin.sh create (script-generated). This output is for module/standalone use when password is TF-generated (#29)."
+  value       = module.bootstrap_admin.password
+  sensitive   = true
 }
 
 output "identity_provider_id" {
@@ -211,8 +223,14 @@ output "cloudwatch_logging_role_arn" {
 }
 
 output "secrets_manager_role_arn" {
-  description = "ARN of the IAM role for ArgoCD Vault Plugin to access AWS Secrets Manager (null if enable_secrets_manager_iam is false)"
+  description = "ARN of the IAM role for External Secrets Operator IRSA to access AWS Secrets Manager (null if enable_secrets_manager_iam is false)"
   value       = module.iam.secrets_manager_role_arn
+  sensitive   = false
+}
+
+output "external_secrets_role_arn" {
+  description = "Alias of secrets_manager_role_arn for External Secrets Operator IRSA (null if enable_secrets_manager_iam is false)"
+  value       = module.iam.external_secrets_role_arn
   sensitive   = false
 }
 

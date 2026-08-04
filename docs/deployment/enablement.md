@@ -224,8 +224,8 @@ flowchart LR
 - Never commit secrets to Git
 - **Production and CI/CD:** use service account `RHCS_CLIENT_ID` + `RHCS_CLIENT_SECRET` — not personal `RHCS_TOKEN`
 - Store credentials in `.rhcs_creds` (gitignored) or CI secrets; rotate service account secrets per your security policy
-- Cluster admin password: `TF_VAR_admin_password` or AWS Secrets Manager
-- Cluster credentials for bootstrap: stored in Secrets Manager by Terraform; bootstrap script reads them automatically
+- **Break-glass cluster admin** (optional, `enable_cluster_admin`): long-lived HTPasswd `admin` in AWS Secrets Manager for `make cluster.<name>.login`. Variable default is `false`; example tfvars set `true`. Optional override: `TF_VAR_admin_password_override`
+- **GitOps bootstrap login**: short-lived HTPasswd `bootstrap` user created/destroyed by `make cluster.<name>.bootstrap` — not stored in Secrets Manager and not used for day-2 login. See [Authentication](../getting-started/authentication.md)
 
 ---
 
@@ -347,9 +347,13 @@ flowchart LR
 
 | Chart | Pinned version |
 |-------|----------------|
-| `app-of-apps-infrastructure` | `0.2.2` |
+| `app-of-apps-infrastructure` | `0.2.3` |
 | `app-of-apps-application` | `1.5.8` |
 | `app-of-apps-acm-team-onboarding` | `0.4.1` |
+| `cluster-bootstrap` | `0.5.19` (module / script default) |
+| `cluster-bootstrap-acm-spoke` | `0.6.14` (module / script default) |
+| `cluster-bootstrap-acm-hub-registration` | `0.2.2` (module / script default) |
+| `aws-privateca-issuer` | `1.6.1` (module / script default) |
 
 Align your fork with these versions, or update the template in your infrastructure fork.
 
@@ -360,7 +364,15 @@ Align your fork with these versions, or update the template in your infrastructu
 
 ### GitOps CMP tools container image
 
-The `cluster-bootstrap` and `cluster-bootstrap-acm-spoke` charts configure an Argo CD repo-server **ConfigManagementPlugin (CMP) sidecar** named `avp`. That sidecar runs `helm`, `argocd-vault-plugin`, `find`, `git`, and related tools so Argo CD can render Application sources marked `plugin: true` in cluster-config (for example AutoNode charts that use AVP with AWS Secrets Manager).
+**Default secrets path:** AWS Secrets Manager integration uses the Red Hat External Secrets Operator (ESO), not AVP. Standard flow is:
+
+1. Terraform creates IAM role access for Secrets Manager ([`enable_secrets_manager_iam = true`](../../terraform/01-variables.tf))
+2. ESO uses `external-secrets-operator:external-secrets-sa` IRSA
+3. `ClusterSecretStore` + `ExternalSecret` sync remote values into Kubernetes `Secret` objects
+
+See the [`external-secrets-operator` chart](https://github.com/rh-mobb/validated-pattern-helm-charts/tree/main/charts/external-secrets-operator) in your cluster-config infrastructure applications and the Terraform toggle [`enable_secrets_manager_iam`](../../terraform/01-variables.tf).
+
+The `gitops_tools_image` setting is now **optional CMP tooling** for clusters that still run Argo CD Applications with `plugin: true` during migration. It is not required for ESO-based Secrets Manager sync.
 
 **Upstream image** (multi-arch, built from [hack/docker/gitops-tools/](../../hack/docker/gitops-tools/)):
 
@@ -368,7 +380,7 @@ The `cluster-bootstrap` and `cluster-bootstrap-acm-spoke` charts configure an Ar
 ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:<tag>
 ```
 
-CI publishes `:latest` and `:sha` tags on merge to main. Pin a digest or SHA tag in production rather than floating `:latest`.
+CI publishes `:latest` and `:sha` tags on merge to main. Pin a digest or SHA tag in production rather than floating `:latest` when CMP plugin mode is enabled.
 
 **When to re-host:** Mirror this image into **your private registry** when any of the following apply:
 
@@ -518,7 +530,11 @@ flowchart LR
 # OCM service account credentials (recommended)
 export RHCS_CLIENT_ID="your-client-id-uuid"
 export RHCS_CLIENT_SECRET="your-client-secret"
-export TF_VAR_admin_password="your-secure-password"
+# Optional break-glass password override (otherwise Terraform generates one when enable_cluster_admin=true):
+# export TF_VAR_admin_password_override="your-secure-password"
+
+# In clusters/acme-dev/terraform.tfvars (example recipes already set this):
+#   enable_cluster_admin = true
 
 # Infrastructure
 make cluster.acme-dev.init
@@ -529,8 +545,11 @@ make cluster.acme-dev.apply
 # 1. Add notification contact emails on cluster Support tab
 # 2. Add platform team users to User Access group with OCM roles
 
-# GitOps bootstrap
+# GitOps bootstrap (uses short-lived bootstrap HTPasswd; tears it down afterward)
 make cluster.acme-dev.bootstrap
+
+# Day-2 oc login (break-glass admin from Secrets Manager)
+make cluster.acme-dev.login
 
 # Validation
 make cluster.acme-dev.verify
@@ -582,6 +601,7 @@ flowchart TB
 | Compute model | `enable_autonode`, `default_*_replicas`, `additional_machine_pools` | [autonode](../../clusters/autonode/terraform.tfvars), [public](../../clusters/public/terraform.tfvars) |
 | Fleet / ACM | `acm_mode`, hub/spoke bootstrap targets | [dev-hub-1](../../clusters/dev-hub-1/terraform.tfvars), [dev-spoke-1](../../clusters/dev-spoke-1/terraform.tfvars) |
 | GitOps | `enable_gitops_bootstrap`, `gitops_git_repo_url`, `gitops_git_path` | Any example with GitOps enabled |
+| Day-0 / break-glass login | `enable_cluster_admin` (default `false`; examples set `true`) | All example tfvars; see [Authentication](../getting-started/authentication.md) |
 | Production hardening | `openshift_version`, KMS, `fips`, `enable_termination_protection` | [egress-zero](../../clusters/egress-zero/terraform.tfvars) |
 
 #### Worked example: BYO VPC + egress-zero + AutoNode
@@ -606,11 +626,12 @@ enable_autonode = true
 openshift_version = "4.19.30"  # AutoNode version/region constraints — verify current docs
 region            = "us-east-1"
 
-# --- Your org: GitOps and naming ---
+# --- Your org: GitOps, naming, day-0 login ---
 cluster_name          = "acme-prod-01"
 gitops_git_repo_url   = "https://github.com/<org>/acme-cluster-config.git"
 gitops_git_path       = "prod/acme-prod-01"
 enable_gitops_bootstrap = true
+enable_cluster_admin   = true  # break-glass for make login until customer IdP exists
 ```
 
 **Operational steps** for this combination:
@@ -881,7 +902,7 @@ flowchart TD
 | Bootstrap can't reach GitHub | Egress-zero or no VPC endpoints for Git | CodeCommit mirroring — [egress-zero GitOps guide](../guides/egress-zero-gitops.md) |
 | CMP plugin apps stuck `Sync: Unknown` (`find: command not found` or plugin sidecar errors) | Repo-server CMP image missing tools or wrong/unreachable image | Use current `gitops-tools` image; re-host to private registry and set `gitops_tools_image` / `defaultImage` in bootstrap templates — [§3c GitOps CMP tools image](#gitops-cmp-tools-container-image) |
 | Repo-server can't pull CMP sidecar image | `ghcr.io` blocked (egress-zero, registry policy) | Mirror `gitops-tools` to ECR; update `defaultImage` in [hub-values.yaml.tftpl](../../modules/infrastructure/cluster/templates/hub-values.yaml.tftpl) and [spoke-values.yaml.tftpl](../../modules/infrastructure/cluster/templates/spoke-values.yaml.tftpl) |
-| `gitops_git_target_revision` ignored | Not wired in hub-values template | Use cluster-config default branch or edit template |
+| Wrong cluster-config branch synced | `gitops_git_target_revision` still `HEAD` or chart older than `0.5.18` | Set `gitops_git_target_revision` in tfvars and use `cluster-bootstrap` >= `0.5.18` |
 | Helm chart version mismatch | Versions hardcoded in template | Pin versions in your helm fork to match template |
 | ACM examples default to `noacm` | `acm_mode` not in example tfvars | Set module variable; use `bootstrap-spoke` target |
 | Worker nodes not ready | Bootstrap waits for ≥2 Ready workers on single-AZ (60 min timeout for `.metal`); long NotReady on bare metal may need `default_auto_repair = false` | Set in `terraform.tfvars`; override `WORKER_READY_MAX_ATTEMPTS` if needed |
@@ -892,7 +913,6 @@ flowchart TD
 These improvements are documented as future work:
 
 - Expose `acm_mode`, `helm_repo_url`, and chart version pins at root `terraform.tfvars`
-- Wire `gitops_git_target_revision` into [hub-values.yaml.tftpl](../../modules/infrastructure/cluster/templates/hub-values.yaml.tftpl)
 - Automate CodeCommit repository creation and mirroring (see internal `docs/TODO.md`)
 
 ---
@@ -905,10 +925,11 @@ These improvements are documented as future work:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
+| `enable_cluster_admin` | Long-lived break-glass HTPasswd admin + Secrets Manager (default `false`; examples set `true`) | `true` |
 | `enable_gitops_bootstrap` | Enable bootstrap outputs and script | `true` |
 | `gitops_git_repo_url` | cluster-config repository URL | `https://github.com/<org>/acme-cluster-config.git` |
 | `gitops_git_path` | Path under repo root | `dev/acme-dev` |
-| `gitops_git_target_revision` | Git branch/tag (limited template support) | `HEAD` |
+| `gitops_git_target_revision` | Git branch/tag/commit for cluster-config values source (`gitTargetRevision`) | `HEAD` or `feature/my-branch` |
 
 **Cluster module only** ([modules/infrastructure/cluster/01-variables.tf](../../modules/infrastructure/cluster/01-variables.tf)) — set via fork or extend root passthrough:
 
@@ -916,9 +937,11 @@ These improvements are documented as future work:
 |----------|---------|-------------|
 | `acm_mode` | `noacm` | `hub`, `spoke`, or `noacm` |
 | `helm_repo_url` | `https://rh-mobb.github.io/validated-pattern-helm-charts/` | Your published Helm repo |
-| `helm_chart_version` | `0.5.15` | `cluster-bootstrap` chart version |
-| `helm_chart_acm_spoke_version` | `0.6.11` | `cluster-bootstrap-acm-spoke` chart version |
-| `gitops_tools_image` | `ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:latest` | CMP repo-server sidecar image; re-host for egress-zero or registry policy — see [§3c](#gitops-cmp-tools-container-image) |
+| `helm_chart_version` | `0.5.19` | `cluster-bootstrap` chart version |
+| `helm_chart_acm_spoke_version` | `0.6.14` | `cluster-bootstrap-acm-spoke` chart version |
+| `helm_chart_acm_hub_registration_version` | `0.2.2` | `cluster-bootstrap-acm-hub-registration` chart version |
+| `helm_chart_awspca_version` | `1.6.1` | `aws-privateca-issuer` chart version |
+| `gitops_tools_image` | `ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:latest` | Optional CMP repo-server sidecar tooling image (used when `plugin: true`); re-host for egress-zero or registry policy — see [§3c](#gitops-cmp-tools-container-image) |
 | `gitops_csv` | `openshift-gitops-operator.v1.19.2` | GitOps operator CSV |
 | `hub_credentials_secret_name` | `""` | Hub secret for spoke mode |
 | `acm_region` | `""` | Hub region for spoke mode |
@@ -935,6 +958,8 @@ From [terraform/90-outputs.tf](../../terraform/90-outputs.tf):
 | `gitops_bootstrap_spoke_values` | YAML for spoke bootstrap |
 | `gitops_bootstrap_env_exports` | Shell `export` statements for bootstrap |
 | `gitops_bootstrap_script_path` | Path to `bootstrap-gitops.sh` |
+| `admin_user_created` | Whether break-glass HTPasswd admin IDP exists |
+| `cluster_credentials_secret_arn` | Secrets Manager ARN for break-glass credentials JSON (null if disabled) |
 | `cluster_domain` | Cluster domain for Helm values |
 
 ### C. Makefile quick reference
@@ -947,9 +972,9 @@ make cluster.<name>.bootstrap         # Bootstrap GitOps (hub/standalone)
 make cluster.<name>.bootstrap-spoke   # Bootstrap as ACM spoke
 make cluster.<name>.teardown-spoke      # Remove spoke from ACM hub
 make cluster.<name>.verify            # Verify GitOps deployment
-make cluster.<name>.login             # oc login
+make cluster.<name>.login             # oc login (requires enable_cluster_admin)
 make cluster.<name>.show-endpoints      # API and console URLs
-make cluster.<name>.show-credentials    # Admin credentials
+make cluster.<name>.show-credentials    # Break-glass admin credentials (if enabled)
 make cluster.<name>.destroy             # Destroy all resources
 make cluster.<name>.sleep               # Sleep cluster (preserve DNS/IAM)
 make cluster.<name>.vpn-start           # Start Client VPN (private clusters)
@@ -968,6 +993,8 @@ make cluster.<name>.vpn-start           # Start Client VPN (private clusters)
 ### E. Related documentation
 
 - [README.md](../../README.md) — Project overview and quick start
+- [Authentication](../getting-started/authentication.md) — Break-glass vs short-lived bootstrap login
+- [Quick Start](../getting-started/quick-start.md) — First public cluster walkthrough
 - [PLAN.md](../../PLAN.md) — Architecture decisions and implementation plan
 - [clusters/README.md](../../clusters/README.md) — Cluster directory patterns
 - [scripts/cluster/README-bootstrap-gitops.md](../../scripts/cluster/README-bootstrap-gitops.md) — Bootstrap script reference
