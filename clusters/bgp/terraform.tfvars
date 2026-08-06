@@ -1,13 +1,11 @@
 # BGP Test Cluster Configuration
 # ROSA HCP with VPC Route Server for CUDN BGP routing operator testing
 #
-# Post-deploy steps:
-# 1. Deploy the BGP operator (make deploy from rosa-bgp-operator)
-# 2. Annotate SA: oc annotate sa openshift-cudn-bgp-routing-controller-manager \
-#      -n openshift-cudn-bgp-routing \
-#      eks.amazonaws.com/role-arn=$(terraform output -raw bgp_operator_role_arn)
-# 3. Restart operator pod for IRSA credential injection
-# 4. Create CUDNBgpConfig CR with spec.aws.routeServerIDs from terraform output route_server_id
+# Post-deploy (preferred, issue #51):
+# 1. enable_secrets_manager_iam + enable_route_server publish {cluster}-bgp-config to SM
+# 2. GitOps installs ESO + cudn-bgp-routing-operator with externalSecret.enabled
+# 3. Chart Job applies IRSA annotation + CUDNBgpConfig aws.* from the synced Secret
+# Manual SA annotate / hardcoded routeServerIDs in cluster-config are no longer required.
 
 cluster_name = "bgp"
 
@@ -30,9 +28,10 @@ default_instance_type = "m5.xlarge"
 default_min_replicas  = 1
 default_max_replicas  = 2
 
-# BGP Route Server
-enable_route_server = true
-route_server_asn    = 64512
+# BGP Route Server + ESO IAM (Secrets Manager secret {cluster}-bgp-config)
+enable_route_server        = true
+route_server_asn           = 64512
+enable_secrets_manager_iam = true
 
 # BGP Router Machine Pools - one baremetal node per AZ
 # Labels match the operator's routerNodeSelector (bgp_router: "true")

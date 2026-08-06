@@ -190,8 +190,8 @@ module "iam" {
   control_plane_log_cloudwatch_enabled        = var.control_plane_log_cloudwatch_enabled
   control_plane_log_cloudwatch_log_group_name = var.control_plane_log_cloudwatch_log_group_name
 
-  # Note: cluster_credentials_secret_arn is no longer passed as a variable
-  # The IAM module looks up the secret by name (${cluster_name}-credentials) to avoid circular dependency
+  # Note: cluster_credentials_secret_arn is not passed — IAM uses name-prefix ARN patterns
+  # (${cluster_name}-credentials-*) so greenfield apply does not require the secret to exist yet
 }
 
 module "cluster" {
@@ -281,9 +281,11 @@ module "cluster" {
   # Termination Protection (IAM resources are in IAM module)
   enable_termination_protection = var.enable_termination_protection
 
-  # GitOps bootstrap configuration - IAM role ARNs from IAM module
+  # GitOps bootstrap configuration - IAM role ARNs from IAM module (rosa-platform-metadata)
   aws_private_ca_arn           = var.aws_private_ca_arn
   cert_manager_role_arn        = module.iam.cert_manager_role_arn
+  secrets_manager_role_arn     = module.iam.secrets_manager_role_arn
+  bgp_config_secret_name       = var.enable_route_server ? "${var.cluster_name}-bgp-config" : null
   channel                      = var.channel
   openshift_version            = var.openshift_version
   upgrade_acknowledgements_for = var.upgrade_acknowledgements_for
@@ -466,6 +468,7 @@ module "route_server" {
   source = "../modules/infrastructure/route-server"
 
   cluster_name            = var.cluster_name
+  region                  = var.region
   vpc_id                  = local.network.vpc_id
   private_subnet_ids      = local.network.private_subnet_ids
   private_route_table_ids = local.network.private_route_table_ids
@@ -474,6 +477,9 @@ module "route_server" {
   route_server_asn        = var.route_server_asn
   tags                    = local.tags
   persists_through_sleep  = var.persists_through_sleep
+
+  # When ESO IAM is enabled, attach GetSecretValue for {cluster}-bgp-config (issue #51).
+  secrets_manager_role_name = var.enable_secrets_manager_iam ? module.iam.secrets_manager_role_name : null
 
   custom_permissions_boundary_arn = var.custom_permissions_boundary_arn
 

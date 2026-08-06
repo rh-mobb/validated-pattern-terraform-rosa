@@ -35,3 +35,15 @@ output "bgp_operator_role_arn" {
   value       = length(aws_iam_role.bgp_operator) > 0 ? aws_iam_role.bgp_operator[0].arn : null
   sensitive   = false
 }
+
+output "bgp_config_secret_name" {
+  description = "Secrets Manager secret name with BGP runtime config for ESO (null if Route Server not deployed)"
+  value       = length(aws_secretsmanager_secret.bgp_config) > 0 ? aws_secretsmanager_secret.bgp_config[0].name : null
+  sensitive   = false
+}
+
+output "bgp_config_secret_arn" {
+  description = "Secrets Manager secret ARN with BGP runtime config for ESO (null if Route Server not deployed)"
+  value       = length(aws_secretsmanager_secret.bgp_config) > 0 ? aws_secretsmanager_secret.bgp_config[0].arn : null
+  sensitive   = false
+}
