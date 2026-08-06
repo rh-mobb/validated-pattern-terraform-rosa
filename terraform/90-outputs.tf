@@ -268,6 +268,18 @@ output "bgp_operator_role_arn" {
   sensitive   = false
 }
 
+output "bgp_config_secret_name" {
+  description = "Secrets Manager secret name for BGP runtime config consumed by ESO (issue #51)"
+  value       = var.enable_route_server && length(module.route_server) > 0 ? module.route_server[0].bgp_config_secret_name : null
+  sensitive   = false
+}
+
+output "bgp_config_secret_arn" {
+  description = "Secrets Manager secret ARN for BGP runtime config consumed by ESO (issue #51)"
+  value       = var.enable_route_server && length(module.route_server) > 0 ? module.route_server[0].bgp_config_secret_arn : null
+  sensitive   = false
+}
+
 output "gitops_bootstrap_enabled" {
   description = "Whether GitOps bootstrap is enabled"
   value       = module.cluster.gitops_bootstrap_enabled

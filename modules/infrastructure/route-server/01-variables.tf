@@ -4,6 +4,19 @@ variable "cluster_name" {
   nullable    = false
 }
 
+variable "region" {
+  description = "AWS region for the cluster and Route Server (written into the BGP config Secrets Manager secret)"
+  type        = string
+  nullable    = false
+}
+
+variable "secrets_manager_role_name" {
+  description = "IAM role name for External Secrets Operator. When set, attaches GetSecretValue on the BGP config secret. Null skips the attachment (enable_secrets_manager_iam must be true for ESO)."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
 variable "vpc_id" {
   description = "VPC ID to associate the Route Server with"
   type        = string
