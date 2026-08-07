@@ -218,6 +218,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Bootstrap skipped `rosa-platform-metadata`**: `install_gitops_hub` called `good_exit` after Helm install, which exited the script before `publish_platform_metadata` / storage-class steps. Hub install now returns to `main()` so metadata is published. ConfigMap data values are quoted strings so numeric `awsAccountId` applies cleanly.
 
 ### Changed
+- **BGP recipe worker size**: `clusters/bgp` default workers use `m7i.2xlarge` (was `m5.xlarge`) for GitOps/BuildConfig headroom on greenfield applies.
+- **`.gitignore` hygiene**: Ignore `__pycache__/` / `*.py[cod]` anywhere and `clusters/*/logs/` (local apply/bootstrap/destroy artifacts).
 - **ROSA default SG wait duration**: Increased `rosa_default_sg_wait_duration` default from `30s` to `120s` (Hypershift SG tagging still exceeded 30s on a fresh autonode apply).
 - **GitOps bootstrap chart versions**: Bump `cluster-bootstrap` to `0.5.15` and `cluster-bootstrap-acm-spoke` to `0.6.11` (CMP init removed; chart defaults to GHCR `gitops-tools` image).
 - **GitOps bootstrap `defaultImage`**: Hub and spoke bootstrap templates now emit `defaultImage` from new cluster module variable `gitops_tools_image` (default `ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:latest`).
