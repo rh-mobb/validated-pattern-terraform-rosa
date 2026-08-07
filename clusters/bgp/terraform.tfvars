@@ -23,8 +23,9 @@ vpc_cidr     = "10.0.0.0/16"
 # Multi-AZ required for BGP (one router per AZ)
 multi_az = true
 
-# Default worker pool
-default_instance_type = "m5.xlarge"
+# Default worker pool — m7i.2xlarge (8 vCPU / 32 GiB) for GitOps/build headroom;
+# m5.xlarge packed out during ESO + operator image builds (Pending pods).
+default_instance_type = "m7i.2xlarge"
 default_min_replicas  = 1
 default_max_replicas  = 2
 
