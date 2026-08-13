@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Local multi-repo dev (Gitea + Argo)**: [`docs/guides/local-multi-repo-dev.md`](docs/guides/local-multi-repo-dev.md) — `bootstrap-private`, `dev.private.sync`, reference clone layout; optional `dev.public.apply-local` escape hatch
+- **Platform metadata publish in bootstrap**: `publish_platform_metadata` ConfigMap in `bootstrap-gitops.sh` for ESO/IRSA charts (`rosa-platform-metadata`).
+- **Private GitOps E2E runner**: `scripts/cluster/e2e-private-gitops.sh` — apply → `bootstrap-private` → `dev.private.sync` → Argo verification (`E2E_CLUSTER_NAME`, `E2E_CLUSTER_PROFILE` optional).
+
 - **Dynamic bootstrap HTPasswd admin (#29)**: New `modules/infrastructure/bootstrap-admin` module and `enable_bootstrap_admin_user` (default false). `make cluster.<name>.bootstrap` generates a password in `bootstrap-admin.sh`, targeted-applies the module (`bootstrap_admin_cluster_id` + optional `bootstrap_admin_password`; null password → module `random_password`), polls `oc login` until the IDP is ready, then tears it down. Spec: `docs/superpowers/specs/2026-07-29-dynamic-bootstrap-htpasswd-design.md`.
 - **Optional break-glass cluster admin (`enable_cluster_admin`, default false)**: Long-lived HTPasswd admin + Secrets Manager credentials when enabled; not used by GitOps bootstrap. Example cluster `terraform.tfvars` set `enable_cluster_admin = true` so `make login` works until a customer IdP is configured.
 - **Shared `modules/infrastructure/htpasswd-idp` (#29)**: Reusable HTPasswd IDP + group membership used by bootstrap-admin and cluster break-glass (independent instances; both can coexist).
@@ -21,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Ignore `.superpowers/`**: Local Superpowers brainstorm session state is gitignored; keep `docs/superpowers/` tracked.
+- **`htpasswd-idp` greenfield plan failure**: `count` depends only on `var.enabled`; `cluster_id` validated at apply via lifecycle precondition (unknown at plan time on fresh clusters).
+- **`bootstrap-private` laptop Helm against Gitea**: Use port-forward URL (`private_gitops_work_helm_repo_url`) instead of in-cluster `cluster.local` for repo setup and chart upload.
+- **`bootstrap-private` cluster-bootstrap install**: Install from local reference chart path when `--private` (Gitea Helm index embeds unreachable internal URLs).
+- **Gitea re-install on bootstrap retry**: Skip Helm upgrade when Gitea release is healthy and `private-gitops.env` exists (bootstrap user may lack `gitea` namespace RBAC).
+- **Gitea chart upload reliability**: Upload bootstrap charts first; retry package upload with backoff on HTTP 500; patch bootstrap `targetRevision` from reference `Chart.yaml` during `bootstrap-private`.
 - **Bootstrap login poll aborted on first failure (macOS bash 3.2)**: `poll_oc_login` used `set +e` around `oc login`, but Bash 3.2 still fires the script `ERR` trap, so the first HTPasswd propagation miss aborted bootstrap instead of retrying. Capture failure with `oc login ... || login_result=$?` (#29).
 - **`make cluster.<name>.login` no longer runs terraform init**: Validates `.terraform` and `api_url` output instead of re-initializing on every login.
 - **`make cluster.<name>.login` checks break-glass outputs first**: If `admin_user_created` is false, exits with instructions to set `enable_cluster_admin = true` instead of attempting `oc login` (uses `cluster_credentials_secret_arn`).
@@ -31,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Public ACM example `zero_egress` mismatch**: Set `zero_egress = false` on `dev-hub-1` / `dev-spoke-2` public recipes (was incorrectly `true` while comments described public NAT egress).
 
 ### Changed
-- **GitOps Helm chart pins (#43)**: Default `cluster-bootstrap` to `0.5.19`, `cluster-bootstrap-acm-spoke` to `0.6.14`, `cluster-bootstrap-acm-hub-registration` to `0.2.2`, `aws-privateca-issuer` to `1.6.1`, and bootstrap `app-of-apps-infrastructure` `targetRevision` to `0.2.3` (aligned with validated-pattern-helm-charts latest).
+- **GitOps Helm chart pins (#43)**: Default `cluster-bootstrap` to `0.5.19`, `cluster-bootstrap-acm-spoke` to `0.6.14`, `cluster-bootstrap-acm-hub-registration` to `0.2.2`, `aws-privateca-issuer` to `1.6.1`. App-of-apps `targetRevision` values are Terraform variables (`app_of_apps_infrastructure_chart_version` default `0.3.0`, `app_of_apps_application_chart_version` `1.5.8`, `app_of_apps_acm_team_onboarding_chart_version` `0.4.1`) rendered into hub bootstrap values instead of hardcoded template literals.
 - **Wire `gitops_git_target_revision` (#43)**: Hub bootstrap values now emit `gitTargetRevision` for cluster-bootstrap (>= `0.5.18`) so Argo CD can sync cluster-config from a branch/tag instead of hardcoded `HEAD`.
 - **Disable AVP CMP by default (#43)**: Hub/spoke bootstrap values set `argocd.plugin.enabled: false` so the Vault Plugin sidecar is not deployed when cluster-config uses native Helm + ESO.
 - **Secrets Manager IRSA for ESO (#43)**: Secrets Manager IAM role trusts External Secrets Operator (`external-secrets-operator:external-secrets-sa`); documentation prefers ESO over Argo CD Vault Plugin.

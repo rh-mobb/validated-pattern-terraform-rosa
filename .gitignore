@@ -79,6 +79,11 @@ acm-crds.yaml
 kubeconfig
 values.generated.yaml
 
+clusters/*/private-gitops.env
+
+# Cluster operation logs (terraform/bootstrap output; may include secret ARNs)
+clusters/*/logs/
+
 # MkDocs local build
 .venv-docs/
 site/

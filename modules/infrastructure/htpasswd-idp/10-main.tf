@@ -5,7 +5,8 @@
 # Relates to #29 / docs/superpowers/specs/2026-07-29-dynamic-bootstrap-htpasswd-design.md
 
 locals {
-  create = var.enabled && var.cluster_id != null && var.cluster_id != ""
+  # count must depend only on var.enabled — cluster_id is unknown on greenfield plan (#29).
+  create = var.enabled
   # Prefer caller-supplied password; otherwise use generated random_password.
   password = local.create ? (
     var.password != null ? var.password : random_password.this[0].result
@@ -36,6 +37,13 @@ resource "rhcs_identity_provider" "this" {
       username = var.username
       password = local.password
     }]
+  }
+
+  lifecycle {
+    precondition {
+      condition     = !var.enabled || (var.cluster_id != null && var.cluster_id != "")
+      error_message = "cluster_id is required when htpasswd-idp enabled is true."
+    }
   }
 }
 
