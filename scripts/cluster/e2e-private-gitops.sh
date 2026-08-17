@@ -69,7 +69,7 @@ oc get applications.argoproj.io -n openshift-gitops -o custom-columns=NAME:.meta
 
 env_file="clusters/${PROFILE}/private-gitops.env"
 if [[ -f "${env_file}" ]]; then
-	# shellcheck disable=SC1091
+	# shellcheck disable=SC1090,SC1091
 	source "${env_file}"
 	GITEA_CHARTS="$(curl -sf -u "${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASSWORD}" \
 		"http://127.0.0.1:13000/api/v1/packages/gitops/helm?limit=5" 2>/dev/null | jq -r 'length' 2>/dev/null || echo "?")"
