@@ -5,9 +5,11 @@
 # Relates to #29 / docs/superpowers/specs/2026-07-29-dynamic-bootstrap-htpasswd-design.md
 
 locals {
-  # count must be known at plan time. Gate only on var.enabled — not cluster_id —
-  # otherwise greenfield apply fails with "Invalid count argument" when cluster_id
-  # is (known after apply). Resource.cluster still depends on cluster_id / depends_on.
+  # Count MUST depend only on var.enabled (a known bool). Do not gate on cluster_id:
+  # on greenfield apply cluster_id is "(known after apply)", which makes
+  # `cluster_id != null && cluster_id != ""` unknown and fails plan with
+  # "Invalid count argument". Callers set enabled=false when no IDP is wanted
+  # (bootstrap-admin leaves cluster_id null until the targeted create step).
   create = var.enabled
   # Prefer caller-supplied password; otherwise use generated random_password.
   password = local.create ? (
@@ -39,6 +41,13 @@ resource "rhcs_identity_provider" "this" {
       username = var.username
       password = local.password
     }]
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.cluster_id != null && var.cluster_id != ""
+      error_message = "htpasswd-idp: cluster_id must be set when enabled=true (got null/empty)."
+    }
   }
 }
 

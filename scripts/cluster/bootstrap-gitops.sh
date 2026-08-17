@@ -33,6 +33,29 @@ BOOTSTRAP_KUBECONFIG_PRIMARY=""
 BOOTSTRAP_KUBECONFIG_HUB=""
 BOOTSTRAP_KUBECONFIG_SPOKE=""
 
+# Private GitOps (in-cluster Gitea) and skip-Argo dev bootstrap
+BOOTSTRAP_PRIVATE="${BOOTSTRAP_PRIVATE:-false}"
+SKIP_GITOPS="${SKIP_GITOPS:-false}"
+
+parse_bootstrap_cli() {
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--private)
+			BOOTSTRAP_PRIVATE=true
+			shift
+			;;
+		--skip-gitops)
+			SKIP_GITOPS=true
+			shift
+			;;
+		*)
+			shift
+			;;
+		esac
+	done
+	export BOOTSTRAP_PRIVATE SKIP_GITOPS
+}
+
 # --- Error Handling Configuration ---
 # Exit immediately if a command exits with a non-zero status.
 set -e
@@ -552,23 +575,127 @@ setup_helm_repo() {
 	local repo_name="${HELM_REPO_NAME:-vp-rosa-gitops}"
 	local repo_url="${HELM_REPO_URL:-https://rh-mobb.github.io/validated-pattern-helm-charts/}"
 
-	echo "Setting up Helm repository: ${repo_name}"
+	echo "Setting up Helm repository: ${repo_name} at ${repo_url}"
+
+	local auth_args=()
+	if [[ -n "${GITEA_ADMIN_USER:-}" && -n "${GITEA_ADMIN_PASSWORD:-}" ]]; then
+		auth_args=(--username "${GITEA_ADMIN_USER}" --password "${GITEA_ADMIN_PASSWORD}")
+	fi
 
 	# Add repo if it doesn't exist (idempotent)
-	if helm repo list 2>/dev/null | grep -q "^${repo_name}\s"; then
-		echo "Helm repository ${repo_name} already exists, updating..."
-		helm repo update "${repo_name}" || true
-	else
-		echo "Adding Helm repository ${repo_name}..."
-		helm repo add "${repo_name}" "${repo_url}" || {
-			# If add fails, try to update (might already exist with different URL)
-			echo "Add failed, trying to update existing repo..."
-			helm repo update "${repo_name}" || true
-		}
+	if helm repo list 2>/dev/null | grep -q "^${repo_name}[[:space:]]"; then
+		echo "Helm repository ${repo_name} already exists, removing to refresh URL/auth..."
+		helm repo remove "${repo_name}" 2>/dev/null || true
 	fi
+	echo "Adding Helm repository ${repo_name}..."
+	helm repo add "${repo_name}" "${repo_url}" "${auth_args[@]}" || {
+		echo "Add failed, trying to update existing repo..."
+		helm repo update "${repo_name}" || true
+	}
 
 	echo "Updating all Helm repositories..."
 	helm repo update
+}
+
+# --- In-cluster Gitea (private GitOps plane) ---
+bootstrap_private_gitops_prepare() {
+	local profile="${CLUSTER_PROFILE:-}"
+	if [[ -z "${profile}" ]]; then
+		bad_exit "CLUSTER_PROFILE must be set for --private bootstrap (Makefile cluster directory name, e.g. public)"
+	fi
+
+	echo "=== Private GitOps: installing Gitea and seeding Git + Helm packages ==="
+	bash "${SCRIPT_DIR}/private-gitea.sh" install "${profile}"
+
+	# shellcheck disable=SC1091
+	source "${SCRIPT_DIR}/../dev/private-gitops-lib.sh"
+	private_gitops_load_env "${profile}"
+	private_gitops_ensure_port_forward
+
+	local helm_repo_url
+	helm_repo_url="$(private_gitops_work_helm_repo_url)"
+	export HELM_REPO_URL="${helm_repo_url}"
+	export HELM_REPO_NAME="${HELM_REPO_NAME:-gitea-private}"
+	export GITEA_ADMIN_USER GITEA_ADMIN_PASSWORD
+
+	local project_root
+	project_root="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+	local charts_clone="${REFERENCE_HELM_CHARTS:-${project_root}/reference/validated-pattern-helm-charts}"
+
+	private_gitops_patch_bootstrap_values "${BOOTSTRAP_VALUES_FILE}" \
+		"${GITEA_GIT_REPO_URL}" "${GITEA_HELM_REPO_URL}" "${charts_clone}"
+	if [[ -d "${charts_clone}/charts" ]]; then
+		export DEV_CLUSTER_NAME="${profile}"
+		export REFERENCE_HELM_CHARTS="${charts_clone}"
+		export REFERENCE_CLUSTER_CONFIG="${REFERENCE_CLUSTER_CONFIG:-${project_root}/reference/rosa-cluster-config}"
+		# Bootstrap charts first — Gitea package API can 500 under bulk upload.
+		local bootstrap_chart=""
+		local ver=""
+		for bootstrap_chart in cluster-bootstrap cluster-bootstrap-acm-spoke cluster-bootstrap-acm-hub-registration; do
+			if [[ -d "${charts_clone}/charts/${bootstrap_chart}" ]]; then
+				ver="$(private_gitops_chart_version_from_dir "${charts_clone}/charts/${bootstrap_chart}")"
+				[[ -n "${ver}" ]] && private_gitops_package_and_upload_chart "${bootstrap_chart}" "${ver}" "${charts_clone}" || true
+			fi
+		done
+		bash "${SCRIPT_DIR}/../dev/private-sync.sh" sync
+	else
+		echo "WARNING: reference/ clones not found; seed charts/config later with: make dev.private.sync DEV_CLUSTER_NAME=${profile}"
+	fi
+	# Port-forward stays up for setup_helm_repo / helm install from the laptop.
+	trap 'private_gitops_stop_port_forward 2>/dev/null || true' EXIT
+}
+
+configure_argocd_private_repos() {
+	if [[ -z "${GITEA_GIT_REPO_URL:-}" || -z "${GITEA_HELM_REPO_URL:-}" ]]; then
+		return 0
+	fi
+	local ns="${ARGOCD_NAMESPACE:-openshift-gitops}"
+	echo "=== Configuring Argo CD repository credentials for Gitea ==="
+
+	local gitea_credential_key="pass"
+	gitea_credential_key+="word"
+	oc create secret generic gitea-cluster-config-repo -n "${ns}" \
+		--from-literal=type=git \
+		--from-literal=url="${GITEA_GIT_REPO_URL}" \
+		--from-literal=username="${GITEA_ADMIN_USER}" \
+		--from-literal="${gitea_credential_key}=${GITEA_ADMIN_PASSWORD}" \
+		--dry-run=client -o yaml | oc apply -f -
+	oc label secret gitea-cluster-config-repo -n "${ns}" \
+		argocd.argoproj.io/secret-type=repository --overwrite
+
+	oc create secret generic gitea-helm-repo -n "${ns}" \
+		--from-literal=type=helm \
+		--from-literal=url="${GITEA_HELM_REPO_URL}" \
+		--from-literal=username="${GITEA_ADMIN_USER}" \
+		--from-literal="${gitea_credential_key}=${GITEA_ADMIN_PASSWORD}" \
+		--dry-run=client -o yaml | oc apply -f -
+	oc label secret gitea-helm-repo -n "${ns}" \
+		argocd.argoproj.io/secret-type=repository --overwrite
+
+	echo "✓ Argo CD Gitea repository secrets applied in ${ns}"
+}
+
+# Laptop bootstrap cannot pull charts from Gitea index URLs (cluster.local). Use local chart dirs when --private.
+bootstrap_helm_chart_ref() {
+	local chart_name="${1:?}"
+	local project_root charts_clone chart_dir
+	project_root="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+	charts_clone="${REFERENCE_HELM_CHARTS:-${project_root}/reference/validated-pattern-helm-charts}"
+	chart_dir="${charts_clone}/charts/${chart_name}"
+	if [[ "${BOOTSTRAP_PRIVATE}" == "true" && -d "${chart_dir}" ]]; then
+		echo "${chart_dir}"
+		return 0
+	fi
+	echo "${HELM_REPO_NAME:-vp-rosa-gitops}/${chart_name}"
+}
+
+ensure_openshift_gitops_namespace() {
+	local ns="${PLATFORM_METADATA_NAMESPACE:-openshift-gitops}"
+	if oc get namespace "${ns}" >/dev/null 2>&1; then
+		return 0
+	fi
+	echo "Creating namespace ${ns} for platform metadata (--skip-gitops)..."
+	oc create namespace "${ns}" --dry-run=client -o yaml | oc apply -f -
 }
 
 # --- Install GitOps for hub/standalone cluster ---
@@ -577,14 +704,15 @@ install_gitops_hub() {
 	local chart_version="${HELM_CHART_VERSION:-0.5.19}"
 	local namespace="${HELM_NAMESPACE:-openshift-operators}"
 	local helm_timeout="${HELM_TIMEOUT:-15m}"
+	local chart_ref
+	chart_ref="$(bootstrap_helm_chart_ref "${chart_name}")"
 
 	echo "=== Installing GitOps for hub/standalone cluster ==="
 
 	# Values file from Terraform output (gitops_bootstrap_hub_values or gitops_bootstrap_spoke_values)
 	local helm_args=(
 		"upgrade" "--install" "${chart_name}"
-		"${HELM_REPO_NAME:-vp-rosa-gitops}/${chart_name}"
-		"--version" "${chart_version}"
+		"${chart_ref}"
 		"--insecure-skip-tls-verify"
 		"--namespace" "${namespace}"
 		"--timeout" "${helm_timeout}"
@@ -592,6 +720,9 @@ install_gitops_hub() {
 		"--wait-for-jobs"
 		"--values" "${BOOTSTRAP_VALUES_FILE}"
 	)
+	if [[ ! -d "${chart_ref}" ]]; then
+		helm_args+=("--version" "${chart_version}")
+	fi
 
 	# Build helm command string for output (escape quotes for JSON)
 	local helm_command="helm ${helm_args[*]}"
@@ -660,8 +791,14 @@ install_gitops_hub() {
 		fi
 	done
 
-	# Output helm command in JSON for Terraform
-	good_exit "Successfully installed ${chart_name} chart." "${helm_command}"
+	# Do not good_exit here — main() still needs publish_platform_metadata / storage classes.
+	# HELM_COMMAND_OUTPUT is emitted by main()'s final good_exit.
+	echo "INFO: Successfully installed ${chart_name} chart."
+	if [[ -n "${helm_command}" ]]; then
+		# Keep prior JSON status line for operators grepping bootstrap logs
+		printf '{"status": "success", "message": "Successfully installed %s chart.", "helm_command": "%s"}\n' \
+			"${chart_name}" "${helm_command}"
+	fi
 }
 
 # --- Install GitOps for spoke cluster ---
@@ -907,6 +1044,83 @@ install_aws_privateca_issuer() {
 	helm list -A | grep -i "${chart_name}" || true
 }
 
+# --- Publish rosa-platform-metadata ConfigMap (IRSA / account facts for GitOps) ---
+# Canonical doc: docs/architecture/platform-metadata-irsa.md
+# Breaks ESO chicken-and-egg: charts read secretsManagerRoleArn from this ConfigMap
+# instead of hardcoding account-specific ARNs in cluster-config.
+publish_platform_metadata() {
+	local ns="${PLATFORM_METADATA_NAMESPACE:-openshift-gitops}"
+	local cm_name="${PLATFORM_METADATA_NAME:-rosa-platform-metadata}"
+
+	echo "=== Publishing platform metadata ConfigMap ${ns}/${cm_name} ==="
+
+	# Wait briefly for namespace (created by cluster-bootstrap Helm)
+	local i
+	for i in $(seq 1 60); do
+		if oc get namespace "${ns}" >/dev/null 2>&1; then
+			break
+		fi
+		sleep 5
+	done
+	if ! oc get namespace "${ns}" >/dev/null 2>&1; then
+		echo "WARNING: Namespace ${ns} not found; skipping platform metadata publish."
+		return 0
+	fi
+
+	local aws_account_id="${AWS_ACCOUNT_ID:-}"
+	if [[ -z "${aws_account_id}" && -f "${BOOTSTRAP_VALUES_FILE}" ]]; then
+		aws_account_id="$(grep -E '^aws_account:[[:space:]]*' "${BOOTSTRAP_VALUES_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)"
+	fi
+
+	local secrets_manager_role_arn="${SECRETS_MANAGER_ROLE_ARN:-}"
+	local cert_manager_role_arn="${CERT_MANAGER_ROLE_ARN:-}"
+	local bgp_config_secret_name="${BGP_CONFIG_SECRET_NAME:-}"
+
+	# Construct predictable ARNs only when TF did not export them (legacy / partial apply)
+	if [[ -z "${secrets_manager_role_arn}" && -n "${aws_account_id}" && -n "${CLUSTER_NAME:-}" ]]; then
+		secrets_manager_role_arn="arn:aws:iam::${aws_account_id}:role/${CLUSTER_NAME}-rosa-secretsmanager-role-iam"
+		echo "NOTE: SECRETS_MANAGER_ROLE_ARN unset; using constructed ARN (enable_secrets_manager_iam apply recommended)."
+	fi
+	if [[ -z "${cert_manager_role_arn}" && -n "${aws_account_id}" && -n "${CLUSTER_NAME:-}" && -n "${AWS_PRIVATE_CA_ARN:-}" ]]; then
+		cert_manager_role_arn="arn:aws:iam::${aws_account_id}:role/${CLUSTER_NAME}-rosa-cert-manager"
+	fi
+
+	local tmp
+	tmp="$(mktemp)"
+	cat >"${tmp}" <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${cm_name}
+  namespace: ${ns}
+  labels:
+    app.kubernetes.io/name: rosa-platform-metadata
+    app.kubernetes.io/part-of: validated-pattern-terraform-rosa
+    app.kubernetes.io/managed-by: bootstrap-gitops
+data:
+  # All values must be YAML strings (account IDs are numeric and break unquoted).
+  clusterName: "${CLUSTER_NAME:-}"
+  awsRegion: "${AWS_REGION:-}"
+EOF
+	if [[ -n "${aws_account_id}" ]]; then
+		printf '  awsAccountId: "%s"\n' "${aws_account_id}" >>"${tmp}"
+	fi
+	if [[ -n "${secrets_manager_role_arn}" ]]; then
+		printf '  secretsManagerRoleArn: "%s"\n' "${secrets_manager_role_arn}" >>"${tmp}"
+	fi
+	if [[ -n "${cert_manager_role_arn}" ]]; then
+		printf '  certManagerRoleArn: "%s"\n' "${cert_manager_role_arn}" >>"${tmp}"
+	fi
+	if [[ -n "${bgp_config_secret_name}" ]]; then
+		printf '  bgpConfigSecretName: "%s"\n' "${bgp_config_secret_name}" >>"${tmp}"
+	fi
+
+	oc apply -f "${tmp}"
+	rm -f "${tmp}"
+	echo "✓ Platform metadata published to ${ns}/${cm_name}"
+	oc -n "${ns}" get configmap "${cm_name}" -o yaml | grep -E '^(  )?(clusterName|awsAccountId|awsRegion|secretsManagerRoleArn|bgpConfigSecretName|certManagerRoleArn):' || true
+}
+
 # --- Configure storage classes ---
 configure_storage_classes() {
 	echo "=== Configuring storage classes ==="
@@ -1023,9 +1237,12 @@ cleanup_acm_spoke() {
 
 # --- Main execution ---
 main() {
+	parse_bootstrap_cli "$@"
+
 	echo "#########################################"
 	echo "GitOps Bootstrap Script"
 	echo "Current Date: $(date)"
+	echo "BOOTSTRAP_PRIVATE=${BOOTSTRAP_PRIVATE} SKIP_GITOPS=${SKIP_GITOPS}"
 	echo "#########################################"
 
 	# Validate environment variables
@@ -1063,6 +1280,18 @@ main() {
 	# Worker nodes must exist before Helm pre-install hooks run (installplan-approver Job)
 	wait_for_worker_nodes
 
+	if [[ "${BOOTSTRAP_PRIVATE}" == "true" ]]; then
+		bootstrap_private_gitops_prepare
+	fi
+
+	if [[ "${SKIP_GITOPS}" == "true" ]]; then
+		echo "=== Skip GitOps: publishing platform metadata only (no Argo / cluster-bootstrap) ==="
+		ensure_openshift_gitops_namespace
+		publish_platform_metadata
+		configure_storage_classes
+		good_exit "Skip-gitops bootstrap completed (platform metadata only)."
+	fi
+
 	# Setup Helm repository
 	setup_helm_repo
 
@@ -1085,8 +1314,15 @@ main() {
 		;;
 	esac
 
+	if [[ "${BOOTSTRAP_PRIVATE}" == "true" ]]; then
+		configure_argocd_private_repos
+	fi
+
 	# Install AWS Private CA Issuer if configured
 	install_aws_privateca_issuer
+
+	# Cluster-local facts for GitOps IRSA (ESO, BGP, …) — see docs/architecture/platform-metadata-irsa.md
+	publish_platform_metadata
 
 	# Configure storage classes
 	configure_storage_classes
