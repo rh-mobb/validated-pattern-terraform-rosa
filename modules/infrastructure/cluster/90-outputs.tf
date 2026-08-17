@@ -180,6 +180,10 @@ output "gitops_bootstrap_env_exports" {
     var.helm_chart_acm_hub_registration_version != null ? "export HELM_CHART_ACM_HUB_REGISTRATION_VERSION='${var.helm_chart_acm_hub_registration_version}'" : "",
     var.helm_chart_awspca != null ? "export HELM_CHART_AWSPCA='${var.helm_chart_awspca}'" : "",
     var.helm_chart_awspca_version != null ? "export HELM_CHART_AWSPCA_VERSION='${var.helm_chart_awspca_version}'" : "",
+    "export AWS_ACCOUNT_ID='${local.aws_account_id}'",
+    var.cert_manager_role_arn != null && var.cert_manager_role_arn != "" ? "export CERT_MANAGER_ROLE_ARN='${var.cert_manager_role_arn}'" : "",
+    var.secrets_manager_role_arn != null && var.secrets_manager_role_arn != "" ? "export SECRETS_MANAGER_ROLE_ARN='${var.secrets_manager_role_arn}'" : "",
+    var.bgp_config_secret_name != null && var.bgp_config_secret_name != "" ? "export BGP_CONFIG_SECRET_NAME='${var.bgp_config_secret_name}'" : "",
     "export ENABLE='true'"
   ])) : null
   sensitive = false

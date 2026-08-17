@@ -529,8 +529,13 @@ install_gitops_hub() {
 	done
 
 	# Do not good_exit here — main() still needs publish_platform_metadata / storage classes.
-	echo "✓ Successfully installed ${chart_name} chart."
-	helm list -n "${namespace}" | grep "${chart_name}" || true
+	# HELM_COMMAND_OUTPUT is emitted by main()'s final good_exit.
+	echo "INFO: Successfully installed ${chart_name} chart."
+	if [[ -n "${helm_command}" ]]; then
+		# Keep prior JSON status line for operators grepping bootstrap logs
+		printf '{"status": "success", "message": "Successfully installed %s chart.", "helm_command": "%s"}\n' \
+			"${chart_name}" "${helm_command}"
+	fi
 }
 
 # --- Install GitOps for spoke cluster ---
@@ -803,12 +808,15 @@ install_aws_privateca_issuer() {
 
 # --- Publish rosa-platform-metadata ConfigMap (IRSA / account facts for GitOps) ---
 # Canonical doc: docs/architecture/platform-metadata-irsa.md
+# Breaks ESO chicken-and-egg: charts read secretsManagerRoleArn from this ConfigMap
+# instead of hardcoding account-specific ARNs in cluster-config.
 publish_platform_metadata() {
 	local ns="${PLATFORM_METADATA_NAMESPACE:-openshift-gitops}"
 	local cm_name="${PLATFORM_METADATA_NAME:-rosa-platform-metadata}"
 
 	echo "=== Publishing platform metadata ConfigMap ${ns}/${cm_name} ==="
 
+	# Wait briefly for namespace (created by cluster-bootstrap Helm)
 	local i
 	for i in $(seq 1 60); do
 		if oc get namespace "${ns}" >/dev/null 2>&1; then
@@ -830,6 +838,7 @@ publish_platform_metadata() {
 	local cert_manager_role_arn="${CERT_MANAGER_ROLE_ARN:-}"
 	local bgp_config_secret_name="${BGP_CONFIG_SECRET_NAME:-}"
 
+	# Construct predictable ARNs only when TF did not export them (legacy / partial apply)
 	if [[ -z "${secrets_manager_role_arn}" && -n "${aws_account_id}" && -n "${CLUSTER_NAME:-}" ]]; then
 		secrets_manager_role_arn="arn:aws:iam::${aws_account_id}:role/${CLUSTER_NAME}-rosa-secretsmanager-role-iam"
 		echo "NOTE: SECRETS_MANAGER_ROLE_ARN unset; using constructed ARN (enable_secrets_manager_iam apply recommended)."
@@ -851,6 +860,7 @@ metadata:
     app.kubernetes.io/part-of: validated-pattern-terraform-rosa
     app.kubernetes.io/managed-by: bootstrap-gitops
 data:
+  # All values must be YAML strings (account IDs are numeric and break unquoted).
   clusterName: "${CLUSTER_NAME:-}"
   awsRegion: "${AWS_REGION:-}"
 EOF
@@ -870,6 +880,7 @@ EOF
 	oc apply -f "${tmp}"
 	rm -f "${tmp}"
 	echo "✓ Platform metadata published to ${ns}/${cm_name}"
+	oc -n "${ns}" get configmap "${cm_name}" -o yaml | grep -E '^(  )?(clusterName|awsAccountId|awsRegion|secretsManagerRoleArn|bgpConfigSecretName|certManagerRoleArn):' || true
 }
 
 # --- Configure storage classes ---
@@ -1056,7 +1067,7 @@ main() {
 	# Install AWS Private CA Issuer if configured
 	install_aws_privateca_issuer
 
-	# Cluster-local facts for GitOps IRSA (ESO, BGP, …)
+	# Cluster-local facts for GitOps IRSA (ESO, BGP, …) — see docs/architecture/platform-metadata-irsa.md
 	publish_platform_metadata
 
 	# Configure storage classes
