@@ -96,6 +96,17 @@ nav:
       - Zero Egress ECR Access: guides/zero-egress-ecr-access.md
       - Registry Image Mirrors: guides/image-mirrors.md
       - CI/CD: guides/ci-cd.md
+      # Covers: Pipeline Identities, Overview, ServiceAccount Identity, Built-in OAuth Clusters, External-Auth Clusters
+      # Does: Publishes the pipeline-identity set as a nested navigation group rather than one page.
+      # Why: The overview chooses between options and each remaining page is one architecture or the shared path.
+      # Change: Flattening this to a single entry hides three pages from the built site's navigation.
+      # Trap: Nav order is reading order here; Overview must stay first because the others assume its architecture question was answered.
+      # Evidence: https://www.mkdocs.org/user-guide/configuration/#nav
+      - Pipeline Identities:
+          - Overview: guides/pipeline-identities/index.md
+          - ServiceAccount Identity: guides/pipeline-identities/service-account-identity.md
+          - Built-in OAuth Clusters: guides/pipeline-identities/built-in-oauth-clusters.md
+          - External-Auth Clusters: guides/pipeline-identities/external-auth-clusters.md
       - Infra Nodes: guides/infra-nodes.md
       - Ingress Improvements: guides/improvements/ingress.md
   - Modules:
