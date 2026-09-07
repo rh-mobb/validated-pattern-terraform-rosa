@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Cluster lifecycle hooks (design, #72)**: [`docs/guides/cluster-lifecycle-hooks.md`](docs/guides/cluster-lifecycle-hooks.md) — optional per-profile `clusters/<profile>/scripts/{pre,post}-{create,bootstrap,destroy}.sh` contract (idempotent, graceful degradation, shared `scripts/cluster/` helpers). Runner implementation tracked in #72.
 - **Plan-safe cluster-admin lifecycle**: make the long-lived HTPasswd
   administrator and its credentials secret follow explicit caller intent, so
   greenfield enable and both existing-cluster toggle directions plan without a

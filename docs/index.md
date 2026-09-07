@@ -13,6 +13,7 @@ This repository provides reusable Terraform modules and per-cluster configuratio
 | Choose full-stack vs bring-your-own (BYO) | [Prerequisites — Choose Your Path](prerequisites/index.md) |
 | Follow the full enablement guide | [Enablement Guide](deployment/enablement.md) |
 | Develop across three repos locally (Gitea + Argo) | [Local Multi-Repo Dev](guides/local-multi-repo-dev.md) |
+| Add profile-specific apply/bootstrap/destroy steps | [Cluster lifecycle hooks](guides/cluster-lifecycle-hooks.md) |
 | Configure a specific cluster profile | [Cluster Configurations](deployment/cluster-configurations.md) |
 | Deploy zero-egress with GitOps | [Egress-Zero GitOps](guides/egress-zero-gitops.md) |
 | Look up module inputs/outputs | [Modules](modules/cluster.md) |

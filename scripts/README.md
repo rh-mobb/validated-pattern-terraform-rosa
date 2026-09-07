@@ -115,6 +115,8 @@ make cluster.byo-vpc.validate-network
 - **`destroy-infrastructure.sh`**: Destroy infrastructure (with confirmation)
 - **`cleanup-infrastructure.sh`**: Sleep infrastructure (destroy with preserved resources, auto-approve, CI/CD friendly)
 
+**Cluster lifecycle hooks** ([#72](https://github.com/rh-mobb/validated-pattern-terraform-rosa/issues/72), planned): optional `clusters/<profile>/scripts/{pre,post}-{create,bootstrap,destroy}.sh` invoked by apply/bootstrap/destroy. Contract: [docs/guides/cluster-lifecycle-hooks.md](../docs/guides/cluster-lifecycle-hooks.md) — idempotent, graceful skip when cluster/API is gone, shared `scripts/cluster/` helpers for AWS logic.
+
 #### GitOps Bootstrap Scripts
 
 - **`bootstrap-admin.sh`**: Create/destroy short-lived HTPasswd bootstrap admin (used by Make bootstrap)

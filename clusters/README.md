@@ -24,7 +24,7 @@ clusters/
 ├── byo-vpc-egress-zero/                  # Example BYO VPC + zero egress
 │   └── terraform.tfvars
 ├── bgp/                                  # VPC Route Server + CUDN BGP (metal routers)
-│   └── terraform.tfvars
+│   └── terraform.tfvars                  # optional: scripts/ for lifecycle hooks
 ├── egress-zero2/                         # Additional egress-zero cluster (example)
 └── us-east-1-production/                 # Additional cluster (example)
 ```
@@ -41,6 +41,20 @@ make cluster.bgp.bootstrap
 # Tear down promptly — 3× c5.metal is expensive
 make cluster.bgp.destroy_force
 ```
+
+### Optional lifecycle hooks (`clusters/<profile>/scripts/`)
+
+Profiles may add **optional, executable** shell hooks run by Make lifecycle targets (`apply`, `bootstrap`, `destroy`). Use hooks for steps that are specific to one recipe (e.g. BGP route-server peer teardown), not for logic every cluster needs — put shared behavior in `scripts/cluster/` and call it from the hook.
+
+**Contract (summary):** hooks must be **idempotent**, **fail only when the parent step cannot proceed**, and **degrade gracefully** when the cluster API or resources are already gone. Full spec: [Cluster lifecycle hooks](../docs/guides/cluster-lifecycle-hooks.md).
+
+| Hook | When |
+|------|------|
+| `pre-create.sh` / `post-create.sh` | Before / after `terraform apply` |
+| `pre-bootstrap.sh` / `post-bootstrap.sh` | Before / after GitOps bootstrap |
+| `pre-destroy.sh` / `post-destroy.sh` | Before / after `terraform destroy` |
+
+Hooks are **not implemented in the runner yet** — see the guide’s implementation checklist before relying on them in CI.
 
 ## Cluster Types
 

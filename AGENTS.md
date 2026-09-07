@@ -1292,6 +1292,22 @@ make test            # Run all tests (recommended before commit)
 6. Cert-manager/awspca bootstrap `--set certManagerRole` is the same idea for imperative Helm; metadata generalizes it for Argo-managed charts.
 7. When adding a new chart that needs AWS account or IRSA: follow this pattern; track remaining migrations in the platform-metadata rollout GitHub issue.
 
+### Cluster lifecycle hooks (`clusters/<profile>/scripts/`)
+
+**Canonical doc:** [`docs/guides/cluster-lifecycle-hooks.md`](docs/guides/cluster-lifecycle-hooks.md). Tracking: [#72](https://github.com/rh-mobb/validated-pattern-terraform-rosa/issues/72).
+
+Optional executable hooks extend `make cluster.<profile>.{apply,bootstrap,destroy*}` for **profile-specific** steps. Runner implementation is pending — follow the guide’s checklist before assuming hooks run in CI.
+
+**Rules for agents:**
+
+1. **Profile-only teardown belongs in hooks**, not Terraform `null_resource` — e.g. BGP: `pre-destroy.sh` deletes CUDN CRs when `oc` works, then calls shared AWS cleanup scripts.
+2. **Shared logic stays in `scripts/cluster/`** — hooks orchestrate; do not duplicate AWS/`oc` cleanup in both a hook and Terraform.
+3. **Idempotent** — safe to re-run; use `--ignore-not-found`, skip when `oc whoami` fails, treat already-deleted peers as success.
+4. **Graceful degradation** — partial teardown (API gone, CRs gone) must not fail fatally if AWS cleanup can still proceed.
+5. **Fail only when blocked** — `pre-destroy` exits non-zero only if destroy cannot proceed after cleanup + waits; optional steps warn and continue.
+6. **Executable opt-in** — hooks must be `chmod +x`; document new hooks in the profile’s commit/PR.
+7. Do **not** add hooks for `init`/`plan` or `sleep` unless the guide is updated first.
+
 ### VPC Route Server / CUDN BGP (`enable_route_server`)
 
 Example recipe: `clusters/bgp/terraform.tfvars`. Human enablement: `docs/deployment/enablement.md` → **CUDN BGP / VPC Route Server**.
