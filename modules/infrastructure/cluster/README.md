@@ -143,6 +143,7 @@ module "cluster" {
 | cloudwatch_audit_logging_role_arn | [DEPRECATED] ARN of CloudWatch audit logging IAM role (from IAM module output, required when enable_audit_logging is true). Use control_plane_log_forwarding_role_arn instead | `string` | `null` |
 | aws_private_ca_arn | AWS Private CA ARN for certificate management (for GitOps bootstrap, from IAM module) | `string` | `null` |
 | cert_manager_role_arn | ARN of cert-manager IAM role (from IAM module output, for GitOps bootstrap) | `string` | `null` |
+| efs_csi_role_arn | ARN of the EFS CSI driver IAM role (from IAM module output, for rosa-platform-metadata) | `string` | `null` |
 | service_cidr | CIDR block for services | `string` | `"172.30.0.0/16"` |
 | pod_cidr | CIDR block for pods | `string` | `"10.128.0.0/14"` |
 | host_prefix | Host prefix for subnet allocation | `number` | `23` |

@@ -13,6 +13,7 @@ vp-terraform-rosa/
 │   ├── iam/                      # Account roles, OIDC, operator roles, KMS
 │   ├── cluster/                  # ROSA HCP cluster, machine pools, GitOps bootstrap
 │   ├── client-vpn/               # AWS Client VPN for private cluster access
+│   ├── route-server/             # VPC Route Server + CUDN BGP IRSA
 │   └── bastion/                  # Optional bastion (deprecated; prefer Client VPN)
 ├── clusters/<name>/              # Per-cluster terraform.tfvars and state
 └── scripts/                      # Init, plan, apply, bootstrap, validation
@@ -56,6 +57,7 @@ Each infrastructure module has a README with inputs, outputs, and examples:
 - [IAM module](../modules/iam.md)
 - [Network (Private)](../modules/network-private.md)
 - [Network (Public)](../modules/network-public.md)
+- [Route Server (BGP)](../modules/route-server.md)
 
 ## Next steps
 

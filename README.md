@@ -33,7 +33,7 @@ make cluster.public.apply
 make cluster.public.bootstrap
 ```
 
-Example clusters: `public`, `egress-zero`, `byo-vpc`, `byo-vpc-egress-zero` — see [clusters/README.md](clusters/README.md).
+Example clusters: `public`, `egress-zero`, `byo-vpc`, `byo-vpc-egress-zero`, `virt` — see [clusters/README.md](clusters/README.md). The Virtualization recipe uses metal instances; see [OpenShift Virtualization](docs/deployment/enablement.md#openshift-virtualization).
 
 Admin credentials (HTPasswd) are stored once in AWS Secrets Manager as `{cluster_name}-credentials` (JSON: `user`, `password`, `url`). Retrieve with `cluster_credentials_secret_arn` or `make cluster.<name>.show-credentials`. See [Authentication](docs/getting-started/authentication.md).
 
@@ -52,6 +52,7 @@ rosa-hcp-infrastructure/
 │       ├── cluster/            # ROSA HCP Cluster module (optional break-glass IDP, EFS, GitOps bootstrap)
 │       ├── htpasswd-idp/       # Shared HTPasswd IDP + group membership (bootstrap + break-glass)
 │       ├── bootstrap-admin/    # Short-lived bootstrap admin (wrapper around htpasswd-idp)
+│       ├── route-server/       # VPC Route Server + CUDN BGP operator IRSA
 │       ├── bastion/            # Bastion host (deprecated; use client-vpn)
 │       └── client-vpn/         # AWS Client VPN for private cluster access (recommended)
 └── clusters/                   # Cluster configurations
@@ -60,7 +61,8 @@ rosa-hcp-infrastructure/
     ├── egress-zero/            # Example egress-zero cluster (reference)
     │   └── terraform.tfvars
     ├── byo-vpc/                # BYO VPC example
-    └── byo-vpc-egress-zero/    # BYO VPC + zero egress
+    ├── byo-vpc-egress-zero/    # BYO VPC + zero egress
+    └── virt/                  # OpenShift Virtualization + EFS + CUDN BGP (reference; expensive metal)
 ```
 
 ### Infrastructure Modules
@@ -73,6 +75,7 @@ rosa-hcp-infrastructure/
 - **Bootstrap admin** (`bootstrap-admin`): Short-lived bootstrap HTPasswd user for GitOps `oc login`
 - **Bastion** (`bastion`): Deprecated; optional bastion for sshuttle (use Client VPN instead)
 - **Client VPN** (`client-vpn`): Optional AWS Client VPN endpoint for private cluster access (recommended)
+- **Route Server** (`route-server`): Optional AWS VPC Route Server + CUDN BGP operator IRSA (`enable_route_server`)
 
 ### Module Architecture
 
@@ -136,6 +139,7 @@ Local preview: `make docs-preview`
 - ✅ **iam**: Production-ready (includes KMS keys, IAM roles for operators)
 - ✅ **cluster**: Production-ready (optional break-glass IDP, EFS storage, GitOps bootstrap)
 - ✅ **bastion**: Deprecated (use client-vpn)
+- ✅ **route-server**: Optional VPC Route Server + CUDN BGP IRSA (`clusters/virt`)
 
 ## Development Setup
 

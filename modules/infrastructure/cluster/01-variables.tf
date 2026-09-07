@@ -775,6 +775,13 @@ variable "bgp_config_secret_name" {
   nullable    = true
 }
 
+variable "efs_csi_role_arn" {
+  description = "ARN of the EFS CSI driver IAM role (from IAM module output, for rosa-platform-metadata)"
+  type        = string
+  default     = null
+  nullable    = true
+}
+
 variable "awspca_csv" {
   description = "CSV for AWS Private CA Issuer operator"
   type        = string

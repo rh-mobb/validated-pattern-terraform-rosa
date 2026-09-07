@@ -29,6 +29,13 @@ locals {
   # AWS account ID (available via data source)
   aws_account_id = data.aws_caller_identity.current.account_id
 
+  # EFS id for bootstrap / platform metadata (cluster-created FS unless caller passed one)
+  bootstrap_efs_file_system_id = (
+    var.efs_file_system_id != null && var.efs_file_system_id != "" ?
+    var.efs_file_system_id :
+    (length(aws_efs_file_system.main) > 0 ? aws_efs_file_system.main[0].id : "")
+  )
+
   # Common resource suffix for consistent naming across resources
   # Used for resources that need globally unique names (e.g., S3 buckets)
   # This ensures all resources from the same cluster share the same suffix for consistency

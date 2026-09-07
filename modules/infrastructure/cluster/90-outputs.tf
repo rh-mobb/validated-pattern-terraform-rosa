@@ -190,6 +190,8 @@ output "gitops_bootstrap_env_exports" {
     var.cert_manager_role_arn != null && var.cert_manager_role_arn != "" ? "export CERT_MANAGER_ROLE_ARN='${var.cert_manager_role_arn}'" : "",
     var.secrets_manager_role_arn != null && var.secrets_manager_role_arn != "" ? "export SECRETS_MANAGER_ROLE_ARN='${var.secrets_manager_role_arn}'" : "",
     var.bgp_config_secret_name != null && var.bgp_config_secret_name != "" ? "export BGP_CONFIG_SECRET_NAME='${var.bgp_config_secret_name}'" : "",
+    var.efs_csi_role_arn != null && var.efs_csi_role_arn != "" ? "export EFS_CSI_ROLE_ARN='${var.efs_csi_role_arn}'" : "",
+    local.bootstrap_efs_file_system_id != "" ? "export EFS_FILE_SYSTEM_ID='${local.bootstrap_efs_file_system_id}'" : "",
     "export ENABLE='true'"
   ])) : null
   sensitive = false

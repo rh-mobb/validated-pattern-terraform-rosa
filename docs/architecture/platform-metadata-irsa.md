@@ -47,6 +47,8 @@ Typical keys (omit empty):
 | `secretsManagerRoleArn` | Full ARN for ESO IRSA (`terraform output secrets_manager_role_arn`) |
 | `bgpConfigSecretName` | `{cluster}-bgp-config` when Route Server is enabled |
 | `certManagerRoleArn` | Full ARN when cert-manager IAM is enabled |
+| `efsCsiRoleArn` | Full ARN for EFS CSI IRSA when `enable_efs` is true |
+| `efsFileSystemId` | EFS filesystem id (`fs-…`) when `enable_efs` is true |
 
 Prefer **full ARNs from Terraform outputs** over reconstructing names in charts (survives renames; multi-account safe).
 
@@ -58,9 +60,11 @@ Charts that need IRSA or Terraform-owned secret names:
 2. Keep optional explicit `serviceAccount.roleArn` for break-glass / migration only.
 3. Do **not** require account-specific ARNs in cluster-config for the happy path.
 
-**ESO chart:** with `platformMetadata.enabled`, install SA + `ClusterSecretStore` without values `roleArn`; a Job annotates the SA from `secretsManagerRoleArn`.
+**ESO chart:** with `platformMetadata.enabled`, a Job annotates the SA from `secretsManagerRoleArn` and applies `ClusterSecretStore` with `region` from `awsRegion`. Do not hardcode `secretStore.region` or IRSA ARNs in portable recipes. Region cannot come from Secrets Manager (`{cluster}-credentials` / `{cluster}-bgp-config`) because CSS needs a region before it can call SM.
 
 **CUDN BGP chart:** Terraform secret `{cluster}-bgp-config` holds operator role ARN / region / routeServerIDs (#51). Chart ExternalSecret + apply Job consume that secret. ESO role comes from platform metadata, not from BGP values.
+
+**cluster-efs chart:** with `platformMetadata.enabled`, a sync Job writes the CSI credentials Secret and `efs-sc` StorageClass from `efsCsiRoleArn` / `efsFileSystemId`. The StorageClass sets EFS access-point `uid` / `gid` to **107** (qemu) by default (`cluster-efs` ≥ 0.5.1) so OpenShift Virtualization VM disks on RWX volumes provision without virt-handler chown failures. Do not hardcode `roleArn` / `fileSystemId` in portable recipes.
 
 ### Precedent: cert-manager / AWS PCA
 
@@ -90,7 +94,7 @@ Apps = ExternalSecrets / Jobs that consume SM + metadata
 
 ## References
 
-- Enablement: [CUDN BGP / VPC Route Server](../deployment/enablement.md#cudn-bgp--vpc-route-server)
+- Enablement: [OpenShift Virtualization](../deployment/enablement.md#openshift-virtualization)
 - Agent rules: `AGENTS.md` → Platform metadata / IRSA bootstrap
-- Route Server module: `modules/infrastructure/route-server/README.md`
+- Route Server module: [Route Server](../modules/route-server.md)
 - Bootstrap script: `scripts/cluster/bootstrap-gitops.sh` (`publish_platform_metadata`)

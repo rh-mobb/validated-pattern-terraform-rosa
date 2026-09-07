@@ -1,15 +1,17 @@
-# BGP Test Cluster Configuration
-# ROSA HCP with VPC Route Server for CUDN BGP routing operator testing
+# OpenShift Virtualization test cluster
+# ROSA HCP with metal workers, EFS RWX, VPC Route Server, and CUDN BGP
 #
 # Post-deploy (preferred, issue #51):
-# 1. enable_secrets_manager_iam + enable_route_server publish {cluster}-bgp-config to SM
-# 2. GitOps installs ESO + cudn-bgp-routing-operator with externalSecret.enabled
-# 3. Chart Job applies IRSA annotation + CUDNBgpConfig aws.* from the synced Secret
-# Manual SA annotate / hardcoded routeServerIDs in cluster-config are no longer required.
+# 1. enable_efs + enable_secrets_manager_iam + enable_route_server
+#    - EFS filesystem + EFS CSI IAM (efsCsiRoleArn / efsFileSystemId on platform metadata)
+#    - {cluster}-bgp-config in Secrets Manager for the BGP operator
+# 2. GitOps (dev/virt) installs ESO, cluster-efs, rosa-virtualization, cudn-bgp-routing-operator
+# 3. Charts bind IRSA / fileSystemId from rosa-platform-metadata (no account ARNs in git)
+# Manual SA annotate / hardcoded routeServerIDs / EFS roleArn are no longer required.
 
-cluster_name = "bgp"
+cluster_name = "virt"
 
-# Version - OCP 4.21+ required for FRR-K8s, CUDN, and RouteAdvertisements
+# Version - OCP 4.21+ required for FRR-K8s, CUDN, RouteAdvertisements, and current CNV CSV
 openshift_version = "4.22.2"
 channel           = "fast-4.22"
 
@@ -20,23 +22,30 @@ private      = false
 region       = "ap-southeast-2"
 vpc_cidr     = "10.0.0.0/16"
 
-# Multi-AZ required for BGP (one router per AZ)
+# Multi-AZ required for BGP (one router per AZ) and Virt live migration
 multi_az = true
 
 # Default worker pool — m7i.2xlarge (8 vCPU / 32 GiB) for GitOps/build headroom;
 # m5.xlarge packed out during ESO + operator image builds (Pending pods).
+# Note: these nodes do not advertise devices.kubevirt.io/kvm — schedule VMs on the
+# bgp_router metal pools below (dual-purpose BGP router + Virt compute in this recipe).
 default_instance_type = "m7i.2xlarge"
 default_min_replicas  = 1
 default_max_replicas  = 2
+
+# EFS (RWX) for OpenShift Virtualization live migration + shared VM disks
+enable_efs = true
 
 # BGP Route Server + ESO IAM (Secrets Manager secret {cluster}-bgp-config)
 enable_route_server        = true
 route_server_asn           = 64512
 enable_secrets_manager_iam = true
 
-# BGP Router Machine Pools - one baremetal node per AZ
-# Labels match the operator's routerNodeSelector (bgp_router: "true")
-# and per-AZ selectors (bgp_router_subnet, az)
+# Virt / BGP router machine pools — one baremetal node per AZ
+# Labels match the BGP operator's routerNodeSelector (bgp_router: "true")
+# and per-AZ selectors (bgp_router_subnet, az).
+# KVM (devices.kubevirt.io/kvm) is available on these metal nodes — use
+# nodeSelector bgp_router=true (or omit anti-affinity) for VM workloads.
 additional_machine_pools = {
   "bgp-router-0" = {
     subnet_index        = 0
@@ -91,19 +100,19 @@ additional_machine_pools = {
   }
 }
 
-# GitOps Bootstrap - installs OpenShift Virtualization via ArgoCD
-# Break-glass HTPasswd admin for make cluster.bgp.login (module default is false)
+# GitOps Bootstrap - Virt + EFS CSI + CUDN BGP via Argo CD
+# Break-glass HTPasswd admin for make cluster.virt.login (module default is false)
 enable_cluster_admin = true
 
 enable_gitops_bootstrap    = true
 gitops_git_repo_url        = "https://github.com/rh-mobb/rosa-cluster-config.git"
-gitops_git_path            = "dev/bgp"
+gitops_git_path            = "dev/virt"
 gitops_git_target_revision = "HEAD"
 
 # DNS
 enable_persistent_dns_domain = true
 
-# Disable features not needed for BGP testing
+# Disable features not needed for Virt / BGP testing
 enable_cert_manager_iam             = false
 enable_termination_protection       = false
 enable_cloudwatch_logging           = false

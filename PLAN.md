@@ -24,6 +24,7 @@ rosa-hcp-infrastructure/
 │       ├── cluster/            # ROSA HCP Cluster module (includes identity provider, storage, GitOps bootstrap)
 │       ├── htpasswd-idp/       # Shared HTPasswd IDP + group membership (bootstrap + break-glass)
 │       ├── bootstrap-admin/    # Short-lived bootstrap admin wrapper around htpasswd-idp (#29)
+│       ├── route-server/       # AWS VPC Route Server + CUDN BGP operator IRSA
 │       ├── bastion/            # Bastion host for private cluster access (fallback to sshuttle)
 │       └── client-vpn/        # AWS Client VPN for private cluster access (recommended)
 ├── terraform/                  # Unified Terraform configuration (shared across clusters)
@@ -36,8 +37,10 @@ rosa-hcp-infrastructure/
     │   └── terraform.tfvars   # Cluster-specific variables (network_type="public")
     ├── egress-zero/            # Example egress-zero cluster (reference)
     │   └── terraform.tfvars   # Cluster-specific variables (network_type="private", zero_egress=true)
-    └── byo-vpc/               # Example BYO VPC cluster (reference)
-        └── terraform.tfvars   # Cluster-specific variables (network_type="existing")
+    ├── byo-vpc/               # Example BYO VPC cluster (reference)
+    │   └── terraform.tfvars   # Cluster-specific variables (network_type="existing")
+    └── virt/                   # OpenShift Virtualization + EFS + CUDN BGP (reference; expensive metal)
+        └── terraform.tfvars   # enable_efs, enable_route_server, metal additional_machine_pools, GitOps dev/virt
 ```
 
 ---
@@ -332,10 +335,11 @@ When `network_type = "existing"`, the root module skips all network modules. Ins
 
 ## Step 5: Example Cluster Implementations
 
-This step creates **three example clusters** demonstrating different network topologies and security postures:
+This step creates **example clusters** demonstrating different network topologies, security postures, and optional platform features:
 
 1. **Public Cluster** (`clusters/public/`) - Development example (reference)
 2. **Egress-Zero Cluster** (`clusters/egress-zero/`) - Production-ready example with extra hardening (reference)
+3. **OpenShift Virtualization** (`clusters/virt/`) - Public multi-AZ, EFS RWX, VPC Route Server, and metal Virt/BGP routers (reference; expensive)
 
 ### 5.1 Example 1: Public Cluster (Development)
 
@@ -677,6 +681,30 @@ The egress-zero example includes:
 
 ---
 
+### 5.3.1 Example: OpenShift Virtualization (`clusters/virt/`)
+
+**Path**: `clusters/virt/` (uses `terraform/`)
+
+**Purpose**: OpenShift Virtualization on ROSA HCP with EFS RWX, AWS VPC Route Server, and the CUDN BGP routing operator ([bgp-cloud-connector](https://github.com/openshift/bgp-cloud-connector)).
+
+**Operator runbook**: [`docs/deployment/enablement.md`](docs/deployment/enablement.md#openshift-virtualization). Modules: `modules/infrastructure/route-server/`, cluster EFS in the cluster module.
+
+**Infrastructure**:
+
+- EFS filesystem + mount targets + EFS CSI IAM (`enable_efs`); GitOps `cluster-efs` publishes StorageClass `efs-sc` from platform metadata
+- VPC Route Server (Amazon-side ASN, default `64512`), 2 endpoints per private subnet, route-table propagation
+- IRSA role for `openshift-cudn-bgp-routing:openshift-cudn-bgp-routing-controller-manager`
+- Secrets Manager secret `{cluster}-bgp-config` for ESO (`enable_secrets_manager_iam = true`)
+
+**Recipe notes**:
+
+- Public multi-AZ, OCP 4.21+ (example `4.22.2` / `fast-4.22`)
+- One Intel `c5.metal` pool per AZ labeled `bgp_router=true` (no nested virt / Graviton metal)
+- GitOps path `dev/virt` installs ESO + `cluster-efs` + Virtualization + `cudn-bgp-routing-operator`
+- Tear down promptly (`make cluster.virt.destroy_force`) — three metal nodes are expensive
+
+---
+
 ### 5.4 Common Variables (`01-variables.tf`)
 
 All examples share common variable definitions:
@@ -818,7 +846,7 @@ locals {
 | 4 | Repo 1 | ~~Build `network-egress-zero` module~~ **CONSOLIDATED**: Egress-zero functionality is now part of `network-private` module | N/A |
 | 5 | Repo 1 | Build `iam` module. Use rhcs provider for account & operator roles | Terraform |
 | 6 | Repo 1 | Build `cluster` module. Reference hardened specs (Private, Encrypted) | Terraform |
-| 7 | Repo 1 | Create example clusters in `clusters/`: public (dev), egress-zero (prod-ready) | Terraform |
+| 7 | Repo 1 | Create example clusters in `clusters/`: public (dev), egress-zero (prod-ready), virt (Virtualization + Route Server) | Terraform |
 | 8 | Verify | Run end-to-end `terraform apply` for each example. Verify configurations and connectivity | CLI |
 | 9 | Future | Build Repository 2 for Bootstrap, GitOps, IDP, Logging, Monitoring | Terraform/GitOps |
 
@@ -874,6 +902,15 @@ GitOps bootstrap is integrated into the cluster module. After cluster deployment
   - Roles stay **per cluster** (OIDC trust); never share ESO/operator roles across clusters.
   - Cert-manager/awspca bootstrap `--set certManagerRole` is the precedent; platform metadata generalizes it for GitOps-managed charts.
   - Doc: [`docs/architecture/platform-metadata-irsa.md`](docs/architecture/platform-metadata-irsa.md).
+
+### VPC Route Server / CUDN BGP (`enable_route_server`)
+- **Decision**: Optional per-cluster AWS VPC Route Server plus IRSA and a Secrets Manager `{cluster}-bgp-config` payload. The Virtualization recipe (`clusters/virt`, GitOps `dev/virt`) also enables EFS RWX and installs ESO, `cluster-efs`, OpenShift Virtualization, and the CUDN BGP operator. ESO / EFS CSI bind via platform metadata; BGP runtime config comes from `{cluster}-bgp-config`.
+- **Status**: Accepted. Reference recipe: `clusters/virt/terraform.tfvars` (renamed from `clusters/bgp`).
+- **Consequences**:
+  - Intel bare metal only for BGP/Virt router pools (`c5.metal` in the example).
+  - OCP 4.21+ for FRR-K8s / CUDN / CNV.
+  - `enable_secrets_manager_iam` and `enable_efs` must be true for the ESO + EFS CSI happy path.
+  - Operator runbook: [`docs/deployment/enablement.md`](docs/deployment/enablement.md#openshift-virtualization).
 
 ### ESO Replaces AVP for Secrets Manager
 - **Decision**: Use the Red Hat External Secrets Operator (ESO) as the default integration path for AWS Secrets Manager instead of Argo CD Vault Plugin (AVP).

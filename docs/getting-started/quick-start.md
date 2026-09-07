@@ -87,6 +87,7 @@ make cluster.my-prod.apply
 | Egress-zero | `clusters/egress-zero/` | Zero egress, Client VPN |
 | BYO VPC | `clusters/byo-vpc/` | Pre-provisioned network |
 | BYO + zero egress | `clusters/byo-vpc-egress-zero/` | BYO VPC with zero egress |
+| OpenShift Virtualization | `clusters/virt/` | Metal + EFS + CUDN BGP — expensive; [enablement](../deployment/enablement.md#openshift-virtualization) |
 
 See [Cluster Configurations](../deployment/cluster-configurations.md) and [Full-Stack Prerequisites](../prerequisites/full-stack.md).
 

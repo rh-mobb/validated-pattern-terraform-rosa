@@ -1292,20 +1292,20 @@ make test            # Run all tests (recommended before commit)
 6. Cert-manager/awspca bootstrap `--set certManagerRole` is the same idea for imperative Helm; metadata generalizes it for Argo-managed charts.
 7. When adding a new chart that needs AWS account or IRSA: follow this pattern; track remaining migrations in the platform-metadata rollout GitHub issue.
 
-### VPC Route Server / CUDN BGP (`enable_route_server`)
+### VPC Route Server / OpenShift Virtualization (`enable_route_server`)
 
-Example recipe: `clusters/bgp/terraform.tfvars`. Human enablement: `docs/deployment/enablement.md` → **CUDN BGP / VPC Route Server**.
+Example recipe: `clusters/virt/terraform.tfvars`. Human enablement: `docs/deployment/enablement.md` → **OpenShift Virtualization**.
 
 **Agent deploy/teardown sequence:**
 
 ```bash
-make cluster.bgp.init && make cluster.bgp.plan && make cluster.bgp.apply
-make cluster.bgp.bootstrap
-make cluster.bgp.login
-# Preferred (#51): enable_secrets_manager_iam + ESO + cudn chart externalSecret
-#   → no hardcoded routeServerIDs / operator role ARN in cluster-config
-# Outputs for debug: bgp_config_secret_name, secrets_manager_role_arn, route_server_id, bgp_operator_role_arn
-make cluster.bgp.destroy_force   # when validation done — 3x c5.metal is expensive
+make cluster.virt.init && make cluster.virt.plan && make cluster.virt.apply
+make cluster.virt.bootstrap
+make cluster.virt.login
+# Preferred (#51): enable_efs + enable_secrets_manager_iam + ESO + cluster-efs + cudn chart externalSecret
+#   → no hardcoded routeServerIDs / operator role ARN / EFS roleArn in cluster-config
+# Outputs for debug: bgp_config_secret_name, efs_file_system_id, efs_csi_role_arn, secrets_manager_role_arn
+make cluster.virt.destroy_force   # when validation done — 3x c5.metal is expensive
 ```
 
 **Rules for agents:**
@@ -1313,14 +1313,14 @@ make cluster.bgp.destroy_force   # when validation done — 3x c5.metal is expen
 1. **Intel bare metal only** for BGP router pools when OpenShift Virtualization is required — do **not** substitute nested virt or Graviton metal for this recipe.
 2. Keep PR/recipe instance type (`c5.metal`) unless the operator explicitly asks to change it. Multi-AZ needs metal in **all** AZs used (e.g. `m5zn.metal` is missing `ap-southeast-2a`).
 3. `enable_route_server = true` creates Route Server, 2 endpoints/private subnet, route-table propagation, IRSA role for `openshift-cudn-bgp-routing-controller-manager`, and Secrets Manager secret `{cluster}-bgp-config`.
-4. Set `enable_secrets_manager_iam = true` on the BGP recipe so ESO can read that secret (issue #51).
-5. GitOps path `dev/bgp` installs ESO + Virt + `cudn-bgp-routing-operator` (builds [bgp-cloud-connector](https://github.com/openshift/bgp-cloud-connector) in-cluster) with `externalSecret` — prefer that over hardcoding role ARN / `routeServerIDs` or manual operator `make deploy`.
-6. ESO role ARN in cluster-config is still needed once (`{cluster}-rosa-secretsmanager-role-iam`); operator IRSA + `CUDNBgpConfig.aws` come from the synced Secret.
-7. Set `enable_cluster_admin = true` on the recipe for break-glass `make cluster.bgp.login`.
-8. OCP **4.21+** required (example uses 4.22.x) for FRR-K8s / CUDN / RouteAdvertisements.
+4. Set `enable_efs = true` and `enable_secrets_manager_iam = true` on the Virt recipe so EFS CSI and ESO can bind from platform metadata.
+5. GitOps path `dev/virt` installs ESO + `cluster-efs` + Virt + `cudn-bgp-routing-operator` (builds [bgp-cloud-connector](https://github.com/openshift/bgp-cloud-connector) in-cluster) with `externalSecret` — prefer that over hardcoding role ARN / `routeServerIDs` / EFS `fileSystemId`.
+6. Do **not** hardcode the ESO or EFS CSI role ARN in cluster-config — `platformMetadata.enabled` binds from `rosa-platform-metadata`. Operator IRSA + `CUDNBgpConfig.aws` come from the synced `{cluster}-bgp-config` Secret.
+7. Set `enable_cluster_admin = true` on the recipe for break-glass `make cluster.virt.login`.
+8. OCP **4.21+** required (example uses 4.22.x) for FRR-K8s / CUDN / RouteAdvertisements / current CNV CSV.
 9. **HTPasswd greenfield plan:** `modules/infrastructure/htpasswd-idp` `count` must depend only on `var.enabled`, not on `cluster_id` (unknown until apply). Gating on `cluster_id != ""` causes `Invalid count argument` on first plan with `enable_cluster_admin=true`.
 10. Long-running apply/destroy/bootstrap: follow [Long-running cluster operations](#long-running-cluster-operations-ai-operators).
-11. If apply is interrupted: check for orphan VPC/`bgp-*` IAM roles, clear stale `clusters/bgp/.infrastructure.tfstate.lock.info`, reconcile state vs AWS before re-plan/apply.
+11. If apply is interrupted: check for orphan VPC/`virt-*` IAM roles, clear stale `clusters/virt/.infrastructure.tfstate.lock.info`, reconcile state vs AWS before re-plan/apply.
 
 ## Long-running cluster operations (AI operators)
 
@@ -1594,15 +1594,21 @@ Before committing code, ensure:
 
 1. **Primary loop:** `make cluster.<profile>.bootstrap-gitea` → edit `reference/*` → `make dev.private.sync` → Argo sync (in-cluster Gitea = customer Git + Helm analogue). `bootstrap-private` is a deprecated alias.
 2. **Clone layout:** `reference/rosa-cluster-config` + `reference/validated-pattern-helm-charts` (separate git remotes; never commit into this repo).
-3. **Bootstrap still required once:** publishes `rosa-platform-metadata` — ESO charts depend on it.
-4. **Do not hardcode account ARNs** in portable cluster-config — use `platformMetadata.enabled: true` per [platform-metadata-irsa.md](docs/architecture/platform-metadata-irsa.md).
-5. **Make targets:** `make dev.private.sync`, `dev.private.sync-{config,charts}`, `dev.private.preflight`; optional `make dev.public.apply-local` (no Gitea/Argo).
-6. **PR land order** for cross-cutting GitOps: Terraform (IAM/metadata) → helm-charts → cluster-config; separate PRs per repo.
-7. **CHANGELOG scope:** Update this repo's `CHANGELOG.md` only for Terraform-repo changes; chart/cluster-config repos use their own changelogs.
-8. **Canonical merge validation:** Always run published Git + Helm Argo path before merge; local Gitea loop is for dev/demos.
-9. **Zero-egress ECR mirrors:** deferred — [#56](https://github.com/rh-mobb/validated-pattern-terraform-rosa/issues/56).
-10. **Credentials:** `clusters/<profile>/private-gitops.env` is gitignored — never commit.
-11. **Customer mapping:** Gitea → GitLab/GHE; Gitea Helm packages → Artifactory/Nexus HTTP repo.
+3. **Git hygiene (sibling remotes):** Treat helm-charts and cluster-config clones like any other GitHub repo. **Never edit or commit on `main`/`master`.** Before the first file change in either clone:
+   - `git fetch origin` and confirm `main` matches `origin/main` (`git pull --ff-only`). If the clone is **behind**, update `main` first — do not branch from a stale checkout.
+   - Working tree on `main` must be **clean** (`git status` empty). Do not pile uncommitted edits on `main`.
+   - `git checkout -b feat/<short-description>` (or that repo's branch convention), then edit, commit, and `gh pr create` **from that branch**.
+   - After committing, leave the clone on clean `main` (the work lives on the feature branch / PR). Use `git stash` or finish the commit before switching.
+   - Same rule applies to **this** Terraform repo.
+4. **Bootstrap still required once:** publishes `rosa-platform-metadata` — ESO charts depend on it.
+5. **Do not hardcode account ARNs** in portable cluster-config — use `platformMetadata.enabled: true` per [platform-metadata-irsa.md](docs/architecture/platform-metadata-irsa.md).
+6. **Make targets:** `make dev.private.sync`, `dev.private.sync-{config,charts}`, `dev.private.preflight`; optional `make dev.public.apply-local` (no Gitea/Argo).
+7. **PR land order** for cross-cutting GitOps: Terraform (IAM/metadata) → helm-charts → cluster-config; separate PRs per repo.
+8. **CHANGELOG scope:** Update this repo's `CHANGELOG.md` only for Terraform-repo changes; chart/cluster-config repos use their own changelogs.
+9. **Canonical merge validation:** Always run published Git + Helm Argo path before merge; local Gitea loop is for dev/demos.
+10. **Zero-egress ECR mirrors:** deferred — [#56](https://github.com/rh-mobb/validated-pattern-terraform-rosa/issues/56).
+11. **Credentials:** `clusters/<profile>/private-gitops.env` is gitignored — never commit.
+12. **Customer mapping:** Gitea → GitLab/GHE; Gitea Helm packages → Artifactory/Nexus HTTP repo.
 
 ### GitOps Helm chart version pins
 

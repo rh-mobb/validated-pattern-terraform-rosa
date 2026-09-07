@@ -111,6 +111,12 @@ output "secrets_manager_role_name" {
   sensitive   = false
 }
 
+output "efs_csi_role_arn" {
+  description = "ARN of the EFS CSI driver IAM role (null if enable_efs is false)"
+  value       = length(aws_iam_role.efs_csi) > 0 ? aws_iam_role.efs_csi[0].arn : null
+  sensitive   = false
+}
+
 output "external_secrets_role_arn" {
   description = "Alias of secrets_manager_role_arn for External Secrets Operator IRSA (null if enable_secrets_manager_iam is false)"
   value       = length(aws_iam_role.secrets_manager) > 0 ? aws_iam_role.secrets_manager[0].arn : null

@@ -50,7 +50,7 @@ Optional (Terraform/provider patterns — [README.md](../../README.md#developmen
 1. **Cluster exists** — `make cluster.<profile>.apply`
 2. **`enable_gitops_bootstrap = true`** in tfvars
 3. **Reference clones** — see [Workspace layout](#workspace-layout)
-4. **`gitops_git_path`** in tfvars matches a path under `reference/rosa-cluster-config/` (e.g. `dev/bgp`)
+4. **`gitops_git_path`** in tfvars matches a path under `reference/rosa-cluster-config/` (e.g. `dev/virt` for the [Virtualization recipe](../deployment/enablement.md#openshift-virtualization))
 5. **Logged in** — `make cluster.<profile>.login`
 
 ---
@@ -173,31 +173,44 @@ Each repo is a **separate git remote** under `reference/` — commit and push in
 
 ## Commit and PR choreography
 
+These clones are **separate GitHub remotes**. Never edit them while checked out on `main`. Fetch and fast-forward `main` first so you do not branch from a stale or dirty tree.
+
+```bash
+cd reference/<repo>
+git fetch origin
+git checkout main
+git pull --ff-only
+git status   # must be clean
+git checkout -b feat/<short-description>
+```
+
 ### Helm charts repo
 
 ```bash
 cd reference/validated-pattern-helm-charts
-git checkout -b feat/my-chart-change
+# clean main + feature branch (see above)
 helm lint charts/<name>
 git commit -am "feat(<chart>): describe change"
 git push -u origin feat/my-chart-change
 gh pr create ...
+git checkout main   # leave main clean; work stays on the branch
 ```
 
 ### cluster-config repo
 
 ```bash
 cd reference/rosa-cluster-config
-git checkout -b dev/<cluster>-my-feature
+# clean main + feature branch (see above)
 git commit -am "feat(<cluster>): adjust infrastructure"
-git push -u origin dev/<cluster>-my-feature
+git push -u origin feat/<cluster>-my-feature
 gh pr create ...
+git checkout main
 ```
 
 Point Terraform at your branch for canonical validation:
 
 ```hcl
-gitops_git_target_revision = "dev/<cluster>-my-feature"
+gitops_git_target_revision = "feat/<cluster>-my-feature"
 ```
 
 ### This repo (Terraform)

@@ -12,7 +12,7 @@ This script bootstraps the OpenShift GitOps operator on a ROSA HCP cluster using
 - **Ephemeral kubeconfigs (#45)**: All `oc`/`helm` calls use process-local `KUBECONFIG` files under a `mktemp` directory (deleted on exit). The script does **not** write to `~/.kube/config` or `clusters/<name>/`, so concurrent bootstrap runs and other terminals cannot steal the context mid-flight.
 - **Spoke → hub login (interim)**: `ACM_MODE=spoke` requires `HUB_CREDENTIALS_SECRET` — the hub **break-glass admin** secret (`enable_cluster_admin = true` on the hub). Durable decoupling is tracked in [#48](https://github.com/rh-mobb/validated-pattern-terraform-rosa/issues/48).
 - **ACM readiness wait (#45)**: Before hub-registration, spoke bootstrap polls for ManagedCluster CRDs **and** `ocm-webhook` endpoints in `multicluster-engine`. CRDs can exist while the admission webhook still has no endpoints; applying registration too early fails.
-- **Platform metadata ConfigMap**: After GitOps install, publishes `openshift-gitops/rosa-platform-metadata` (`secretsManagerRoleArn`, account/region, optional BGP/cert-manager keys) so ESO and other charts bind IRSA without hardcoding account ARNs in cluster-config. See [platform-metadata-irsa.md](../../docs/architecture/platform-metadata-irsa.md).
+- **Platform metadata ConfigMap**: After GitOps install, publishes `openshift-gitops/rosa-platform-metadata` (`secretsManagerRoleArn`, account/region, optional BGP / cert-manager / EFS CSI keys) so ESO, `cluster-efs`, and other charts bind IRSA without hardcoding account ARNs in cluster-config. See [platform-metadata-irsa.md](../../docs/architecture/platform-metadata-irsa.md).
 
 ## Prerequisites
 
