@@ -127,6 +127,16 @@ check "external_auth_cluster_admin_conflict" {
   }
 }
 
+check "oidc_client_secret_coverage" {
+  assert {
+    condition = alltrue([
+      for k, v in var.oidc_identity_providers :
+      contains(nonsensitive(keys(var.oidc_client_secrets)), k) || v.client_secret_secret_id != null
+    ])
+    error_message = "Every oidc_identity_providers entry must have a client secret via oidc_client_secrets[key] or client_secret_secret_id."
+  }
+}
+
 # Generate random suffix for resource naming (reusable across multiple modules)
 # This ensures consistency - all resources from the same cluster share the same suffix
 # Persists through sleep operation (not gated by persists_through_sleep)

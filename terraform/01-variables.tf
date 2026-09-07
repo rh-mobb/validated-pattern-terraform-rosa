@@ -434,18 +434,24 @@ variable "external_auth_providers_enabled" {
 variable "oidc_identity_providers" {
   description = <<-EOT
     Generic OpenID Connect identity providers for the built-in OpenShift OAuth
-    server. Map keys are stable Terraform identities. client_secret_secret_id
-    names an AWS Secrets Manager secret whose complete SecretString is the OIDC
-    client secret; the resolved value is sensitive and remains in Terraform
-    state. RHCS 1.7.7 requires a broad lifecycle workaround that hides changes
-    to ca, client_id, client_secret, issuer, extra_scopes,
-    extra_authorize_parameters, and claims; replace the affected resource when
-    any member changes. Leave the map empty when no provider is required.
+    server. Map keys are stable Terraform identities. The client secret can be
+    supplied in two ways (checked in this order):
+    1. oidc_client_secrets[key] — direct value via the companion variable,
+       typically injected as TF_VAR_oidc_client_secrets.
+    2. client_secret_secret_id — an AWS Secrets Manager secret name/ID whose
+       complete SecretString is the OIDC client secret.
+    At least one must be provided per entry. When both are set, the direct
+    value wins and the Secrets Manager lookup is skipped. Either way the
+    resolved value is sensitive and remains in Terraform state. RHCS 1.7.7
+    requires a broad lifecycle workaround that hides changes to ca, client_id,
+    client_secret, issuer, extra_scopes, extra_authorize_parameters, and
+    claims; replace the affected resource when any member changes. Leave the
+    map empty when no provider is required.
   EOT
   type = map(object({
     name                       = string
     client_id                  = string
-    client_secret_secret_id    = string
+    client_secret_secret_id    = optional(string)
     issuer                     = string
     mapping_method             = optional(string, "claim")
     ca                         = optional(string)
@@ -476,6 +482,14 @@ variable "oidc_identity_providers" {
     ])
     error_message = "Every OIDC issuer must use HTTPS and contain no query string or fragment."
   }
+}
+
+variable "oidc_client_secrets" {
+  description = "Direct OIDC client secrets keyed by the same map keys used in oidc_identity_providers. Takes priority over client_secret_secret_id (AWS Secrets Manager). Inject via TF_VAR_oidc_client_secrets to keep secrets out of tfvars."
+  type        = map(string)
+  default     = {}
+  sensitive   = true
+  nullable    = false
 }
 
 variable "enable_bootstrap_admin_user" {

@@ -11,34 +11,30 @@ resource cardinality before the cluster id exists.
 
 ## Entra ID example
 
-Create the confidential-client secret in AWS Secrets Manager before planning.
-Store only its locator in tfvars. The AWS provider reads the complete
-SecretString as the client secret.
+The client secret can be supplied two ways (checked in this order):
+
+1. **Environment variable** via `oidc_client_secrets` — a companion map keyed
+   by provider key. Inject as `TF_VAR_oidc_client_secrets='{"entra":"<secret>"}'`.
+   Simplest for development and CI.
+2. **AWS Secrets Manager** via `client_secret_secret_id` in the provider entry —
+   a locator whose SecretString is resolved at plan time. Preferred for
+   production.
+
+At least one must be provided per entry. When both are set, the direct value
+wins and the Secrets Manager lookup is skipped.
+
+### Option A: AWS Secrets Manager (production)
+
+Create the secret in AWS Secrets Manager first, then reference it by name.
 
 ```hcl
-# Purpose: attach an Entra OpenID registration to built-in OpenShift OAuth.
-# What this is not: the locator avoids a secret literal in source; it does not
-# keep the resolved secret out of Terraform state.
-# Prerequisites: external auth disabled, an HTTPS Entra issuer, a registered
-# confidential web client, and an encrypted owner-restricted state backend.
-# Authoritative references:
-# - https://learn.microsoft.com/en-us/entra/identity-platform/v2-protocols-oidc
-# - https://registry.terraform.io/providers/terraform-redhat/rhcs/1.7.7/docs/resources/identity_provider
-# Covers: external_auth_providers_enabled, oidc_identity_providers, entra, name, client_id, client_secret_secret_id, issuer, mapping_method, extra_scopes, claims, email, preferred_username, groups
-# Does: Configures one Entra registration and the claim fallbacks OpenShift reads.
-# Why: Explicit values make identity mapping and secret custody reviewable before apply.
-# Change: `claim` refuses automatic attachment; use `add` only for an intentional identity merge.
-# Trap: the `groups` claim needs app configuration and disappears above the overage limit.
-# Evidence: https://learn.microsoft.com/en-us/entra/identity/hybrid/connect/how-to-connect-fed-group-claims
-# Omission: an empty map creates no identity provider; omitted optional claim
-# lists do not populate those OpenShift user fields.
 external_auth_providers_enabled = false
 
 oidc_identity_providers = {
   entra = {
     name                    = "entra-id"
     client_id               = "<application-client-id>"
-    client_secret_secret_id = "<secrets-manager-secret-id>"
+    client_secret_secret_id = "<secrets-manager-secret-name-or-arn>"
     issuer                  = "https://login.microsoftonline.com/<tenant-id>/v2.0"
     mapping_method          = "claim"
     extra_scopes            = ["email", "profile"]
@@ -50,6 +46,35 @@ oidc_identity_providers = {
     }
   }
 }
+```
+
+### Option B: Environment variable (development / CI)
+
+Omit `client_secret_secret_id` and inject the secret via env var instead.
+
+```hcl
+# terraform.tfvars — no secret values
+external_auth_providers_enabled = false
+
+oidc_identity_providers = {
+  entra = {
+    name         = "entra-id"
+    client_id    = "<application-client-id>"
+    issuer       = "https://login.microsoftonline.com/<tenant-id>/v2.0"
+    extra_scopes = ["email", "profile"]
+    claims = {
+      email              = ["email"]
+      name               = ["name"]
+      preferred_username = ["preferred_username", "upn"]
+      groups             = ["groups"]
+    }
+  }
+}
+```
+
+```bash
+# inject the secret at plan/apply time
+export TF_VAR_oidc_client_secrets='{"entra":"<client-secret-value>"}'
 ```
 
 The provider organization's reference ROSA HCP module independently uses the
@@ -186,12 +211,17 @@ curl -sS "https://<keycloak-host>/realms/<realm-name>/.well-known/openid-configu
 
 ## Secret custody
 
-`client_secret_secret_id` is a locator, not a secret value. The caller needs
-`secretsmanager:GetSecretValue` for that exact secret. The resolved
-SecretString enters the RHCS resource and Terraform state. Encrypt the state
-backend, restrict state and backup readers, and rotate the client secret after
-any suspected state disclosure. This pattern does not provide write-only
-provider arguments.
+Whether the client secret arrives via `oidc_client_secrets` (env var) or an
+AWS Secrets Manager lookup (`client_secret_secret_id`), the resolved value
+enters the RHCS resource and Terraform state. Encrypt the state backend,
+restrict state and backup readers, and rotate the client secret after any
+suspected state disclosure. This pattern does not provide write-only provider
+arguments.
+
+When using Secrets Manager, `client_secret_secret_id` is a locator, not a
+secret value. The caller needs `secretsmanager:GetSecretValue` for that exact
+secret. When using `oidc_client_secrets`, inject via
+`TF_VAR_oidc_client_secrets` — never commit secret values to tfvars.
 
 ## Entra group claims
 
