@@ -1,15 +1,15 @@
 # Cluster Configurations
 
-This directory contains cluster-specific Terraform configurations for ROSA HCP clusters. Each directory under `/clusters/` represents a single cluster. The `public` and `egress-zero` directories are reference examples.
+This directory contains cluster-specific Terraform configurations for ROSA HCP clusters. Each directory under `/clusters/` represents a single cluster. Reference examples include `public`, `egress-zero`, `byo-vpc`, `byo-vpc-egress-zero`, and `virt`.
 
 ## RHCS API Authentication
 
 Set RHCS credentials **before** using any `make` or Terraform commands. This project does not manage credentials.
 
-- **Option 1 (Token):** `export RHCS_TOKEN="your-offline-token"` — Get token from https://console.redhat.com/openshift/token/rosa/show
-- **Option 2 (Service account):** `export RHCS_CLIENT_ID="..."` and `export RHCS_CLIENT_SECRET="..."` — Create in Red Hat Hybrid Cloud Console → User Management → Service accounts
+- **Option 1 (Token):** Set `RHCS_TOKEN` from https://console.redhat.com/openshift/token/rosa/show
+- **Option 2 (Service account):** Set `RHCS_CLIENT_ID` and `RHCS_CLIENT_SECRET` from Red Hat Hybrid Cloud Console → User Management → Service accounts
 
-See [README.md](../README.md#rhcs-api-authentication) for full documentation.
+See [Authentication](../docs/getting-started/authentication.md) for full documentation.
 
 ## Directory Structure
 
@@ -23,24 +23,13 @@ clusters/
 │   └── terraform.tfvars                  # Cluster-specific variables
 ├── byo-vpc-egress-zero/                  # Example BYO VPC + zero egress
 │   └── terraform.tfvars
-├── bgp/                                  # VPC Route Server + CUDN BGP (metal routers)
+├── virt/                                 # OpenShift Virtualization + EFS + CUDN BGP (metal)
 │   └── terraform.tfvars
 ├── egress-zero2/                         # Additional egress-zero cluster (example)
 └── us-east-1-production/                 # Additional cluster (example)
 ```
 
-Each directory under `/clusters/` represents a single cluster. The `public`, `egress-zero`, `byo-vpc`, and `bgp` directories are reference examples. You can create additional clusters by creating new directories at the same level.
-
-### BGP / Route Server (`clusters/bgp/`)
-
-Provisions AWS VPC Route Server and IRSA for the CUDN BGP routing operator, plus multi-AZ Intel bare-metal worker pools for OpenShift Virtualization. See [CUDN BGP / VPC Route Server](../docs/deployment/enablement.md#cudn-bgp--vpc-route-server) and [modules/infrastructure/route-server/README.md](../modules/infrastructure/route-server/README.md).
-
-```bash
-make cluster.bgp.init && make cluster.bgp.plan && make cluster.bgp.apply
-make cluster.bgp.bootstrap
-# Tear down promptly — 3× c5.metal is expensive
-make cluster.bgp.destroy_force
-```
+Each directory under `/clusters/` represents a single cluster. The directories listed above are copy-paste recipes, not exclusive topologies. You can create additional clusters by creating new directories at the same level.
 
 ## Cluster Types
 
@@ -141,9 +130,41 @@ make cluster.my-byo-cluster.apply
 
 **Usage with your own IaC:** Create VPC, subnets (with ROSA tags), VPC endpoints, and NAT gateways, then provide the IDs in `terraform.tfvars` as above.
 
+<a id="openshift-virtualization-clustersvirt"></a>
+<a id="bgp-route-server-clustersbgp"></a>
+<a id="bgp--route-server-clustersbgp"></a>
+
+### OpenShift Virtualization (`clusters/virt/`)
+
+Public multi-AZ ROSA HCP for OpenShift Virtualization: Intel metal workers, EFS RWX (`efs-sc`), AWS VPC Route Server, and IRSA for the [CUDN BGP routing operator](https://github.com/openshift/bgp-cloud-connector).
+
+This is a **feature recipe** on a public network, not a separate network topology. Full deploy, GitOps/ESO/EFS wiring, validation, and teardown: [OpenShift Virtualization](../docs/deployment/enablement.md#openshift-virtualization). Module reference: [Route Server](../docs/modules/route-server.md).
+
+**Characteristics:**
+
+- `enable_efs = true` plus `enable_secrets_manager_iam = true` (platform metadata publishes `efsCsiRoleArn` / `efsFileSystemId`)
+- `enable_route_server = true` (ESO reads `{cluster}-bgp-config`)
+- OCP **4.21+** (example pins `4.22.2` / `fast-4.22`) for FRR-K8s / CUDN / CNV
+- One `c5.metal` pool per AZ labeled `bgp_router=true` (nested virt and Graviton metal are not supported for this path). Metal nodes advertise KVM and host VM workloads; default workers do not
+- Default workers `m7i.2xlarge` for GitOps / in-cluster operator builds (no KVM — do not schedule VMs here)
+- GitOps path `dev/virt` installs ESO, `cluster-efs` (≥ 0.5.1: `efs-sc` uid/gid 107 for VM disks), OpenShift Virtualization, and `cudn-bgp-routing-operator`
+- `enable_cluster_admin = true` for `make cluster.virt.login`
+
+**Cost warning:** Three `c5.metal` nodes in `ap-southeast-2` are ~$16/hr on-demand. Tear down promptly after validation.
+
+```bash
+make cluster.virt.init && make cluster.virt.plan && make cluster.virt.apply
+make cluster.virt.bootstrap
+make cluster.virt.login
+# Optional: EFS RWX live-migration smoke test (requires cluster-efs >= 0.5.1)
+./scripts/cluster/test-virt-efs-live-migrate.sh
+# Tear down promptly — 3× c5.metal is expensive
+make cluster.virt.destroy_force
+```
+
 ## Creating a New Cluster
 
-1. **Choose a cluster type**: `public`, `egress-zero`, or `byo-vpc`
+1. **Choose a cluster type**: `public`, `egress-zero`, `byo-vpc`, or `virt` (metal Virtualization — expensive)
 
 2. **Create cluster directory**:
    ```bash
@@ -186,6 +207,8 @@ make cluster.my-byo-cluster.apply
 | VPN Tunnel Required | No | No | Yes | No (unless private) |
 | Use Case | Development/Testing | Production (private API) | Production (high security) | Existing network / multi-team |
 
+`clusters/virt` is a public-network recipe (`network_type = "public"`) with metal Virtualization, EFS, and Route Server. See <a href="#openshift-virtualization-clustersvirt">OpenShift Virtualization</a> rather than treating it as a fourth network type.
+
 ## Configuration Files
 
 ### `terraform.tfvars`
@@ -198,6 +221,8 @@ Contains cluster-specific variables:
 - `region`: AWS region
 - `vpc_cidr`: VPC CIDR block
 - `multi_az`: Multi-AZ deployment (true/false)
+- `enable_route_server` / `route_server_asn`: VPC Route Server + CUDN BGP IRSA (see <a href="#openshift-virtualization-clustersvirt"><code>clusters/virt</code></a>)
+- `enable_efs`: EFS filesystem + CSI IAM (GitOps `cluster-efs` publishes StorageClass `efs-sc`)
 - `instance_type`: EC2 instance type for worker nodes
 - KMS encryption (optional): `ebs_kms_key_arn`, `efs_kms_key_arn`, `etcd_kms_key_arn`, `etcd_encryption` — external KMS keys must be tagged `red-hat = "true"`
 - Production variables (version pinning, etc.) - typically used with egress-zero
@@ -265,7 +290,7 @@ For CI/CD pipelines, you can call scripts directly without Make:
 # All operations are handled through infrastructure scripts
 ```
 
-See [scripts/README.md](../scripts/README.md) for complete script documentation and CI/CD examples.
+See [Scripts](../docs/operations/scripts.md) for complete script documentation and CI/CD examples.
 
 ## Egress-Zero Specific Notes
 
@@ -337,6 +362,7 @@ If you need to access infrastructure outputs:
 
 ## See Also
 
-- [Main README](../README.md) - Project overview and architecture
-- [PLAN.md](../PLAN.md) - Implementation plan and architecture decisions
-- [Network Module Documentation](../modules/infrastructure/network-private/README.md) - Network module details
+- [Documentation home](../docs/index.md) — project overview
+- [Enablement Guide](../docs/deployment/enablement.md) — adoption path, including [OpenShift Virtualization](../docs/deployment/enablement.md#openshift-virtualization)
+- [Network (Private) module](../docs/modules/network-private.md)
+- [Route Server (BGP) module](../docs/modules/route-server.md)
