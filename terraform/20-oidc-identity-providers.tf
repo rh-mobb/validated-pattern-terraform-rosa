@@ -23,17 +23,17 @@ locals {
 
 data "aws_secretsmanager_secret_version" "oidc_identity_provider" {
   # Only look up secrets for entries not covered by oidc_client_secrets.
-  for_each = {
+  for_each = var.persists_through_sleep ? {
     for k, v in var.oidc_identity_providers : k => v
     if !contains(local.oidc_direct_secret_keys, k)
-  }
+  } : {}
 
   secret_id = each.value.client_secret_secret_id
 }
 
 module "oidc_identity_provider" {
   source   = "../modules/infrastructure/oidc-idp"
-  for_each = var.oidc_identity_providers
+  for_each = var.persists_through_sleep ? var.oidc_identity_providers : {}
 
   # The cluster output is intentionally inside the module body. Terraform can
   # order creation even when this value is unknown during a greenfield plan.

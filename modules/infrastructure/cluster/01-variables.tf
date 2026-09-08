@@ -19,7 +19,7 @@ variable "vpc_id" {
   validation {
     # When persists_through_sleep is true, resource will be created (count = 1), so vpc_id must not be null
     # When persists_through_sleep is false, resource won't be created (count = 0), so vpc_id can be null
-    condition     = (var.persists_through_sleep_cluster != null ? var.persists_through_sleep_cluster : var.persists_through_sleep) == true ? var.vpc_id != null : true
+    condition     = var.persists_through_sleep == true ? var.vpc_id != null : true
     error_message = "vpc_id must not be null when persists_through_sleep is true (resource will be created)."
   }
 }
@@ -36,7 +36,7 @@ variable "installer_role_arn" {
   nullable    = true
 
   validation {
-    condition     = (var.persists_through_sleep_cluster != null ? var.persists_through_sleep_cluster : var.persists_through_sleep) == true ? var.installer_role_arn != null : true
+    condition     = var.persists_through_sleep == true ? var.installer_role_arn != null : true
     error_message = "installer_role_arn must not be null when persists_through_sleep is true (resource will be created)."
   }
 }
@@ -47,7 +47,7 @@ variable "support_role_arn" {
   nullable    = true
 
   validation {
-    condition     = (var.persists_through_sleep_cluster != null ? var.persists_through_sleep_cluster : var.persists_through_sleep) == true ? var.support_role_arn != null : true
+    condition     = var.persists_through_sleep == true ? var.support_role_arn != null : true
     error_message = "support_role_arn must not be null when persists_through_sleep is true (resource will be created)."
   }
 }
@@ -58,7 +58,7 @@ variable "worker_role_arn" {
   nullable    = true
 
   validation {
-    condition     = (var.persists_through_sleep_cluster != null ? var.persists_through_sleep_cluster : var.persists_through_sleep) == true ? var.worker_role_arn != null : true
+    condition     = var.persists_through_sleep == true ? var.worker_role_arn != null : true
     error_message = "worker_role_arn must not be null when persists_through_sleep is true (resource will be created)."
   }
 }
@@ -67,14 +67,14 @@ variable "oidc_config_id" {
   description = "OIDC configuration ID from IAM module (null when persists_through_sleep is false, but OIDC is never gated)"
   type        = string
   nullable    = true
-  # Note: OIDC is never gated by persists_through_sleep, but may be null if IAM module has persists_through_sleep_iam = false
+  # Note: OIDC is never gated by persists_through_sleep, but may be null if IAM module has keep_iam_on_sleep is false
 }
 
 variable "oidc_endpoint_url" {
   description = "OIDC endpoint URL from IAM module (null when persists_through_sleep is false, but OIDC is never gated)"
   type        = string
   nullable    = true
-  # Note: OIDC is never gated by persists_through_sleep, but may be null if IAM module has persists_through_sleep_iam = false
+  # Note: OIDC is never gated by persists_through_sleep, but may be null if IAM module has keep_iam_on_sleep is false
 }
 
 # Cluster Configuration Variables (with organizational defaults)
@@ -86,7 +86,7 @@ variable "availability_zones" {
   default     = []
 
   validation {
-    condition     = (var.persists_through_sleep_cluster != null ? var.persists_through_sleep_cluster : var.persists_through_sleep) == true ? length(var.availability_zones) > 0 : true
+    condition     = var.persists_through_sleep == true ? length(var.availability_zones) > 0 : true
     error_message = "availability_zones must not be empty when persists_through_sleep is true (resource will be created)."
   }
 }
@@ -185,7 +185,7 @@ variable "private_subnet_ids" {
   nullable    = false
 
   validation {
-    condition     = (var.persists_through_sleep_cluster != null ? var.persists_through_sleep_cluster : var.persists_through_sleep) == true ? length(var.private_subnet_ids) > 0 : true
+    condition     = var.persists_through_sleep == true ? length(var.private_subnet_ids) > 0 : true
     error_message = "private_subnet_ids must not be empty when persists_through_sleep is true (resource will be created)."
   }
 }
@@ -351,13 +351,6 @@ variable "persists_through_sleep" {
   type        = bool
   default     = true
   nullable    = false
-}
-
-variable "persists_through_sleep_cluster" {
-  description = "Override persists_through_sleep for cluster resources. If null, uses persists_through_sleep value. Allows sleeping cluster while preserving other resources."
-  type        = bool
-  default     = null
-  nullable    = true
 }
 
 variable "api_endpoint_allowed_cidrs" {

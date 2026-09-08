@@ -1,6 +1,5 @@
 locals {
-  # Determine if cluster persists/is active (use override if provided, else global)
-  persists_through_sleep = var.persists_through_sleep_network != null ? var.persists_through_sleep_network : var.persists_through_sleep
+  persists_through_sleep = var.persists_through_sleep || var.keep_network_on_sleep
 
   # Determine number of AZs based on multi_az
   # Reference: https://github.com/rh-mobb/terraform-rosa/blob/main/modules/terraform-rosa-networking/data.tf

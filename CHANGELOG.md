@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`persists_through_sleep` simplified and fixed**: Replaced three nullable override variables (`persists_through_sleep_cluster`, `persists_through_sleep_network`, `persists_through_sleep_iam`) with two simple booleans (`keep_network_on_sleep`, `keep_iam_on_sleep`) that only apply when sleeping. Cluster always follows the global `persists_through_sleep`. Fixes:
+  - `enable_identity_provider`, `create_cluster_credentials_secret`, and `additional_machine_pools_resolved` now correctly gated by `persists_through_sleep`
+  - OIDC identity provider module (`terraform/20-oidc-identity-providers.tf`) was not gated by sleep at all — caused null cluster_id errors during sleep
+  - Bastion, client VPN, and route server modules now use resolved network sleep value
+  - Control plane log forwarding infrastructure (CloudWatch log group, S3 bucket, bucket policy, versioning, encryption, lifecycle) was not gated by sleep
+  - Control plane log forwarding IAM role and policies were not gated by sleep
+  - Cluster credentials secret shell was not gated by sleep (secret version was already gated)
+
 ### Added
 - **Plan-safe cluster-admin lifecycle**: make the long-lived HTPasswd
   administrator and its credentials secret follow explicit caller intent, so

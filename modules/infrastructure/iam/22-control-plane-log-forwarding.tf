@@ -10,9 +10,8 @@
 # IAM Role for Control Plane Log Forwarding
 # Role name must include "CustomerLogDistribution" as per ROSA documentation
 # ROSA's central log distribution role assumes this role to forward logs
-# Persists through sleep operation (not gated by persists_through_sleep)
 resource "aws_iam_role" "control_plane_log_forwarding" {
-  count = var.enable_control_plane_log_forwarding ? 1 : 0
+  count = local.persists_through_sleep && var.enable_control_plane_log_forwarding ? 1 : 0
 
   # IMPORTANT: ROSA requires the role name to START with "CustomerLogDistribution"
   # per the documented prefix pattern: arn:aws:iam::*:role/CustomerLogDistribution-*
@@ -34,19 +33,17 @@ resource "aws_iam_role" "control_plane_log_forwarding" {
   })
 
   tags = merge(local.common_tags, {
-    Name                   = "CustomerLogDistribution-${var.cluster_name}"
-    Purpose                = "ControlPlaneLogForwarding"
-    ManagedBy              = "Terraform"
-    persists_through_sleep = "true"
+    Name      = "CustomerLogDistribution-${var.cluster_name}"
+    Purpose   = "ControlPlaneLogForwarding"
+    ManagedBy = "Terraform"
   })
 }
 
 # CloudWatch IAM Policy for Control Plane Log Forwarding
 # Grants permissions to write logs to CloudWatch log group
 # Uses constructed ARN pattern to avoid circular dependency (log group created in cluster module)
-# Persists through sleep operation (not gated by persists_through_sleep)
 resource "aws_iam_policy" "control_plane_log_forwarding_cloudwatch" {
-  count = var.enable_control_plane_log_forwarding && var.control_plane_log_cloudwatch_enabled ? 1 : 0
+  count = local.persists_through_sleep && var.enable_control_plane_log_forwarding && var.control_plane_log_cloudwatch_enabled ? 1 : 0
 
   name        = "${var.cluster_name}-rosa-control-plane-log-forwarding-cloudwatch"
   path        = "/"
@@ -79,17 +76,15 @@ resource "aws_iam_policy" "control_plane_log_forwarding_cloudwatch" {
   })
 
   tags = merge(local.common_tags, {
-    Name                   = "${var.cluster_name}-rosa-control-plane-log-forwarding-cloudwatch-policy"
-    Purpose                = "ControlPlaneLogForwarding"
-    ManagedBy              = "Terraform"
-    persists_through_sleep = "true"
+    Name      = "${var.cluster_name}-rosa-control-plane-log-forwarding-cloudwatch-policy"
+    Purpose   = "ControlPlaneLogForwarding"
+    ManagedBy = "Terraform"
   })
 }
 
 # Attach CloudWatch policy to the role
-# Persists through sleep operation (not gated by persists_through_sleep)
 resource "aws_iam_role_policy_attachment" "control_plane_log_forwarding_cloudwatch" {
-  count = var.enable_control_plane_log_forwarding && var.control_plane_log_cloudwatch_enabled ? 1 : 0
+  count = local.persists_through_sleep && var.enable_control_plane_log_forwarding && var.control_plane_log_cloudwatch_enabled ? 1 : 0
 
   role       = aws_iam_role.control_plane_log_forwarding[0].name
   policy_arn = aws_iam_policy.control_plane_log_forwarding_cloudwatch[0].arn

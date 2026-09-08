@@ -18,25 +18,25 @@ output "oidc_provider_arn" {
 }
 
 output "installer_role_arn" {
-  description = "ARN of the Installer account role (null if persists_through_sleep_iam is false)"
+  description = "ARN of the Installer account role (null if sleeping)"
   value       = length(module.account_roles) > 0 ? local.installer_role_arn : null
   sensitive   = false
 }
 
 output "support_role_arn" {
-  description = "ARN of the Support account role (null if persists_through_sleep_iam is false)"
+  description = "ARN of the Support account role (null if sleeping)"
   value       = length(module.account_roles) > 0 ? local.support_role_arn : null
   sensitive   = false
 }
 
 output "worker_role_arn" {
-  description = "ARN of the Worker account role (null if persists_through_sleep_iam is false)"
+  description = "ARN of the Worker account role (null if sleeping)"
   value       = length(module.account_roles) > 0 ? local.worker_role_arn : null
   sensitive   = false
 }
 
 output "operator_role_arns" {
-  description = "Map of operator role names to ARNs. Operator roles are created by the operator-roles module and referenced by prefix in the cluster. (null if persists_through_sleep_iam is false)"
+  description = "Map of operator role names to ARNs. Operator roles are created by the operator-roles module and referenced by prefix in the cluster. (null if sleeping)"
   value = length(module.operator_roles) > 0 ? {
     # Operator roles are created by the operator-roles module using substr({prefix}-{namespace}-{operator_name}, 0, 64)
     ingress        = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:role/${substr("${local.operator_role_prefix_final}-openshift-ingress-operator-cloud-credentials", 0, 64)}"

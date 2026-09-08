@@ -45,11 +45,11 @@ variable "persists_through_sleep" {
   nullable    = false
 }
 
-variable "persists_through_sleep_iam" {
-  description = "Override persists_through_sleep for IAM resources. If null, uses persists_through_sleep value. Allows sleeping IAM roles while preserving OIDC configuration for reuse across clusters."
+variable "keep_iam_on_sleep" {
+  description = "Keep IAM roles and policies alive when persists_through_sleep is false. Avoids role recreation delays on wake. Has no effect when persists_through_sleep is true."
   type        = bool
-  default     = null
-  nullable    = true
+  default     = false
+  nullable    = false
 }
 
 # KMS configuration

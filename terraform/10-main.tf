@@ -12,9 +12,9 @@ module "network_public" {
   multi_az    = var.multi_az
   # subnet_cidr_size is automatically calculated based on VPC CIDR and number of subnets
 
-  tags                           = local.tags
-  persists_through_sleep         = var.persists_through_sleep
-  persists_through_sleep_network = var.persists_through_sleep_network
+  tags                   = local.tags
+  persists_through_sleep = var.persists_through_sleep
+  keep_network_on_sleep  = var.keep_network_on_sleep
 }
 
 module "network_private" {
@@ -35,9 +35,9 @@ module "network_private" {
 
   custom_permissions_boundary_arn = var.custom_permissions_boundary_arn
 
-  tags                           = local.tags
-  persists_through_sleep         = var.persists_through_sleep
-  persists_through_sleep_network = var.persists_through_sleep_network
+  tags                   = local.tags
+  persists_through_sleep = var.persists_through_sleep
+  keep_network_on_sleep  = var.keep_network_on_sleep
 }
 
 # Data sources for BYO VPC (network_type = "existing") - look up subnets to derive AZs and CIDRs
@@ -60,6 +60,11 @@ data "aws_route_table" "existing_private" {
 data "aws_route_table" "existing_public" {
   count     = var.network_type == "existing" ? length(coalesce(var.existing_public_subnet_ids, [])) : 0
   subnet_id = coalesce(var.existing_public_subnet_ids, [])[count.index]
+}
+
+locals {
+  effective_persists_network = var.persists_through_sleep || var.keep_network_on_sleep
+  effective_persists_iam     = var.persists_through_sleep || var.keep_iam_on_sleep
 }
 
 # Create a normalized network object from the active network source.
@@ -175,13 +180,13 @@ locals {
 module "iam" {
   source = "../modules/infrastructure/iam"
 
-  cluster_name               = var.cluster_name
-  account_role_prefix        = var.cluster_name # No trailing dash - account-iam-resources module adds it
-  operator_role_prefix       = var.cluster_name # No trailing dash - operator-roles module adds it
-  zero_egress                = var.zero_egress  # Pass directly - IAM needs ECR policy when zero_egress is enabled (independent of network_type)
-  tags                       = local.tags
-  persists_through_sleep     = var.persists_through_sleep
-  persists_through_sleep_iam = var.persists_through_sleep_iam
+  cluster_name           = var.cluster_name
+  account_role_prefix    = var.cluster_name # No trailing dash - account-iam-resources module adds it
+  operator_role_prefix   = var.cluster_name # No trailing dash - operator-roles module adds it
+  zero_egress            = var.zero_egress  # Pass directly - IAM needs ECR policy when zero_egress is enabled (independent of network_type)
+  tags                   = local.tags
+  persists_through_sleep = var.persists_through_sleep
+  keep_iam_on_sleep      = var.keep_iam_on_sleep
 
   # KMS configuration
   enable_storage          = true
@@ -228,16 +233,15 @@ module "cluster" {
   # Subnet selection - pass private and public separately, cluster module will concatenate
   # Public clusters use both private and public subnets
   # Private and egress-zero clusters use only private subnets
-  private_subnet_ids             = local.network.private_subnet_ids
-  public_subnet_ids              = coalesce(local.network.public_subnet_ids, [])
-  installer_role_arn             = module.iam.installer_role_arn
-  support_role_arn               = module.iam.support_role_arn
-  worker_role_arn                = module.iam.worker_role_arn
-  oidc_config_id                 = module.iam.oidc_config_id    # OIDC is never gated
-  oidc_endpoint_url              = module.iam.oidc_endpoint_url # OIDC is never gated
-  enable_persistent_dns_domain   = var.enable_persistent_dns_domain
-  persists_through_sleep         = var.persists_through_sleep
-  persists_through_sleep_cluster = var.persists_through_sleep_cluster
+  private_subnet_ids           = local.network.private_subnet_ids
+  public_subnet_ids            = coalesce(local.network.public_subnet_ids, [])
+  installer_role_arn           = module.iam.installer_role_arn
+  support_role_arn             = module.iam.support_role_arn
+  worker_role_arn              = module.iam.worker_role_arn
+  oidc_config_id               = module.iam.oidc_config_id    # OIDC is never gated
+  oidc_endpoint_url            = module.iam.oidc_endpoint_url # OIDC is never gated
+  enable_persistent_dns_domain = var.enable_persistent_dns_domain
+  persists_through_sleep       = var.persists_through_sleep
 
   # Proxy variables
   http_proxy              = var.http_proxy
@@ -263,7 +267,7 @@ module "cluster" {
   # Trap: Replacing the intent boolean with password nullability makes count unknown at plan time.
   # Evidence: https://developer.hashicorp.com/terraform/language/meta-arguments/count
   enable_identity_provider          = var.enable_cluster_admin && var.persists_through_sleep && !(var.external_auth_providers_enabled == true)
-  create_cluster_credentials_secret = var.enable_cluster_admin && !(var.external_auth_providers_enabled == true)
+  create_cluster_credentials_secret = var.enable_cluster_admin && var.persists_through_sleep && !(var.external_auth_providers_enabled == true)
   admin_username                    = var.admin_username
   admin_password_for_bootstrap      = var.enable_cluster_admin && !(var.external_auth_providers_enabled == true) ? (var.admin_password_override != null ? var.admin_password_override : random_password.admin_password[0].result) : null
 
@@ -404,7 +408,7 @@ module "cluster" {
 module "cluster_timing" {
   source = "../modules/utility/timing"
 
-  enabled = var.enable_timing
+  enabled = var.enable_timing && var.persists_through_sleep
   stage   = "cluster-creation"
 
   # Track cluster completion - timing ends when cluster is ready
@@ -458,9 +462,8 @@ module "bootstrap_admin" {
 # For production deployments, use AWS Transit Gateway, Direct Connect, or VPN connections.
 # NOTE: For egress-zero clusters, bastion_public_ip should always be false
 # The bastion module creates SSM VPC endpoints required for Session Manager access
-# Only create bastion when persists_through_sleep is true and network resources exist (prevents errors during sleep)
 module "bastion" {
-  count  = var.enable_bastion && var.persists_through_sleep && length(local.network.private_subnet_ids) > 0 ? 1 : 0
+  count  = var.enable_bastion && local.effective_persists_network && length(local.network.private_subnet_ids) > 0 ? 1 : 0
   source = "../modules/infrastructure/bastion"
 
   name_prefix              = var.cluster_name
@@ -471,7 +474,7 @@ module "bastion" {
   vpc_cidr                 = var.vpc_cidr
   bastion_public_ip        = var.bastion_public_ip # Should be false for egress-zero
   bastion_public_ssh_key   = var.bastion_public_ssh_key
-  persists_through_sleep   = var.persists_through_sleep
+  persists_through_sleep   = local.effective_persists_network
   permissions_boundary_arn = var.custom_permissions_boundary_arn
 
   tags = var.tags
@@ -487,7 +490,7 @@ module "bastion" {
 # Reference: ./reference/rosa-tf/modules/networking/client-vpn/
 
 module "client_vpn" {
-  count  = var.enable_client_vpn && var.persists_through_sleep && length(local.network.private_subnet_ids) > 0 ? 1 : 0
+  count  = var.enable_client_vpn && local.effective_persists_network && length(local.network.private_subnet_ids) > 0 ? 1 : 0
   source = "../modules/infrastructure/client-vpn"
 
   cluster_name               = var.cluster_name
@@ -510,7 +513,7 @@ module "client_vpn" {
 #------------------------------------------------------------------------------
 
 module "route_server" {
-  count  = var.enable_route_server && var.persists_through_sleep && length(local.network.private_subnet_ids) > 0 ? 1 : 0
+  count  = var.enable_route_server && local.effective_persists_network && length(local.network.private_subnet_ids) > 0 ? 1 : 0
   source = "../modules/infrastructure/route-server"
 
   cluster_name            = var.cluster_name
@@ -522,7 +525,7 @@ module "route_server" {
   oidc_endpoint_url       = module.iam.oidc_endpoint_url
   route_server_asn        = var.route_server_asn
   tags                    = local.tags
-  persists_through_sleep  = var.persists_through_sleep
+  persists_through_sleep  = local.effective_persists_network
 
   # When ESO IAM is enabled, attach GetSecretValue for {cluster}-bgp-config (issue #51).
   secrets_manager_role_name = var.enable_secrets_manager_iam ? module.iam.secrets_manager_role_name : null

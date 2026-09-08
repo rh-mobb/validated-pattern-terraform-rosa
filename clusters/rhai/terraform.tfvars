@@ -75,7 +75,7 @@ oidc_identity_providers = {
 
 # Optional Features - minimal for lab/demo
 persists_through_sleep               = true
-enable_persistent_dns_domain         = false
+enable_persistent_dns_domain         = true
 enable_control_plane_log_forwarding  = true
 control_plane_log_cloudwatch_enabled = true
 enable_cert_manager_iam              = false

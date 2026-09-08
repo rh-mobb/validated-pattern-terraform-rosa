@@ -642,31 +642,24 @@ variable "vpn_session_timeout_hours" {
 
 # Destroy Protection Variables
 variable "persists_through_sleep" {
-  description = "Set to false to put cluster in sleep mode (destroys resources). Default true keeps cluster active. To sleep cluster, set this to false and run terraform apply."
+  description = "Set to false to put cluster in sleep mode (destroys cluster and all dependent resources). Default true keeps cluster active. Use keep_network_on_sleep and keep_iam_on_sleep to preserve infrastructure while sleeping."
   type        = bool
   default     = true
   nullable    = false
 }
 
-variable "persists_through_sleep_cluster" {
-  description = "Override persists_through_sleep for cluster resources. If null, uses persists_through_sleep value."
+variable "keep_network_on_sleep" {
+  description = "Keep VPC, subnets, and network infrastructure alive when persists_through_sleep is false. Avoids expensive network recreation on wake. Has no effect when persists_through_sleep is true."
   type        = bool
-  default     = null
-  nullable    = true
+  default     = false
+  nullable    = false
 }
 
-variable "persists_through_sleep_iam" {
-  description = "Override persists_through_sleep for IAM resources. If null, uses persists_through_sleep value."
+variable "keep_iam_on_sleep" {
+  description = "Keep IAM roles and policies alive when persists_through_sleep is false. Avoids role recreation delays on wake. Has no effect when persists_through_sleep is true."
   type        = bool
-  default     = null
-  nullable    = true
-}
-
-variable "persists_through_sleep_network" {
-  description = "Override persists_through_sleep for network resources. If null, uses persists_through_sleep value."
-  type        = bool
-  default     = null
-  nullable    = true
+  default     = false
+  nullable    = false
 }
 
 variable "enable_persistent_dns_domain" {

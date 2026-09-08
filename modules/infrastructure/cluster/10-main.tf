@@ -2,9 +2,7 @@
 data "aws_caller_identity" "current" {}
 
 locals {
-  # Determine if resources persist through sleep (use override if provided, else global)
-  # Note: persists_through_sleep=true means resources persist (don't destroy), which is opposite of destroy_enabled
-  persists_through_sleep = var.persists_through_sleep_cluster != null ? var.persists_through_sleep_cluster : var.persists_through_sleep
+  persists_through_sleep = var.persists_through_sleep
 
   # Concatenate private and public subnet IDs for cluster resource
   # Cluster needs all subnets (private + public for public clusters, just private for private clusters)
