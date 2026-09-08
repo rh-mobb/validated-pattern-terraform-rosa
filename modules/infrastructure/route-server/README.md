@@ -48,6 +48,12 @@ AWS VPC Route Server for BGP routing with the [BGP cloud connector](https://gith
 | bgp_config_secret_name | Secrets Manager secret name for ESO (`{cluster}-bgp-config`) |
 | bgp_config_secret_arn | Secrets Manager secret ARN |
 
+## Destroy / BGP peer cleanup (planned, [#72](https://github.com/rh-mobb/validated-pattern-terraform-rosa/issues/72))
+
+The CUDN BGP operator creates **route-server-peers** in AWS at runtime. They are not Terraform-managed and can block endpoint deletion during `terraform destroy`.
+
+**Planned:** [Cluster lifecycle hooks](../../../docs/guides/cluster-lifecycle-hooks.md) — e.g. `clusters/bgp/scripts/pre-destroy.sh` deletes CUDN CRs when the API is up, then runs shared AWS peer cleanup from `scripts/cluster/`.
+
 ## GitOps / ESO (preferred)
 
 1. Set `enable_secrets_manager_iam = true` and `enable_route_server = true`
