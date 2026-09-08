@@ -4,8 +4,7 @@ data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 
 locals {
-  # Determine if cluster persists/is active (use override if provided, else global)
-  persists_through_sleep = var.persists_through_sleep_iam != null ? var.persists_through_sleep_iam : var.persists_through_sleep
+  persists_through_sleep = var.persists_through_sleep || var.keep_iam_on_sleep
 
   # Use cluster_name as prefix if not provided
   account_role_prefix_final  = var.account_role_prefix != null ? var.account_role_prefix : var.cluster_name

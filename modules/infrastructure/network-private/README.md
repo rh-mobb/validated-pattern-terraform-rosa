@@ -87,7 +87,7 @@ module "network" {
 | custom_permissions_boundary_arn | ARN of the permission boundary policy for the VPC flow log IAM role. If null, no boundary is applied | `string` | `null` | no |
 | tags | Tags to apply to all resources | `map(string)` | `{}` | no |
 | persists_through_sleep | Set to false to put cluster in sleep mode (destroys resources) | `bool` | `true` | no |
-| persists_through_sleep_network | Override persists_through_sleep for network resources | `bool` | `null` | no |
+| keep_network_on_sleep | Keep network infrastructure alive when persists_through_sleep is false | `bool` | `false` | no |
 
 ## Outputs
 

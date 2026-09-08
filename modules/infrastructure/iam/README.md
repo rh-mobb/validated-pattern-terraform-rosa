@@ -83,7 +83,7 @@ module "iam" {
 | zero_egress | Enable zero egress mode. When true, attaches AmazonEC2ContainerRegistryReadOnly policy to worker role (required for egress-zero clusters) | `bool` | `false` | no |
 | tags | Tags to apply to all resources | `map(string)` | `{}` | no |
 | persists_through_sleep | Set to false to put cluster in sleep mode (destroys resources). Default true keeps cluster active | `bool` | `true` | no |
-| persists_through_sleep_iam | Override persists_through_sleep for IAM resources. If null, uses persists_through_sleep value | `bool` | `null` | no |
+| keep_iam_on_sleep | Keep IAM roles alive when persists_through_sleep is false | `bool` | `false` | no |
 | enable_storage | Enable storage resources (CSI driver IAM roles) | `bool` | `false` | no |
 | enable_efs | Enable EFS file system (required for EFS CSI driver IAM role) | `bool` | `false` | no |
 | create_kms_keys | Create KMS keys internally. When false (default), uses external ARNs or no encryption | `bool` | `false` | no |

@@ -77,11 +77,11 @@ variable "persists_through_sleep" {
   nullable    = false
 }
 
-variable "persists_through_sleep_network" {
-  description = "Override persists_through_sleep for network resources. If null, uses persists_through_sleep value. Allows sleeping network resources while preserving other resources."
+variable "keep_network_on_sleep" {
+  description = "Keep network infrastructure alive when persists_through_sleep is false. Avoids expensive VPC/subnet recreation on wake. Has no effect when persists_through_sleep is true."
   type        = bool
-  default     = null
-  nullable    = true
+  default     = false
+  nullable    = false
 }
 
 variable "custom_permissions_boundary_arn" {

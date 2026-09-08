@@ -9,27 +9,24 @@
 
 # CloudWatch Log Group for Control Plane Logs
 # Log group name must match the pattern used in IAM module policy
-# Persists through sleep operation (not gated by persists_through_sleep)
 resource "aws_cloudwatch_log_group" "control_plane_logs" {
-  count = var.enable_control_plane_log_forwarding && var.control_plane_log_cloudwatch_enabled ? 1 : 0
+  count = local.persists_through_sleep && var.enable_control_plane_log_forwarding && var.control_plane_log_cloudwatch_enabled ? 1 : 0
 
   name = var.control_plane_log_cloudwatch_log_group_name != null ? var.control_plane_log_cloudwatch_log_group_name : "${var.cluster_name}-control-plane-logs"
 
   retention_in_days = var.control_plane_log_cloudwatch_retention_days
 
   tags = merge(local.common_tags, {
-    Name                   = var.control_plane_log_cloudwatch_log_group_name != null ? var.control_plane_log_cloudwatch_log_group_name : "${var.cluster_name}-control-plane-logs"
-    Purpose                = "ControlPlaneLogForwarding"
-    ManagedBy              = "Terraform"
-    persists_through_sleep = "true"
+    Name      = var.control_plane_log_cloudwatch_log_group_name != null ? var.control_plane_log_cloudwatch_log_group_name : "${var.cluster_name}-control-plane-logs"
+    Purpose   = "ControlPlaneLogForwarding"
+    ManagedBy = "Terraform"
   })
 }
 
 # S3 Bucket for Control Plane Logs
-# Persists through sleep operation (not gated by persists_through_sleep)
 # Bucket name is auto-generated if not provided: <cluster_name>-control-plane-logs-<random_suffix>
 resource "aws_s3_bucket" "control_plane_logs" {
-  count = var.enable_control_plane_log_forwarding && var.control_plane_log_s3_enabled ? 1 : 0
+  count = local.persists_through_sleep && var.enable_control_plane_log_forwarding && var.control_plane_log_s3_enabled ? 1 : 0
 
   bucket = local.s3_bucket_name
 
@@ -39,17 +36,15 @@ resource "aws_s3_bucket" "control_plane_logs" {
   force_destroy = true
 
   tags = merge(local.common_tags, {
-    Name                   = local.s3_bucket_name
-    Purpose                = "ControlPlaneLogForwarding"
-    ManagedBy              = "Terraform"
-    persists_through_sleep = "true"
+    Name      = local.s3_bucket_name
+    Purpose   = "ControlPlaneLogForwarding"
+    ManagedBy = "Terraform"
   })
 }
 
 # S3 Bucket Versioning (optional, but recommended for log storage)
-# Persists through sleep operation (not gated by persists_through_sleep)
 resource "aws_s3_bucket_versioning" "control_plane_logs" {
-  count = var.enable_control_plane_log_forwarding && var.control_plane_log_s3_enabled ? 1 : 0
+  count = local.persists_through_sleep && var.enable_control_plane_log_forwarding && var.control_plane_log_s3_enabled ? 1 : 0
 
   bucket = aws_s3_bucket.control_plane_logs[0].id
 
@@ -59,7 +54,6 @@ resource "aws_s3_bucket_versioning" "control_plane_logs" {
 }
 
 # S3 Bucket Server-Side Encryption (AES256 / SSE-S3)
-# Persists through sleep operation (not gated by persists_through_sleep)
 #
 # We use AWS-managed SSE-S3 (AES256) rather than customer-managed KMS (SSE-KMS) because:
 # - ROSA's central log distribution role (arn:aws:iam::859037107838:role/ROSA-CentralLogDistributionRole-*)
@@ -68,7 +62,7 @@ resource "aws_s3_bucket_versioning" "control_plane_logs" {
 # - Granting decrypt access to an external account's IAM role is a security trade-off we choose to avoid.
 # - SSE-S3 provides encryption at rest without exposing key access to ROSA's account. AWS manages the keys.
 resource "aws_s3_bucket_server_side_encryption_configuration" "control_plane_logs" {
-  count = var.enable_control_plane_log_forwarding && var.control_plane_log_s3_enabled ? 1 : 0
+  count = local.persists_through_sleep && var.enable_control_plane_log_forwarding && var.control_plane_log_s3_enabled ? 1 : 0
 
   bucket = aws_s3_bucket.control_plane_logs[0].id
 
@@ -80,10 +74,9 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "control_plane_log
 }
 
 # S3 Bucket Lifecycle - expire objects after retention period for cost control
-# Persists through sleep operation (not gated by persists_through_sleep)
 # When control_plane_log_s3_retention_days is null, no lifecycle rule (retain indefinitely)
 resource "aws_s3_bucket_lifecycle_configuration" "control_plane_logs" {
-  count = var.enable_control_plane_log_forwarding && var.control_plane_log_s3_enabled && var.control_plane_log_s3_retention_days != null ? 1 : 0
+  count = local.persists_through_sleep && var.enable_control_plane_log_forwarding && var.control_plane_log_s3_enabled && var.control_plane_log_s3_retention_days != null ? 1 : 0
 
   bucket = aws_s3_bucket.control_plane_logs[0].id
 
@@ -106,9 +99,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "control_plane_logs" {
 
 # S3 Bucket Policy
 # Allows ROSA's central log distribution role to write to the bucket
-# Persists through sleep operation (not gated by persists_through_sleep)
 resource "aws_s3_bucket_policy" "control_plane_logs" {
-  count = var.enable_control_plane_log_forwarding && var.control_plane_log_s3_enabled ? 1 : 0
+  count = local.persists_through_sleep && var.enable_control_plane_log_forwarding && var.control_plane_log_s3_enabled ? 1 : 0
 
   bucket = aws_s3_bucket.control_plane_logs[0].id
 

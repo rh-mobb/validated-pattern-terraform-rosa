@@ -62,16 +62,15 @@ moved {
 #   "url": "https://api.cluster.example.com:6443"
 # }
 resource "aws_secretsmanager_secret" "cluster_credentials" {
-  count = local.create_credentials_secret ? 1 : 0
+  count = local.create_credentials_secret && local.persists_through_sleep ? 1 : 0
 
   name                    = "${var.cluster_name}-credentials"
-  description             = "Break-glass cluster credentials for ROSA HCP cluster ${var.cluster_name} (persists through sleep)"
+  description             = "Break-glass cluster credentials for ROSA HCP cluster ${var.cluster_name}"
   recovery_window_in_days = 0
 
   tags = merge(local.common_tags, {
-    Name                   = "${var.cluster_name}-credentials"
-    Purpose                = "ClusterCredentials"
-    persists_through_sleep = "true"
+    Name    = "${var.cluster_name}-credentials"
+    Purpose = "ClusterCredentials"
   })
 
   depends_on = [
