@@ -665,7 +665,7 @@ variable "helm_chart" {
 variable "helm_chart_version" {
   description = "Helm chart version for cluster bootstrap"
   type        = string
-  default     = "0.5.19"
+  default     = "0.5.20"
   nullable    = false
 }
 

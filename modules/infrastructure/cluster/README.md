@@ -168,7 +168,7 @@ Rendered into `gitops_bootstrap_hub_values` / `gitops_bootstrap_spoke_values` (s
 
 | Name | Description | Type | Default |
 |------|-------------|------|---------|
-| helm_chart_version | `cluster-bootstrap` chart version | `string` | `0.5.19` |
+| helm_chart_version | `cluster-bootstrap` chart version | `string` | `0.5.20` |
 | helm_chart_acm_spoke_version | `cluster-bootstrap-acm-spoke` chart version | `string` | `0.6.14` |
 | helm_chart_acm_hub_registration_version | `cluster-bootstrap-acm-hub-registration` chart version | `string` | `0.2.2` |
 | helm_chart_awspca_version | `aws-privateca-issuer` chart version | `string` | `1.6.1` |

@@ -152,7 +152,7 @@ export BOOTSTRAP_VALUES_FILE="/path/to/clusters/my-cluster/cluster-bootstrap-val
 | `HELM_REPO_NAME` | Name for Helm repository | `helm_repo_new` |
 | `HELM_REPO_URL` | Helm repository URL | `https://rh-mobb.github.io/validated-pattern-helm-charts/` |
 | `HELM_CHART` | Helm chart name (hub/standalone) | `cluster-bootstrap` |
-| `HELM_CHART_VERSION` | Helm chart version | `0.5.19` |
+| `HELM_CHART_VERSION` | Helm chart version | `0.5.20` |
 
 ### ACM Spoke Helm Charts
 

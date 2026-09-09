@@ -350,7 +350,7 @@ flowchart LR
 | `app-of-apps-infrastructure` | `app_of_apps_infrastructure_chart_version` | `0.3.0` |
 | `app-of-apps-application` | `app_of_apps_application_chart_version` | `1.5.8` |
 | `app-of-apps-acm-team-onboarding` | `app_of_apps_acm_team_onboarding_chart_version` | `0.4.1` |
-| `cluster-bootstrap` | `helm_chart_version` | `0.5.19` |
+| `cluster-bootstrap` | `helm_chart_version` | `0.5.20` |
 | `cluster-bootstrap-acm-spoke` | `helm_chart_acm_spoke_version` | `0.6.14` |
 | `cluster-bootstrap-acm-hub-registration` | `helm_chart_acm_hub_registration_version` | `0.2.2` |
 | `aws-privateca-issuer` | `helm_chart_awspca_version` | `1.6.1` |
@@ -753,9 +753,10 @@ Manual fallback (no ESO): annotate the operator ServiceAccount with `bgp_operato
 1. Workers Ready including three metal BGP routers (`oc get nodes -l bgp_router=true`)
 2. OpenShift Virtualization / CNV operator healthy (`oc get csv -n openshift-cnv | grep kubevirt`)
 3. StorageClass `efs-sc` exists (`oc get sc efs-sc`) with EFS access-point `uid`/`gid` **107** (qemu — required for VM disks; `cluster-efs` ≥ 0.5.1). EFS CSI operator healthy
-4. Operator pod Running in `openshift-cudn-bgp-routing` with IRSA (no AWS credential errors in logs)
-5. `CUDNBgpConfig` status.peerGroups shows discovered Route Server neighbors / ASN
-6. Route Server peers exist for BGP router node IPs (`aws ec2 describe-route-server-peers`)
+4. CDI clone/upload memory: `rosa-virtualization` ≥ **1.0.3** sets HyperConverged `storageWorkloads` (4Gi); verify `oc get cdiconfig config -o jsonpath='{.status.defaultPodResourceRequirements.limits.memory}'` before large DataVolume clones
+5. Operator pod Running in `openshift-cudn-bgp-routing` with IRSA (no AWS credential errors in logs)
+6. `CUDNBgpConfig` status.peerGroups shows discovered Route Server neighbors / ASN
+7. Route Server peers exist for BGP router node IPs (`aws ec2 describe-route-server-peers`)
 
 **Optional — EFS live migration smoke test** (after CNV is Available):
 
@@ -765,6 +766,8 @@ Manual fallback (no ESO): annotate the operator ServiceAccount with `bgp_operato
 ```
 
 VMs must use `nodeSelector: { bgp_router: "true" }` (or equivalent) on this recipe — regular workers lack KVM.
+
+**Agents:** Step-by-step E2E gates (CDI memory, BGP teardown, failure modes) — [`clusters/virt/AGENTS.md`](../../clusters/virt/AGENTS.md). Generic agent flow — [AGENTS.md](../../AGENTS.md#agent-guided-end-to-end-e2e-cluster-validation).
 
 #### Teardown
 
@@ -1099,7 +1102,7 @@ These improvements are documented as future work:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `helm_repo_url` | `https://rh-mobb.github.io/validated-pattern-helm-charts/` | Your published Helm repo |
-| `helm_chart_version` | `0.5.19` | `cluster-bootstrap` chart version |
+| `helm_chart_version` | `0.5.20` | `cluster-bootstrap` chart version |
 | `helm_chart_acm_spoke_version` | `0.6.14` | `cluster-bootstrap-acm-spoke` chart version |
 | `helm_chart_acm_hub_registration_version` | `0.2.2` | `cluster-bootstrap-acm-hub-registration` chart version |
 | `helm_chart_awspca_version` | `1.6.1` | `aws-privateca-issuer` chart version |

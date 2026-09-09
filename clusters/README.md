@@ -31,6 +31,17 @@ clusters/
 
 Each directory under `/clusters/` represents a single cluster. The directories listed above are copy-paste recipes, not exclusive topologies. You can create additional clusters by creating new directories at the same level.
 
+### Agent E2E instructions (`AGENTS.md`)
+
+For **live end-to-end validation** (deploy → bootstrap → Day-2 gates → smoke tests → teardown), agents follow the generic flow in [AGENTS.md](../AGENTS.md#agent-guided-end-to-end-e2e-cluster-validation). Cluster recipes with non-trivial Day-2 behavior **should** include a local **`clusters/<name>/AGENTS.md`** for recipe-specific gates, smoke tests, cost warnings, and known failure modes.
+
+| Cluster | Agent E2E doc |
+|---------|----------------|
+| `virt` | [virt/AGENTS.md](virt/AGENTS.md) — EFS, CNV, BGP, live migration |
+| Others | Generic flow only until a recipe-specific `AGENTS.md` is added |
+
+When you add features to a recipe, update its `AGENTS.md` (and enablement) in the same change — do not rely on ad-hoc coordinator scripts under `clusters/*/logs/`.
+
 ## Cluster Types
 
 ### Public Clusters (`clusters/public/`)
