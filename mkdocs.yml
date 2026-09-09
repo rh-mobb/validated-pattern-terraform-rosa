@@ -83,6 +83,8 @@ nav:
   - Deployment:
       - Enablement Guide: deployment/enablement.md
       - Cluster Configurations: deployment/cluster-configurations.md
+  - Architecture:
+      - Platform metadata / IRSA: architecture/platform-metadata-irsa.md
   - Guides:
 # Covers: Built-in OAuth with OpenID Connect
 # Does: Adds the OpenID provider guide to the rendered documentation navigation.
@@ -104,6 +106,7 @@ nav:
       - Network (Private): modules/network-private.md
       - Network (Public): modules/network-public.md
       - Network (Existing): modules/network-existing.md
+      - Route Server (BGP): modules/route-server.md
       - Client VPN: modules/client-vpn.md
       - Bastion: modules/bastion.md
       - Timing: modules/timing.md

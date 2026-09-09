@@ -101,6 +101,15 @@ fi
 # fi
 
 info "Destroying remaining infrastructure..."
+
+if [ "$(get_tfvar "$CLUSTER_DIR" enable_route_server false)" = "true" ]; then
+	info "Cleaning up CUDN BGP route server peers before Terraform destroy..."
+	if ! "$SCRIPT_DIR/cleanup-route-server-bgp-peers.sh" "$CLUSTER_NAME"; then
+		error "Route server BGP peer cleanup failed; fix peers/endpoints then re-run destroy"
+		exit 1
+	fi
+fi
+
 terraform destroy \
 	-var-file="$CLUSTER_TFVARS" \
 	-auto-approve

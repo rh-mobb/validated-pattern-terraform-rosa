@@ -587,6 +587,7 @@ Do **not** treat docs as optional follow-up. Before considering the work done, s
 | CI/CD | `docs/CI_CD.md` / `docs/guides/ci-cd.md` | Env vars, pipeline secrets, script contracts |
 | Scripts docs | `scripts/README.md`, `scripts/**/README*.md` | Script usage, required env vars, Make targets |
 | Module / cluster docs | `modules/**/README.md`, `clusters/README.md` | Module interface or example cluster patterns |
+| Agent E2E steps | `AGENTS.md` (generic), `clusters/<name>/AGENTS.md` | New recipe, bootstrap/GitOps/teardown behavior, smoke tests, validation gates |
 | Project overview | `README.md`, `PLAN.md` | Architecture, module layout, operator-facing summary |
 | Changelog | `CHANGELOG.md` | User-visible behavior (delta for this PR/commit only) |
 
@@ -1292,20 +1293,20 @@ make test            # Run all tests (recommended before commit)
 6. Cert-manager/awspca bootstrap `--set certManagerRole` is the same idea for imperative Helm; metadata generalizes it for Argo-managed charts.
 7. When adding a new chart that needs AWS account or IRSA: follow this pattern; track remaining migrations in the platform-metadata rollout GitHub issue.
 
-### VPC Route Server / CUDN BGP (`enable_route_server`)
+### VPC Route Server / OpenShift Virtualization (`enable_route_server`)
 
-Example recipe: `clusters/bgp/terraform.tfvars`. Human enablement: `docs/deployment/enablement.md` → **CUDN BGP / VPC Route Server**.
+Example recipe: `clusters/virt/terraform.tfvars`. Human enablement: `docs/deployment/enablement.md` → **OpenShift Virtualization**.
 
 **Agent deploy/teardown sequence:**
 
 ```bash
-make cluster.bgp.init && make cluster.bgp.plan && make cluster.bgp.apply
-make cluster.bgp.bootstrap
-make cluster.bgp.login
-# Preferred (#51): enable_secrets_manager_iam + ESO + cudn chart externalSecret
-#   → no hardcoded routeServerIDs / operator role ARN in cluster-config
-# Outputs for debug: bgp_config_secret_name, secrets_manager_role_arn, route_server_id, bgp_operator_role_arn
-make cluster.bgp.destroy_force   # when validation done — 3x c5.metal is expensive
+make cluster.virt.init && make cluster.virt.plan && make cluster.virt.apply
+make cluster.virt.bootstrap
+make cluster.virt.login
+# Preferred (#51): enable_efs + enable_secrets_manager_iam + ESO + cluster-efs + cudn chart externalSecret
+#   → no hardcoded routeServerIDs / operator role ARN / EFS roleArn in cluster-config
+# Outputs for debug: bgp_config_secret_name, efs_file_system_id, efs_csi_role_arn, secrets_manager_role_arn
+make cluster.virt.destroy_force   # when validation done — 3x c5.metal is expensive
 ```
 
 **Rules for agents:**
@@ -1313,14 +1314,78 @@ make cluster.bgp.destroy_force   # when validation done — 3x c5.metal is expen
 1. **Intel bare metal only** for BGP router pools when OpenShift Virtualization is required — do **not** substitute nested virt or Graviton metal for this recipe.
 2. Keep PR/recipe instance type (`c5.metal`) unless the operator explicitly asks to change it. Multi-AZ needs metal in **all** AZs used (e.g. `m5zn.metal` is missing `ap-southeast-2a`).
 3. `enable_route_server = true` creates Route Server, 2 endpoints/private subnet, route-table propagation, IRSA role for `openshift-cudn-bgp-routing-controller-manager`, and Secrets Manager secret `{cluster}-bgp-config`.
-4. Set `enable_secrets_manager_iam = true` on the BGP recipe so ESO can read that secret (issue #51).
-5. GitOps path `dev/bgp` installs ESO + Virt + `cudn-bgp-routing-operator` (builds [bgp-cloud-connector](https://github.com/openshift/bgp-cloud-connector) in-cluster) with `externalSecret` — prefer that over hardcoding role ARN / `routeServerIDs` or manual operator `make deploy`.
-6. ESO role ARN in cluster-config is still needed once (`{cluster}-rosa-secretsmanager-role-iam`); operator IRSA + `CUDNBgpConfig.aws` come from the synced Secret.
-7. Set `enable_cluster_admin = true` on the recipe for break-glass `make cluster.bgp.login`.
-8. OCP **4.21+** required (example uses 4.22.x) for FRR-K8s / CUDN / RouteAdvertisements.
+4. Set `enable_efs = true` and `enable_secrets_manager_iam = true` on the Virt recipe so EFS CSI and ESO can bind from platform metadata.
+5. GitOps path `dev/virt` installs ESO + `cluster-efs` + Virt + `cudn-bgp-routing-operator` (builds [bgp-cloud-connector](https://github.com/openshift/bgp-cloud-connector) in-cluster) with `externalSecret` — prefer that over hardcoding role ARN / `routeServerIDs` / EFS `fileSystemId`.
+6. Do **not** hardcode the ESO or EFS CSI role ARN in cluster-config — `platformMetadata.enabled` binds from `rosa-platform-metadata`. Operator IRSA + `CUDNBgpConfig.aws` come from the synced `{cluster}-bgp-config` Secret.
+7. Set `enable_cluster_admin = true` on the recipe for break-glass `make cluster.virt.login`.
+8. OCP **4.21+** required (example uses 4.22.x) for FRR-K8s / CUDN / RouteAdvertisements / current CNV CSV.
 9. **HTPasswd greenfield plan:** `modules/infrastructure/htpasswd-idp` `count` must depend only on `var.enabled`, not on `cluster_id` (unknown until apply). Gating on `cluster_id != ""` causes `Invalid count argument` on first plan with `enable_cluster_admin=true`.
 10. Long-running apply/destroy/bootstrap: follow [Long-running cluster operations](#long-running-cluster-operations-ai-operators).
-11. If apply is interrupted: check for orphan VPC/`bgp-*` IAM roles, clear stale `clusters/bgp/.infrastructure.tfstate.lock.info`, reconcile state vs AWS before re-plan/apply.
+11. If apply is interrupted: check for orphan VPC/`virt-*` IAM roles, clear stale `clusters/virt/.infrastructure.tfstate.lock.info`, reconcile state vs AWS before re-plan/apply.
+12. **E2E validation:** follow [Agent-guided end-to-end (E2E) cluster validation](#agent-guided-end-to-end-e2e-cluster-validation) and [`clusters/virt/AGENTS.md`](clusters/virt/AGENTS.md) for recipe-specific gates and tests.
+
+## Agent-guided end-to-end (E2E) cluster validation
+
+**Purpose:** Validate a cluster recipe end-to-end after meaningful changes (new variables, bootstrap/GitOps behavior, Day-2 operators, teardown paths). This is **agent-operated, step-by-step validation** — not a single fire-and-forget shell script.
+
+**Why step-by-step (not a monolithic coordinator script):**
+
+- Failures mid-pipeline need **diagnosis and adaptation** (wrong GitOps sync, OOM, stale plan, BGP peers, immutable StorageClass params).
+- Expensive clusters (e.g. metal Virt) have **recipe-specific gates** that change as features land.
+- `make cluster.<name>.*` targets and focused smoke tests (`scripts/cluster/test-*.sh`) are the stable API; agents orchestrate them with explicit **done-when** checks between steps.
+
+**Do not** add multi-step e2e coordinator scripts under `clusters/*/logs/` or `/tmp`. That directory is gitignored and is for **operator logs only**. Optional **single-purpose** smoke tests under `scripts/cluster/` are fine when they encode one bounded check with a clear exit code.
+
+### When to run E2E
+
+- Before merging a PR that changes deploy/bootstrap/GitOps/teardown behavior for a recipe.
+- After bumping Helm chart pins, platform-metadata keys, or cluster-config paths consumed by a recipe.
+- When the operator explicitly requests a live validation run.
+
+Skip full cluster E2E for pure refactors with no operator-facing behavior change (note in PR if helpful).
+
+### Generic E2E flow (any cluster `<name>`)
+
+Replace `<name>` with the cluster directory (e.g. `public`, `virt`, `egress-zero`). Read **`clusters/<name>/AGENTS.md`** when it exists for recipe-specific gates, smoke tests, cost warnings, and teardown notes. Human operators use [`docs/deployment/enablement.md`](docs/deployment/enablement.md).
+
+**Execution:** Use [Long-running cluster operations](#long-running-cluster-operations-ai-operators) (tmux, tee logs under `clusters/<name>/logs/`). **Complete each step and validate before starting the next.** On failure: validate inputs/state, diagnose root cause, discuss fix options with the operator if non-obvious, then resume from the failed step — do not blindly re-run the whole pipeline.
+
+| Step | Action | Done when |
+|------|--------|-----------|
+| **0. Preflight** | Confirm AWS + RHCS auth, `clusters/<name>/terraform.tfvars` matches intent, state/plan paths under `clusters/<name>/`. | Credentials work; no stale lock file; operator approves cost/teardown if expensive. |
+| **1. Init / plan** | `make cluster.<name>.init` then `make cluster.<name>.plan` | Plan succeeds; inspect `terraform show clusters/<name>/terraform.tfplan` for expected resources and variable values. |
+| **2. Apply** | `make cluster.<name>.apply` (tmux for long runs) | Cluster API reachable; `terraform output` looks correct. Log tee optional: `clusters/<name>/logs/<timestamp>-apply.log`. |
+| **3. Bootstrap** | `make cluster.<name>.bootstrap` (or `bootstrap-gitea` / `bootstrap-spoke` per recipe) | Bootstrap exits 0; `rosa-platform-metadata` ConfigMap in `openshift-gitops` when GitOps enabled. |
+| **4. Login / verify** | `make cluster.<name>.login`; `make cluster.<name>.verify` when available | `oc` commands succeed; GitOps operator and app-of-apps healthy per verify script. |
+| **5. GitOps / Day-2 gates** | Recipe-specific — see `clusters/<name>/AGENTS.md` and enablement | Argo apps Synced/Healthy; operators/StorageClasses/IRSA bindings match acceptance criteria. |
+| **6. Smoke tests** | Recipe-specific scripts in `scripts/cluster/` or documented `oc` checks | Script exit 0 or documented criteria met. |
+| **7. Teardown** | `make cluster.<name>.destroy` or `destroy_force` when required (tmux) | State empty or expected leftovers documented; AWS console spot-check for expensive resources (metal, Route Server, NAT). |
+
+**Parallel hub + spoke** is a variant: see [Parallel Hub + Spoke Test Deployments](#parallel-hub--spoke-test-deployments-same-checkout). Still use per-step validation; parallel apply does not replace recipe-specific gates after bootstrap.
+
+### Per-cluster `AGENTS.md`
+
+Each cluster example **may** include `clusters/<name>/AGENTS.md` for everything the generic flow does not cover:
+
+- Extra validation gates (operators, storage, networking, fleet registration).
+- Smoke test commands and manifests under `clusters/<name>/`.
+- Cost / duration warnings and required teardown (`destroy_force`, spoke unregister).
+- Known failure modes and fixes discovered during E2E.
+
+**When adding or changing a cluster recipe or feature:**
+
+1. Update human docs (`docs/deployment/enablement.md`, module/cluster README) as today.
+2. **Update or create `clusters/<name>/AGENTS.md`** with new/changed E2E steps, gates, and smoke tests.
+3. If the change applies to **all** clusters (e.g. bootstrap contract), update the generic section in **this file** too.
+4. Add focused smoke tests under `scripts/cluster/` only when a single bounded check is reusable; keep orchestration in agent instructions.
+
+Link new cluster directories from [`clusters/README.md`](clusters/README.md).
+
+### Logging conventions (agents)
+
+- Write logs to `clusters/<name>/logs/<timestamp>-<phase>.log` (gitignored).
+- Optional exit marker line at end of tee’d Make output (e.g. `VIRT_APPLY_EXIT:0`) for tmux pane polling — **not** a substitute for reading logs and cluster state on failure.
+- Do not store executable scripts in `clusters/*/logs/`.
 
 ## Long-running cluster operations (AI operators)
 
@@ -1328,7 +1393,7 @@ make cluster.bgp.destroy_force   # when validation done — 3x c5.metal is expen
 
 ### Prefer tmux
 
-1. Use the **tmux MCP** (or an equivalent durable tmux session) for long-lived e2e — one session, panes for apply/destroy/bootstrap/helm/coordinator.
+1. Use the **tmux MCP** (or an equivalent durable tmux session) for long-lived e2e — one session, panes for apply/destroy/bootstrap as needed. Follow [Agent-guided end-to-end (E2E) cluster validation](#agent-guided-end-to-end-e2e-cluster-validation) between steps; reserve multi-pane **coordinators** for parallel hub/spoke only (below).
 2. Do **not** rely on Cursor Shell + nested `cmd &` / detached `nohup`: when the parent shell exits, background jobs can be SIGHUPed mid-apply/destroy and leave AWS orphans outside state.
 3. Keep 2-minute status updates (or the interval the operator requests) via `capture-pane` / log tails while ops run.
 
@@ -1460,6 +1525,7 @@ When writing new Terraform code, ensure:
 - [ ] Comments added for complex logic or non-obvious decisions
 - [ ] Module README.md created/updated (if creating/updating a module)
 - [ ] Documentation / enablement updated for operator-facing feature changes (not only module README)
+- [ ] **Agent E2E steps updated** - `clusters/<name>/AGENTS.md` and generic E2E section here when deploy/bootstrap/GitOps/teardown or smoke tests change
 - [ ] **Code quality checks passed** - **MANDATORY**: Run `make test` after modifying files (see Code Quality Checks section)
 
 When writing new shell scripts, ensure:
@@ -1485,7 +1551,8 @@ Before committing code, ensure:
 10. [ ] PLAN.md updated if architecture changed
 11. [ ] CHANGELOG.md updated with changes since last commit only (see Versioning and Changelog — delta-based workflow)
 12. [ ] Docs / enablement reviewed and updated where helpful or necessary (getting-started, enablement, CI/CD, scripts docs, README — see Feature Changes → Documentation & Enablement Review)
-13. [ ] **Code quality checks passed** - **MANDATORY**: Run `make test` after modifying Terraform or shell script files (see Code Quality Checks section)
+13. [ ] **Agent E2E steps** updated in `clusters/<name>/AGENTS.md` (and generic `AGENTS.md` if applicable) when deploy/bootstrap/GitOps/teardown or smoke tests change
+14. [ ] **Code quality checks passed** - **MANDATORY**: Run `make test` after modifying Terraform or shell script files (see Code Quality Checks section)
     - [ ] Terraform files formatted: `make tf-fmt-check` passes
     - [ ] Terraform files validated: `make tf-validate` passes
     - [ ] Shell scripts formatted: `make sh-fmt-check` passes
@@ -1594,15 +1661,21 @@ Before committing code, ensure:
 
 1. **Primary loop:** `make cluster.<profile>.bootstrap-gitea` → edit `reference/*` → `make dev.private.sync` → Argo sync (in-cluster Gitea = customer Git + Helm analogue). `bootstrap-private` is a deprecated alias.
 2. **Clone layout:** `reference/rosa-cluster-config` + `reference/validated-pattern-helm-charts` (separate git remotes; never commit into this repo).
-3. **Bootstrap still required once:** publishes `rosa-platform-metadata` — ESO charts depend on it.
-4. **Do not hardcode account ARNs** in portable cluster-config — use `platformMetadata.enabled: true` per [platform-metadata-irsa.md](docs/architecture/platform-metadata-irsa.md).
-5. **Make targets:** `make dev.private.sync`, `dev.private.sync-{config,charts}`, `dev.private.preflight`; optional `make dev.public.apply-local` (no Gitea/Argo).
-6. **PR land order** for cross-cutting GitOps: Terraform (IAM/metadata) → helm-charts → cluster-config; separate PRs per repo.
-7. **CHANGELOG scope:** Update this repo's `CHANGELOG.md` only for Terraform-repo changes; chart/cluster-config repos use their own changelogs.
-8. **Canonical merge validation:** Always run published Git + Helm Argo path before merge; local Gitea loop is for dev/demos.
-9. **Zero-egress ECR mirrors:** deferred — [#56](https://github.com/rh-mobb/validated-pattern-terraform-rosa/issues/56).
-10. **Credentials:** `clusters/<profile>/private-gitops.env` is gitignored — never commit.
-11. **Customer mapping:** Gitea → GitLab/GHE; Gitea Helm packages → Artifactory/Nexus HTTP repo.
+3. **Git hygiene (sibling remotes):** Treat helm-charts and cluster-config clones like any other GitHub repo. **Never edit or commit on `main`/`master`.** Before the first file change in either clone:
+   - `git fetch origin` and confirm `main` matches `origin/main` (`git pull --ff-only`). If the clone is **behind**, update `main` first — do not branch from a stale checkout.
+   - Working tree on `main` must be **clean** (`git status` empty). Do not pile uncommitted edits on `main`.
+   - `git checkout -b feat/<short-description>` (or that repo's branch convention), then edit, commit, and `gh pr create` **from that branch**.
+   - After committing, leave the clone on clean `main` (the work lives on the feature branch / PR). Use `git stash` or finish the commit before switching.
+   - Same rule applies to **this** Terraform repo.
+4. **Bootstrap still required once:** publishes `rosa-platform-metadata` — ESO charts depend on it.
+5. **Do not hardcode account ARNs** in portable cluster-config — use `platformMetadata.enabled: true` per [platform-metadata-irsa.md](docs/architecture/platform-metadata-irsa.md).
+6. **Make targets:** `make dev.private.sync`, `dev.private.sync-{config,charts}`, `dev.private.preflight`; optional `make dev.public.apply-local` (no Gitea/Argo).
+7. **PR land order** for cross-cutting GitOps: Terraform (IAM/metadata) → helm-charts → cluster-config; separate PRs per repo.
+8. **CHANGELOG scope:** Update this repo's `CHANGELOG.md` only for Terraform-repo changes; chart/cluster-config repos use their own changelogs.
+9. **Canonical merge validation:** Always run published Git + Helm Argo path before merge; local Gitea loop is for dev/demos.
+10. **Zero-egress ECR mirrors:** deferred — [#56](https://github.com/rh-mobb/validated-pattern-terraform-rosa/issues/56).
+11. **Credentials:** `clusters/<profile>/private-gitops.env` is gitignored — never commit.
+12. **Customer mapping:** Gitea → GitLab/GHE; Gitea Helm packages → Artifactory/Nexus HTTP repo.
 
 ### GitOps Helm chart version pins
 

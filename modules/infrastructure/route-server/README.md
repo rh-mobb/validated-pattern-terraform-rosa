@@ -48,10 +48,26 @@ AWS VPC Route Server for BGP routing with the [BGP cloud connector](https://gith
 | bgp_config_secret_name | Secrets Manager secret name for ESO (`{cluster}-bgp-config`) |
 | bgp_config_secret_arn | Secrets Manager secret ARN |
 
+## Destroy / BGP peer cleanup
+
+The CUDN BGP operator creates **route-server-peers** in AWS at runtime. They are not Terraform-managed and can block endpoint deletion during `terraform destroy`.
+
+On destroy, `null_resource.cleanup_route_server_bgp_peers` runs [`scripts/cluster/cleanup-route-server-bgp-peers.sh`](../../../scripts/cluster/cleanup-route-server-bgp-peers.sh) (same script used for manual pre-destroy). It deletes operator peers (and orphaned endpoints) before Terraform removes `aws_vpc_route_server_endpoint` resources.
+
+Manual break-glass (optional):
+
+```bash
+./scripts/cluster/cleanup-route-server-bgp-peers.sh <cluster-name>
+```
+
+## Example cluster
+
+`clusters/virt/terraform.tfvars` is the reference recipe (`enable_efs`, `enable_route_server`, metal routers, GitOps `dev/virt`). Operator runbook: [OpenShift Virtualization](../../../docs/deployment/enablement.md#openshift-virtualization).
+
 ## GitOps / ESO (preferred)
 
 1. Set `enable_secrets_manager_iam = true` and `enable_route_server = true`
-2. Install the `external-secrets-operator` chart with `serviceAccount.roleArn` from `terraform output -raw secrets_manager_role_arn` (or `external_secrets_role_arn`)
+2. Bootstrap publishes `rosa-platform-metadata`; GitOps installs ESO with `platformMetadata.enabled: true` (do not hardcode the ESO role ARN in cluster-config)
 3. Enable `externalSecret` on the `cudn-bgp-routing-operator` chart with `remoteKey: <cluster>-bgp-config`
 
 Manual SA annotation is only needed if ESO / chart automation is not used.

@@ -126,6 +126,7 @@ module "iam" {
 | cloudwatch_logging_role_arn | ARN of the CloudWatch logging IAM role (null if enable_cloudwatch_logging is false) |
 | secrets_manager_role_arn | ARN of the Secrets Manager IAM role (null if enable_secrets_manager_iam is false) |
 | external_secrets_role_arn | Alias of `secrets_manager_role_arn` for External Secrets Operator IRSA (null if enable_secrets_manager_iam is false) |
+| efs_csi_role_arn | ARN of the EFS CSI driver IAM role (null if enable_efs is false) |
 | cert_manager_role_arn | ARN of the cert-manager IAM role (null if enable_cert_manager_iam is false) |
 
 ## Account Roles

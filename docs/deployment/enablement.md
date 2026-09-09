@@ -105,7 +105,7 @@ Terraform creates AWS infrastructure and generates Helm values for bootstrap. Gi
 | OCM service account (recommended) | For Terraform and CI/CD — see [OCM service accounts](#ocm-service-accounts-recommended) below |
 | Personal RHCS token (dev only) | Offline token for local testing — [README.md](../../README.md#rhcs-api-authentication) |
 | ROSA subscription / OCM access | [ROSA HCP documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_service_on_aws/) |
-| Client VPN (private/egress-zero) | [clusters/README.md](../../clusters/README.md#vpn-tunnel-requirement) |
+| Client VPN (private/egress-zero) | [Cluster Configurations](cluster-configurations.md#vpn-tunnel-requirement) |
 
 ### OCM service accounts (recommended)
 
@@ -251,7 +251,7 @@ flowchart TD
 
 1. Fork or copy this repository into your organization (GitHub Enterprise, GitLab, Bitbucket, etc.)
 2. Replace example cluster directories under [clusters/](../../clusters/) with your naming convention, e.g. `clusters/<org>-<env>/`
-3. Configure remote state (S3 + DynamoDB) — see [clusters/README.md](../../clusters/README.md#backend-configuration) and [CI/CD guide](../guides/ci-cd.md)
+3. Configure remote state (S3 + DynamoDB) — see [Cluster Configurations](cluster-configurations.md#backend-configuration) and [CI/CD guide](../guides/ci-cd.md)
 4. Pin provider versions in [terraform/00-providers.tf](../../terraform/00-providers.tf)
 5. Modules are already in-repo under [modules/infrastructure/](../../modules/infrastructure/) — no external module registry required
 
@@ -350,7 +350,7 @@ flowchart LR
 | `app-of-apps-infrastructure` | `app_of_apps_infrastructure_chart_version` | `0.3.0` |
 | `app-of-apps-application` | `app_of_apps_application_chart_version` | `1.5.8` |
 | `app-of-apps-acm-team-onboarding` | `app_of_apps_acm_team_onboarding_chart_version` | `0.4.1` |
-| `cluster-bootstrap` | `helm_chart_version` | `0.5.19` |
+| `cluster-bootstrap` | `helm_chart_version` | `0.5.20` |
 | `cluster-bootstrap-acm-spoke` | `helm_chart_acm_spoke_version` | `0.6.14` |
 | `cluster-bootstrap-acm-hub-registration` | `helm_chart_acm_hub_registration_version` | `0.2.2` |
 | `aws-privateca-issuer` | `helm_chart_awspca_version` | `1.6.1` |
@@ -621,7 +621,7 @@ flowchart TB
 | Cluster access | `enable_client_vpn`, `enable_bastion` | [egress-zero](../../clusters/egress-zero/terraform.tfvars) |
 | Compute model | `enable_autonode`, `default_*_replicas`, `additional_machine_pools` | [autonode](../../clusters/autonode/terraform.tfvars), [public](../../clusters/public/terraform.tfvars) |
 | Fleet / ACM | `acm_mode`, hub/spoke bootstrap targets | [dev-hub-1](../../clusters/dev-hub-1/terraform.tfvars), [dev-spoke-1](../../clusters/dev-spoke-1/terraform.tfvars) |
-| BGP / Route Server | `enable_route_server`, `route_server_asn`, metal `additional_machine_pools` | [bgp](../../clusters/bgp/terraform.tfvars) — see [CUDN BGP / VPC Route Server](#cudn-bgp--vpc-route-server) |
+| Virtualization / CUDN BGP | `enable_efs`, `enable_route_server`, metal `additional_machine_pools` | [virt](../../clusters/virt/terraform.tfvars) — see [OpenShift Virtualization](#openshift-virtualization) |
 | GitOps | `enable_gitops_bootstrap`, `gitops_git_repo_url`, `gitops_git_path` | Any example with GitOps enabled |
 | Day-0 / break-glass login | `enable_cluster_admin` (default `false`; examples set `true`) | All example tfvars; see [Authentication](../getting-started/authentication.md) |
 | Production hardening | `openshift_version`, KMS, `fips`, `enable_termination_protection` | [egress-zero](../../clusters/egress-zero/terraform.tfvars) |
@@ -678,39 +678,47 @@ Use these as copy-paste sources — not as exclusive cluster "types":
 | [autonode](../../clusters/autonode/terraform.tfvars) | `enable_autonode`, `additional_cluster_properties`, version/region |
 | [dev-hub-1](../../clusters/dev-hub-1/terraform.tfvars) | Hub cluster sizing; set `acm_mode = hub` in module |
 | [dev-spoke-1](../../clusters/dev-spoke-1/terraform.tfvars) | Spoke GitOps path; use `bootstrap-spoke` Makefile target |
-| [bgp](../../clusters/bgp/terraform.tfvars) | `enable_route_server`, multi-AZ metal BGP routers, GitOps path `dev/bgp` |
+| [virt](../../clusters/virt/terraform.tfvars) | Metal Virt nodes, EFS RWX, Route Server, GitOps path `dev/virt` |
 
-### CUDN BGP / VPC Route Server
+<a id="cudn-bgp-vpc-route-server"></a>
+<a id="cudn-bgp--vpc-route-server"></a>
+<a id="openshift-virtualization"></a>
 
-Use the [bgp](../../clusters/bgp/terraform.tfvars) recipe to provision AWS VPC Route Server + IRSA for the [BGP cloud connector](https://github.com/openshift/bgp-cloud-connector), with OpenShift Virtualization and operator install driven by [rosa-cluster-config `dev/bgp`](https://github.com/rh-mobb/rosa-cluster-config/tree/main/dev/bgp).
+### OpenShift Virtualization
 
-**What Terraform creates** when `enable_route_server = true`:
+Use the [virt](../../clusters/virt/terraform.tfvars) recipe (formerly `clusters/bgp`) for OpenShift Virtualization on ROSA HCP: Intel metal workers, EFS RWX, AWS VPC Route Server, and the [BGP cloud connector](https://github.com/openshift/bgp-cloud-connector). GitOps is [rosa-cluster-config `dev/virt`](https://github.com/rh-mobb/rosa-cluster-config/tree/main/dev/virt).
 
-| Resource | Purpose |
-|----------|---------|
-| VPC Route Server + ASN | Amazon-side BGP peer (`route_server_asn`, default `64512`) |
-| Endpoints (2 per private subnet) | BGP neighbor ENIs; operator discovers via `DescribeRouteServerEndpoints` |
-| Route propagation | Private + public route tables |
-| IAM role/policy (IRSA) | Trusts `openshift-cudn-bgp-routing:openshift-cudn-bgp-routing-controller-manager` |
+**What Terraform creates:**
 
-**Recipe characteristics** (`clusters/bgp`):
+| Flag | Resource | Purpose |
+|------|----------|---------|
+| `enable_efs` (default on) | EFS filesystem, mount targets, EFS CSI IAM role | RWX StorageClass `efs-sc` after GitOps |
+| `enable_route_server` | VPC Route Server + ASN (`route_server_asn`, default `64512`) | Amazon-side BGP peer |
+| | Endpoints (2 per private subnet) | BGP neighbor ENIs |
+| | Route propagation | Private + public route tables |
+| | IAM role/policy (IRSA) | Trusts `openshift-cudn-bgp-routing:openshift-cudn-bgp-routing-controller-manager` |
+| | Secrets Manager `{cluster}-bgp-config` | Operator role ARN / region / route server IDs for ESO (#51) |
 
-- Public multi-AZ ROSA HCP, OCP **4.21+** (example pins `4.22.2` / `fast-4.22`) for FRR-K8s / CUDN / RouteAdvertisements
-- One **Intel bare-metal** worker pool per AZ (`c5.metal`) labeled `bgp_router=true` (OpenShift Virtualization — nested virt is not supported for this path)
-- GitOps path `dev/bgp` installs `rosa-virtualization` + `cudn-bgp-routing-operator`
-- Set `enable_cluster_admin = true` for `make cluster.bgp.login`
+**Recipe characteristics** (`clusters/virt`):
 
-**Cost warning:** Three `c5.metal` nodes in `ap-southeast-2` are ~$16/hr on-demand. Tear down promptly after validation (`make cluster.bgp.destroy_force`).
+- Public multi-AZ ROSA HCP (`network_type = "public"`), OCP **4.21+** (example pins `4.22.2` / `fast-4.22`) for FRR-K8s / CUDN / CNV
+- `enable_efs = true` plus `enable_secrets_manager_iam = true`
+- Default workers `m7i.2xlarge` (GitOps / in-cluster operator image builds) — **no KVM**; do not schedule VMs here
+- One **Intel bare-metal** worker pool per AZ (`c5.metal`) labeled `bgp_router=true` (nested virt and Graviton metal are not supported for this path). Metal pools advertise `devices.kubevirt.io/kvm` and host both BGP routing and VM workloads in this recipe
+- GitOps path `dev/virt` installs ESO, `cluster-efs`, `rosa-virtualization`, and `cudn-bgp-routing-operator`
+- Set `enable_cluster_admin = true` for `make cluster.virt.login`
+
+**Cost warning:** Three `c5.metal` nodes in `ap-southeast-2` are ~$16/hr on-demand. Tear down promptly after validation (`make cluster.virt.destroy_force`).
 
 #### Deploy
 
 ```bash
 # Requires AWS + RHCS/OCM credentials (service account preferred for apply)
-make cluster.bgp.init
-make cluster.bgp.plan
-make cluster.bgp.apply      # 30–45+ minutes; Route Server finishes early, ROSA cluster dominates
-make cluster.bgp.bootstrap  # GitOps + short-lived bootstrap HTPasswd
-make cluster.bgp.login      # break-glass admin from Secrets Manager
+make cluster.virt.init
+make cluster.virt.plan
+make cluster.virt.apply      # 30–45+ minutes; Route Server finishes early, ROSA cluster dominates
+make cluster.virt.bootstrap  # GitOps + short-lived bootstrap HTPasswd
+make cluster.virt.login      # break-glass admin from Secrets Manager
 ```
 
 #### Wire BGP config via External Secrets (preferred — issue #51)
@@ -719,19 +727,21 @@ Terraform publishes `{cluster_name}-bgp-config` to AWS Secrets Manager (`role_ar
 
 Architecture (do not hardcode ESO/operator ARNs in git):
 
-1. Bootstrap writes `rosa-platform-metadata` (`secretsManagerRoleArn`, `bgpConfigSecretName`, …) — [platform-metadata-irsa.md](../architecture/platform-metadata-irsa.md)
-2. GitOps installs ESO with `platformMetadata.enabled: true` (binds IRSA from ConfigMap)
+1. Bootstrap writes `rosa-platform-metadata` (`secretsManagerRoleArn`, `efsCsiRoleArn`, `efsFileSystemId`, `bgpConfigSecretName`, …) — [platform-metadata-irsa.md](../architecture/platform-metadata-irsa.md)
+2. GitOps installs ESO and `cluster-efs` with `platformMetadata.enabled: true`
 3. `cudn-bgp-routing-operator` uses `externalSecret` for operator role / region / routeServerIDs from `{cluster}-bgp-config`
 
-Keep `defaults.plugin: false` in [rosa-cluster-config](https://github.com/rh-mobb/rosa-cluster-config) `dev/bgp/infrastructure.yaml`. Set ESO `target.enabled: false` unless you need the Kuadrant credentials ExternalSecret.
+Keep `defaults.plugin: false` in [rosa-cluster-config](https://github.com/rh-mobb/rosa-cluster-config) `dev/virt/infrastructure.yaml`. Set ESO `target.enabled: false` unless you need the Kuadrant credentials ExternalSecret.
 
 ```bash
 # Optional verification after apply / bootstrap
 cd terraform
-export TF_DATA_DIR="../clusters/bgp/.terraform"
+export TF_DATA_DIR="../clusters/virt/.terraform"
 terraform init -reconfigure -input=false \
-  -backend-config="path=$(pwd)/../clusters/bgp/infrastructure.tfstate" >/dev/null
+  -backend-config="path=$(pwd)/../clusters/virt/infrastructure.tfstate" >/dev/null
 terraform output -raw bgp_config_secret_name
+terraform output -raw efs_file_system_id
+terraform output -raw efs_csi_role_arn
 terraform output -raw secrets_manager_role_arn
 oc -n openshift-gitops get configmap rosa-platform-metadata -o yaml
 ```
@@ -741,20 +751,33 @@ Manual fallback (no ESO): annotate the operator ServiceAccount with `bgp_operato
 #### Post-deploy validation checklist
 
 1. Workers Ready including three metal BGP routers (`oc get nodes -l bgp_router=true`)
-2. OpenShift Virtualization / CNV operator healthy
-3. Operator pod Running in `openshift-cudn-bgp-routing` with IRSA (no AWS credential errors in logs)
-4. `CUDNBgpConfig` status.peerGroups shows discovered Route Server neighbors / ASN
-5. Route Server peers exist for BGP router node IPs (`aws ec2 describe-route-server-peers`)
+2. OpenShift Virtualization / CNV operator healthy (`oc get csv -n openshift-cnv | grep kubevirt`)
+3. StorageClass `efs-sc` exists (`oc get sc efs-sc`) with EFS access-point `uid`/`gid` **107** (qemu — required for VM disks; `cluster-efs` ≥ 0.5.1). EFS CSI operator healthy
+4. CDI clone/upload memory: `rosa-virtualization` ≥ **1.0.3** sets HyperConverged `storageWorkloads` (4Gi); verify `oc get cdiconfig config -o jsonpath='{.status.defaultPodResourceRequirements.limits.memory}'` before large DataVolume clones
+5. Operator pod Running in `openshift-cudn-bgp-routing` with IRSA (no AWS credential errors in logs)
+6. `CUDNBgpConfig` status.peerGroups shows discovered Route Server neighbors / ASN
+7. Route Server peers exist for BGP router node IPs (`aws ec2 describe-route-server-peers`)
+
+**Optional — EFS live migration smoke test** (after CNV is Available):
+
+```bash
+# Schedules on metal (KVM); disk clones to efs-sc RWX; migrates to another metal node
+./scripts/cluster/test-virt-efs-live-migrate.sh
+```
+
+VMs must use `nodeSelector: { bgp_router: "true" }` (or equivalent) on this recipe — regular workers lack KVM.
+
+**Agents:** Step-by-step E2E gates (CDI memory, BGP teardown, failure modes) — [`clusters/virt/AGENTS.md`](../../clusters/virt/AGENTS.md). Generic agent flow — [AGENTS.md](../../AGENTS.md#agent-guided-end-to-end-e2e-cluster-validation).
 
 #### Teardown
 
 ```bash
-make cluster.bgp.destroy_force
+make cluster.virt.destroy_force
 ```
 
 Unregister ACM spokes first if this cluster was imported to a hub. Confirm Route Server and metal instances are gone in the AWS console before walking away (cost).
 
-Module reference: [modules/infrastructure/route-server/README.md](../../modules/infrastructure/route-server/README.md).
+Module reference: [Route Server](../modules/route-server.md). Cluster directory patterns: [Cluster Configurations](cluster-configurations.md#openshift-virtualization-clustersvirt).
 
 ### Post-bootstrap validation
 
@@ -1079,7 +1102,7 @@ These improvements are documented as future work:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `helm_repo_url` | `https://rh-mobb.github.io/validated-pattern-helm-charts/` | Your published Helm repo |
-| `helm_chart_version` | `0.5.19` | `cluster-bootstrap` chart version |
+| `helm_chart_version` | `0.5.20` | `cluster-bootstrap` chart version |
 | `helm_chart_acm_spoke_version` | `0.6.14` | `cluster-bootstrap-acm-spoke` chart version |
 | `helm_chart_acm_hub_registration_version` | `0.2.2` | `cluster-bootstrap-acm-hub-registration` chart version |
 | `helm_chart_awspca_version` | `1.6.1` | `aws-privateca-issuer` chart version |
@@ -1141,7 +1164,7 @@ make cluster.<name>.vpn-start           # Start Client VPN (private clusters)
 - [Authentication](../getting-started/authentication.md) — Break-glass vs short-lived bootstrap login
 - [Quick Start](../getting-started/quick-start.md) — First public cluster walkthrough
 - [PLAN.md](../../PLAN.md) — Architecture decisions and implementation plan
-- [clusters/README.md](../../clusters/README.md) — Cluster directory patterns
+- [Cluster Configurations](cluster-configurations.md) — Cluster directory patterns
 - [scripts/cluster/README-bootstrap-gitops.md](../../scripts/cluster/README-bootstrap-gitops.md) — Bootstrap script reference
 - [egress-zero GitOps guide](../guides/egress-zero-gitops.md) — GitOps for zero-egress clusters
 - [CI/CD guide](../guides/ci-cd.md) — Pipeline integration

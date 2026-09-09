@@ -143,6 +143,7 @@ module "cluster" {
 | cloudwatch_audit_logging_role_arn | [DEPRECATED] ARN of CloudWatch audit logging IAM role (from IAM module output, required when enable_audit_logging is true). Use control_plane_log_forwarding_role_arn instead | `string` | `null` |
 | aws_private_ca_arn | AWS Private CA ARN for certificate management (for GitOps bootstrap, from IAM module) | `string` | `null` |
 | cert_manager_role_arn | ARN of cert-manager IAM role (from IAM module output, for GitOps bootstrap) | `string` | `null` |
+| efs_csi_role_arn | ARN of the EFS CSI driver IAM role (from IAM module output, for rosa-platform-metadata) | `string` | `null` |
 | service_cidr | CIDR block for services | `string` | `"172.30.0.0/16"` |
 | pod_cidr | CIDR block for pods | `string` | `"10.128.0.0/14"` |
 | host_prefix | Host prefix for subnet allocation | `number` | `23` |
@@ -168,7 +169,7 @@ Rendered into `gitops_bootstrap_hub_values` / `gitops_bootstrap_spoke_values` (s
 
 | Name | Description | Type | Default |
 |------|-------------|------|---------|
-| helm_chart_version | `cluster-bootstrap` chart version | `string` | `0.5.19` |
+| helm_chart_version | `cluster-bootstrap` chart version | `string` | `0.5.20` |
 | helm_chart_acm_spoke_version | `cluster-bootstrap-acm-spoke` chart version | `string` | `0.6.14` |
 | helm_chart_acm_hub_registration_version | `cluster-bootstrap-acm-hub-registration` chart version | `string` | `0.2.2` |
 | helm_chart_awspca_version | `aws-privateca-issuer` chart version | `string` | `1.6.1` |

@@ -742,7 +742,7 @@ ensure_openshift_gitops_namespace() {
 # --- Install GitOps for hub/standalone cluster ---
 install_gitops_hub() {
 	local chart_name="${HELM_CHART:-cluster-bootstrap}"
-	local chart_version="${HELM_CHART_VERSION:-0.5.19}"
+	local chart_version="${HELM_CHART_VERSION:-0.5.20}"
 	local namespace="${HELM_NAMESPACE:-openshift-operators}"
 	local helm_timeout="${HELM_TIMEOUT:-15m}"
 	local chart_ref
@@ -1116,6 +1116,8 @@ publish_platform_metadata() {
 	local secrets_manager_role_arn="${SECRETS_MANAGER_ROLE_ARN:-}"
 	local cert_manager_role_arn="${CERT_MANAGER_ROLE_ARN:-}"
 	local bgp_config_secret_name="${BGP_CONFIG_SECRET_NAME:-}"
+	local efs_csi_role_arn="${EFS_CSI_ROLE_ARN:-}"
+	local efs_file_system_id="${EFS_FILE_SYSTEM_ID:-}"
 
 	# Construct predictable ARNs only when TF did not export them (legacy / partial apply)
 	if [[ -z "${secrets_manager_role_arn}" && -n "${aws_account_id}" && -n "${CLUSTER_NAME:-}" ]]; then
@@ -1124,6 +1126,10 @@ publish_platform_metadata() {
 	fi
 	if [[ -z "${cert_manager_role_arn}" && -n "${aws_account_id}" && -n "${CLUSTER_NAME:-}" && -n "${AWS_PRIVATE_CA_ARN:-}" ]]; then
 		cert_manager_role_arn="arn:aws:iam::${aws_account_id}:role/${CLUSTER_NAME}-rosa-cert-manager"
+	fi
+	if [[ -z "${efs_csi_role_arn}" && -n "${efs_file_system_id}" && -n "${aws_account_id}" && -n "${CLUSTER_NAME:-}" ]]; then
+		efs_csi_role_arn="arn:aws:iam::${aws_account_id}:role/${CLUSTER_NAME}-rosa-efs-csi-role-iam"
+		echo "NOTE: EFS_CSI_ROLE_ARN unset; using constructed ARN (enable_efs apply recommended)."
 	fi
 
 	local tmp
@@ -1155,11 +1161,17 @@ EOF
 	if [[ -n "${bgp_config_secret_name}" ]]; then
 		printf '  bgpConfigSecretName: "%s"\n' "${bgp_config_secret_name}" >>"${tmp}"
 	fi
+	if [[ -n "${efs_csi_role_arn}" ]]; then
+		printf '  efsCsiRoleArn: "%s"\n' "${efs_csi_role_arn}" >>"${tmp}"
+	fi
+	if [[ -n "${efs_file_system_id}" ]]; then
+		printf '  efsFileSystemId: "%s"\n' "${efs_file_system_id}" >>"${tmp}"
+	fi
 
 	oc apply -f "${tmp}"
 	rm -f "${tmp}"
 	echo "✓ Platform metadata published to ${ns}/${cm_name}"
-	oc -n "${ns}" get configmap "${cm_name}" -o yaml | grep -E '^(  )?(clusterName|awsAccountId|awsRegion|secretsManagerRoleArn|bgpConfigSecretName|certManagerRoleArn):' || true
+	oc -n "${ns}" get configmap "${cm_name}" -o yaml | grep -E '^(  )?(clusterName|awsAccountId|awsRegion|secretsManagerRoleArn|bgpConfigSecretName|certManagerRoleArn|efsCsiRoleArn|efsFileSystemId):' || true
 }
 
 # --- Configure storage classes ---

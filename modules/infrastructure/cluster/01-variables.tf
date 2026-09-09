@@ -658,7 +658,7 @@ variable "helm_chart" {
 variable "helm_chart_version" {
   description = "Helm chart version for cluster bootstrap"
   type        = string
-  default     = "0.5.19"
+  default     = "0.5.20"
   nullable    = false
 }
 
@@ -763,6 +763,13 @@ variable "secrets_manager_role_arn" {
 
 variable "bgp_config_secret_name" {
   description = "AWS Secrets Manager secret name for CUDN BGP operator config (for rosa-platform-metadata); null when Route Server is disabled"
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "efs_csi_role_arn" {
+  description = "ARN of the EFS CSI driver IAM role (from IAM module output, for rosa-platform-metadata)"
   type        = string
   default     = null
   nullable    = true

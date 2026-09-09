@@ -192,6 +192,12 @@ output "efs_file_system_arn" {
   sensitive   = false
 }
 
+output "efs_csi_role_arn" {
+  description = "ARN of the EFS CSI driver IAM role (null if enable_efs is false)"
+  value       = module.iam.efs_csi_role_arn
+  sensitive   = false
+}
+
 output "ebs_kms_key_arn" {
   description = "ARN of the KMS key for EBS encryption (persists through sleep, null if enable_storage is false)"
   value       = module.iam.ebs_kms_key_arn

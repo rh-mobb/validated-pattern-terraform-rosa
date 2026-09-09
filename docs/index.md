@@ -47,6 +47,7 @@ flowchart TB
 | Egress-zero (prod) | `clusters/egress-zero/` | Zero internet egress, private API |
 | BYO VPC | `clusters/byo-vpc/` | Network team owns VPC |
 | BYO VPC + zero egress | `clusters/byo-vpc-egress-zero/` | Pre-provisioned VPC, zero egress |
+| OpenShift Virtualization | `clusters/virt/` | Metal + EFS RWX + CUDN BGP / Route Server — see [enablement](deployment/enablement.md#openshift-virtualization) |
 
 ## Local preview
 

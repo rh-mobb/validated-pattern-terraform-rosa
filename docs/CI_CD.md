@@ -514,5 +514,5 @@ If configuration layer can't access infrastructure outputs:
 ## See Also
 
 - [scripts/README.md](../scripts/README.md) - Complete script documentation
-- [clusters/README.md](../clusters/README.md) - Cluster configuration guide
+- [Cluster Configurations](../deployment/cluster-configurations.md) — Cluster directory patterns
 - [Main README](../README.md) - Project overview
