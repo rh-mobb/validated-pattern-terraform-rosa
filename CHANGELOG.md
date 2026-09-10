@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Cluster credentials secret shell was not gated by sleep (secret version was already gated)
 
 ### Added
+- **Subnet tag capacity opt-in**: `check_subnet_tag_capacity = true` enables the read-only capacity check from both cluster validation targets; requested checks that cannot resolve a VPC are explicitly reported as not run.
+- **BYO subnet tag lifecycle tooling**: `byo-subnet-tags.py` provides a read-only capacity check and an explicitly approved, exact-key cleanup flow with three-state OCM inventory evidence, complete-map snapshots, and post-delete byte-equality verification. Manual and IRSA-backed Jenkins run paths use the same tool.
 - **Plan-safe cluster-admin lifecycle**: make the long-lived HTPasswd
   administrator and its credentials secret follow explicit caller intent, so
   greenfield enable and both existing-cluster toggle directions plan without a

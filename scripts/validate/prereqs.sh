@@ -19,6 +19,13 @@ NETWORK_TYPE=$(get_tfvar "$CLUSTER_DIR" "network_type" "public")
 ZERO_EGRESS=$(get_tfvar "$CLUSTER_DIR" "zero_egress" "false")
 MULTI_AZ=$(get_tfvar "$CLUSTER_DIR" "multi_az" "true")
 VPC_ID=$(get_tfvar "$CLUSTER_DIR" "existing_vpc_id" "")
+# Covers: env:CHECK_SUBNET_TAG_CAPACITY
+# Does: Reads the cluster's opt-in for the additional tag capacity reads.
+# Why: False preserves existing validation until the cluster explicitly enables it.
+# Change: A missing file or key uses false; only the parsed true value enables it.
+# Trap: This input selects check, never clean, and adds no OCM credential.
+# Evidence: Syntax-only: get_tfvar reads the same cluster file used by the other validation inputs.
+CHECK_SUBNET_TAG_CAPACITY=$(get_tfvar "$CLUSTER_DIR" "check_subnet_tag_capacity" "false")
 CW_LOGS=$(get_tfvar "$CLUSTER_DIR" "control_plane_log_cloudwatch_enabled" "false")
 
 ACCOUNT_ARGS=(--region "$REGION")
@@ -34,6 +41,16 @@ else
 fi
 if [[ "$CW_LOGS" == "true" ]]; then
 	NETWORK_ARGS+=(--require-cloudwatch)
+fi
+
+# Covers: --check-subnet-tag-capacity
+# Does: Passes the opt-in once to both BYO and Terraform-discovered VPC paths.
+# Why: Both network invocations consume the same shared argument array.
+# Change: All values other than true leave the additional check disabled.
+# Trap: Unreadable tags fail opted-in validation, including transient EC2 failures.
+# Evidence: Syntax-only: both invocations below consume NETWORK_ARGS and preserve failure handling.
+if [[ "$CHECK_SUBNET_TAG_CAPACITY" == "true" ]]; then
+	NETWORK_ARGS+=(--check-subnet-tag-capacity)
 fi
 
 info "Validating account prerequisites for cluster: $CLUSTER_NAME (region: $REGION)"
@@ -59,9 +76,15 @@ else
 			"$SCRIPT_DIR/byo-network.sh" "${NETWORK_ARGS[@]}" --vpc-id "$TF_VPC" || NETWORK_EXIT=$?
 		else
 			info "Skipping VPC validation — run after 'make cluster.$CLUSTER_NAME.init' and apply network, or use validate-network with --vpc-id"
+			if [[ "$CHECK_SUBNET_TAG_CAPACITY" == "true" ]]; then
+				info "Subnet tag capacity: requested, but network validation was skipped (no VPC id resolved) — check did not run"
+			fi
 		fi
 	else
 		info "Skipping VPC validation — cluster not initialized (no terraform output yet)"
+		if [[ "$CHECK_SUBNET_TAG_CAPACITY" == "true" ]]; then
+			info "Subnet tag capacity: requested, but network validation was skipped (no VPC id resolved) — check did not run"
+		fi
 	fi
 fi
 

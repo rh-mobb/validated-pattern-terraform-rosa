@@ -417,9 +417,13 @@ validate-network: check-cluster ## Validate VPC for BYO or Terraform-managed net
 		ZERO=$$(get_tfvar "$$CLUSTER_DIR" zero_egress false); \
 		MULTI=$$(get_tfvar "$$CLUSTER_DIR" multi_az true); \
 		VPC_ID=$$(get_tfvar "$$CLUSTER_DIR" existing_vpc_id ""); \
+		CHECK_SUBNET_TAG_CAPACITY=$$(get_tfvar "$$CLUSTER_DIR" check_subnet_tag_capacity false); \
 		ARGS="--region $$REGION"; \
 		[[ "$$ZERO" == "true" ]] && ARGS="$$ARGS --zero-egress"; \
 		[[ "$$MULTI" == "true" ]] && ARGS="$$ARGS --multi-az" || ARGS="$$ARGS --single-az"; \
+		if [[ "$$CHECK_SUBNET_TAG_CAPACITY" == "true" ]]; then \
+			ARGS="$$ARGS --check-subnet-tag-capacity"; \
+		fi; \
 		if [[ -n "$$VPC_ID" ]]; then \
 			ARGS="$$ARGS --vpc-id $$VPC_ID"; \
 		elif [ -f "$(TF_DATA_DIR)/terraform.tfstate" ]; then \
@@ -430,6 +434,9 @@ validate-network: check-cluster ## Validate VPC for BYO or Terraform-managed net
 			$(SCRIPT_DIR)/validate/byo-network.sh $$ARGS; \
 		else \
 			echo "$(YELLOW)Skipping VPC validation — no vpc-id (BYO: set existing_vpc_id; full-stack: init/apply first)$(NC)"; \
+			if [[ "$$CHECK_SUBNET_TAG_CAPACITY" == "true" ]]; then \
+				echo "Subnet tag capacity: requested, but network validation was skipped (no VPC id resolved) — check did not run"; \
+			fi; \
 		fi'
 
 validate-terraform: ## Validate Terraform configuration syntax
