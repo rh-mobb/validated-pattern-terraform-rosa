@@ -10,6 +10,9 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import re
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -504,6 +507,73 @@ class InputTests(unittest.TestCase):
                 self.assertIn("--apply", text)
                 self.assertIn("--assume-absent", text)
                 self.assertIn("unobserved", text)
+
+
+class CapacityOptInTests(unittest.TestCase):
+    def test_prereqs_appends_once_before_both_network_invocations(self) -> None:
+        source = (ROOT / "scripts/validate/prereqs.sh").read_text()
+        self.assertIn(
+            'CHECK_SUBNET_TAG_CAPACITY=$(get_tfvar "$CLUSTER_DIR" '
+            '"check_subnet_tag_capacity" "false")', source
+        )
+        guard = (
+            'if [[ "$CHECK_SUBNET_TAG_CAPACITY" == "true" ]]; then\n'
+            '\tNETWORK_ARGS+=(--check-subnet-tag-capacity)\nfi'
+        )
+        self.assertEqual(source.count('NETWORK_ARGS+=(--check-subnet-tag-capacity)'), 1)
+        self.assertIn(guard, source)
+        calls = list(re.finditer(r'"\$SCRIPT_DIR/byo-network.sh"', source))
+        self.assertEqual(len(calls), 2)
+        for call in calls:
+            self.assertLess(source.index(guard), call.start())
+            line = source[call.start():].splitlines()[0]
+            self.assertIn('"${NETWORK_ARGS[@]}"', line)
+            self.assertIn('|| NETWORK_EXIT=$?', line)
+
+    def test_validate_network_uses_explicit_guard_before_vpc_selection(self) -> None:
+        source = (ROOT / "Makefile.cluster").read_text()
+        recipe = source.split("validate-network: check-cluster", 1)[1].split(
+            "\nvalidate-terraform:", 1
+        )[0]
+        self.assertIn(
+            'CHECK_SUBNET_TAG_CAPACITY=$$(get_tfvar "$$CLUSTER_DIR" '
+            'check_subnet_tag_capacity false)', recipe
+        )
+        self.assertEqual(recipe.count('--check-subnet-tag-capacity'), 1)
+        guard = recipe.index('if [[ "$$CHECK_SUBNET_TAG_CAPACITY" == "true" ]]; then')
+        append = recipe.index('ARGS="$$ARGS --check-subnet-tag-capacity"')
+        end = recipe.index('fi;', append)
+        vpc = recipe.index('if [[ -n "$$VPC_ID" ]]; then')
+        self.assertLess(guard, append)
+        self.assertLess(append, end)
+        self.assertLess(end, vpc)
+        self.assertNotIn('--ocm-token-file', recipe)
+
+    @unittest.skipUnless(shutil.which("bash"), "bash is required to exercise get_tfvar")
+    def test_get_tfvar_capacity_opt_in_values(self) -> None:
+        cases = (
+            ("missing file", None, "false", "off"),
+            ("missing key", 'region = "us-east-1"\n', "false", "off"),
+            ("bare true", 'check_subnet_tag_capacity = true\n', "true", "on"),
+            ("quoted true", 'check_subnet_tag_capacity = "true"\n', "true", "on"),
+            ("false", 'check_subnet_tag_capacity = false\n', "false", "off"),
+            ("junk", 'check_subnet_tag_capacity = "junk"\n', "junk", "off"),
+        )
+        for name, content, expected, enabled in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                if content is not None:
+                    (Path(directory) / "terraform.tfvars").write_text(content)
+                # Exercise the real reader in its callers' command-substitution form.
+                result = subprocess.run(
+                    ["bash", "-c", ('source "$1"; '
+                     'value=$(get_tfvar "$2" check_subnet_tag_capacity false); '
+                     'printf "%s\\n" "$value"; '
+                     'if [[ "$value" == "true" ]]; then echo on; else echo off; fi'),
+                     "capacity-test", str(ROOT / "scripts/common.sh"), directory],
+                    capture_output=True, text=True, check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.splitlines(), [expected, enabled])
 
 
 if __name__ == "__main__":

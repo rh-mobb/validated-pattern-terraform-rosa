@@ -28,6 +28,9 @@
 #
 # Validate before apply:
 #   make cluster.<name>.validate
+# Optional read-only tag capacity check for validate and validate-network.
+# Default off; uncomment to enable. Unreadable EC2 tags fail validation.
+# check_subnet_tag_capacity = true
 #
 # Quick start: rosa create network (ROSA CLI v1.2.48+) — then adjust for zero egress if needed.
 # See: https://access.redhat.com/articles/7096266

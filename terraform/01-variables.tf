@@ -47,6 +47,18 @@ variable "existing_public_subnet_ids" {
   nullable    = true
 }
 
+# Covers: description, type, default
+# Does: Declares the boolean consumed by pre-create validation rather than a resource.
+# Why: False keeps the additional EC2 tag reads opt-in for existing configurations.
+# Change: True enables the check in both validation entry points; omission stays off.
+# Trap: Declaring it avoids an undeclared-variable plan warning but adds an unused-declaration lint warning.
+# Evidence: https://developer.hashicorp.com/terraform/language/values/variables
+variable "check_subnet_tag_capacity" {
+  description = "Opt in to the read-only subnet tag capacity check during pre-create validation. Read by validation scripts, not by any Terraform resource. Unreadable EC2 tag data fails validation."
+  type        = bool
+  default     = false
+}
+
 variable "zero_egress" {
   description = "Enable zero egress mode (no internet egress, only VPC endpoints). This is a cluster-level ROSA API property that can be set independently of network_type. However, zero egress typically requires network_type='private' (PrivateLink API endpoint) and the network module will configure infrastructure (disable NAT Gateway, enable strict egress security groups) when both conditions are met. Matches ROSA API property name."
   type        = bool
