@@ -7,7 +7,7 @@
 # time_sleep delays the data source read until ROSA has had time to create the SG (no local-exec).
 
 locals {
-  need_cluster_default_sg = local.persists_through_sleep && (var.enable_efs || var.enable_autonode)
+  need_cluster_default_sg = local.persists_through_sleep && (var.enable_efs || var.enable_autonode || var.enable_bgp_e2e_worker_sg)
   cluster_default_sg_name = local.need_cluster_default_sg ? "${one(rhcs_cluster_rosa_hcp.main[*].id)}-default-sg" : ""
 }
 

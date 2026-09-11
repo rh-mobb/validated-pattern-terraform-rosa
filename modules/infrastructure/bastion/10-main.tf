@@ -110,6 +110,17 @@ resource "aws_security_group" "bastion" {
     cidr_blocks = var.bastion_public_ip ? ["0.0.0.0/0"] : []
   }
 
+  dynamic "ingress" {
+    for_each = length(var.bgp_e2e_ingress_cidrs) > 0 ? [1] : []
+    content {
+      description = "BGP e2e all traffic from CUDN"
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = var.bgp_e2e_ingress_cidrs
+    }
+  }
+
   egress {
     description = "All outbound traffic"
     from_port   = 0
@@ -260,6 +271,13 @@ sudo systemctl status amazon-ssm-agent --no-pager -l || echo "SSM agent status c
 
 echo "Bastion initialization complete. SSM agent should be running and registering with AWS Systems Manager."
 echo "Note: For egress-zero clusters, no additional packages are installed (no internet access)."
+%{if var.enable_bgp_e2e_http_echo~}
+echo "Starting BGP e2e icanhazip on port ${var.bgp_e2e_http_port} (osd-gcp echo_client pattern)..."
+yum install -y podman || true
+podman rm -f icanhazip-e2e 2>/dev/null || true
+podman pull docker.io/thejordanprice/icanhazip-clone:latest || true
+podman run -d --name icanhazip-e2e --restart always -p ${var.bgp_e2e_http_port}:80 docker.io/thejordanprice/icanhazip-clone:latest
+%{endif~}
 EOF
 
   # Ensure SSM Agent is running before considering instance ready

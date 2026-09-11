@@ -1350,6 +1350,8 @@ Replace `<name>` with the cluster directory (e.g. `public`, `virt`, `egress-zero
 
 **Execution:** Use [Long-running cluster operations](#long-running-cluster-operations-ai-operators) (tmux, tee logs under `clusters/<name>/logs/`). **Complete each step and validate before starting the next.** On failure: validate inputs/state, diagnose root cause, discuss fix options with the operator if non-obvious, then resume from the failed step — do not blindly re-run the whole pipeline.
 
+**Teardown is operator-confirmed:** After Step 6 smoke tests pass, **stop and ask the operator** whether to tear down, keep the cluster for further manual testing, or run only partial cleanup (e.g. bastion). Do **not** start `destroy` / `destroy_force` unless they explicitly approve — expensive recipes (virt metal, hub/spoke) are often kept alive briefly for follow-up work.
+
 | Step | Action | Done when |
 |------|--------|-----------|
 | **0. Preflight** | Confirm AWS + RHCS auth, `clusters/<name>/terraform.tfvars` matches intent, state/plan paths under `clusters/<name>/`. | Credentials work; no stale lock file; operator approves cost/teardown if expensive. |
@@ -1359,7 +1361,7 @@ Replace `<name>` with the cluster directory (e.g. `public`, `virt`, `egress-zero
 | **4. Login / verify** | `make cluster.<name>.login`; `make cluster.<name>.verify` when available | `oc` commands succeed; GitOps operator and app-of-apps healthy per verify script. |
 | **5. GitOps / Day-2 gates** | Recipe-specific — see `clusters/<name>/AGENTS.md` and enablement | Argo apps Synced/Healthy; operators/StorageClasses/IRSA bindings match acceptance criteria. |
 | **6. Smoke tests** | Recipe-specific scripts in `scripts/cluster/` or documented `oc` checks | Script exit 0 or documented criteria met. |
-| **7. Teardown** | `make cluster.<name>.destroy` or `destroy_force` when required (tmux) | State empty or expected leftovers documented; AWS console spot-check for expensive resources (metal, Route Server, NAT). |
+| **7. Teardown (operator-approved only)** | After operator confirms: `make cluster.<name>.destroy` or `destroy_force` (tmux) | State empty or expected leftovers documented; AWS console spot-check for expensive resources (metal, Route Server, NAT). |
 
 **Parallel hub + spoke** is a variant: see [Parallel Hub + Spoke Test Deployments](#parallel-hub--spoke-test-deployments-same-checkout). Still use per-step validation; parallel apply does not replace recipe-specific gates after bootstrap.
 

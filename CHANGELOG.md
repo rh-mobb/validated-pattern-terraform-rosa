@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **BGP e2e worker security group**: When `bastion_enable_bgp_e2e` and `enable_route_server` are true, add ROSA default worker SG ingress for all traffic from the VPC CIDR (ROSA allows ICMP/SSH but blocks other cross-boundary traffic to CUDN overlay IPs). Bastion SG allows all traffic from configured CUDN CIDRs. Fixes virt external VM↔bastion connectivity tests (`modules/infrastructure/cluster/12-bgp-e2e-worker-sg.tf`, bastion module). `:8080` remains the default smoke-test echo port only.
 - **`persists_through_sleep` simplified and fixed**: Replaced three nullable override variables (`persists_through_sleep_cluster`, `persists_through_sleep_network`, `persists_through_sleep_iam`) with two simple booleans (`keep_network_on_sleep`, `keep_iam_on_sleep`) that only apply when sleeping. Cluster always follows the global `persists_through_sleep`. Fixes:
   - `enable_identity_provider`, `create_cluster_credentials_secret`, and `additional_machine_pools_resolved` now correctly gated by `persists_through_sleep`
   - OIDC identity provider module (`terraform/20-oidc-identity-providers.tf`) was not gated by sleep at all — caused null cluster_id errors during sleep
@@ -17,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Cluster credentials secret shell was not gated by sleep (secret version was already gated)
 
 ### Added
-- **Plan-safe cluster-admin lifecycle**: make the long-lived HTPasswd
+- **Virt external VM↔bastion BGP smoke test**: `scripts/cluster/test-virt-external-vm-ping.sh`, `clusters/virt/test-external-vm-ping.yaml`, and optional `clusters/virt/bastion-e2e.tfvars` for targeted bastion + worker SG apply. Python stdlib caller-IP echo on bastion and VM (no podman/docker.io). Agent Step 6b in `clusters/virt/AGENTS.md`.
+
   administrator and its credentials secret follow explicit caller intent, so
   greenfield enable and both existing-cluster toggle directions plan without a
   target-first password apply.

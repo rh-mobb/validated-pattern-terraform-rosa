@@ -12,6 +12,28 @@ Recipe-specific steps for agent-guided validation. **Generic flow:** [AGENTS.md]
 | Storage | EFS RWX (`enable_efs`); platform metadata → `cluster-efs` chart |
 | Cost | ~$16/hr (metal + workers) — **teardown promptly** |
 
+## Known limitation — CUDN VMs on BGP peers only
+
+Until [bgp-cloud-connector#121](https://github.com/openshift/bgp-cloud-connector/issues/121) lands, the operator sets **`SourceDestCheck=false`** (AWS anti-spoofing / IP forwarding) only on nodes matching `routerNodeSelector` (`bgp_router=true`). CUDN egress uses the **scheduling node’s ENI** with the **CUDN source IP preserved** (RouteAdvertisements; not SNAT to the worker primary IP). Replies and outbound VPC traffic from a VM on a **non-speaker** worker fail unless that node’s ENI also allows forwarding.
+
+**Until #121:** schedule **KubeVirt VMs** (and any CUDN workload that must reach the VPC with a routable overlay IP) on **`bgp_router` metal pools only** — `nodeSelector: { bgp_router: "true" }`. Default `m7i` workers are for platform/GitOps only.
+
+Production shape (small speaker pool + CUDN on general workers) needs #121 or an interim all-workers workaround (see ARO `azure-nic-ip-forwarding` pattern). This recipe **collapses** speakers and VM compute onto the same three metal nodes to stay within Route Server peer limits and avoid the extra-hop gap.
+
+### EgressIP not used (ruled out)
+
+**EgressIP** SNATs CUDN traffic to a worker-subnet IP before it hits the cloud — the opposite of this recipe, which uses **RouteAdvertisements + BGP** so the VPC routes the **real CUDN prefix** (`10.100.0.0/16`) to VM/pod IPs.
+
+EgressIP was investigated for CUDN **internet egress** elsewhere (osd-gcp-cudn-routing) and ruled out for Layer2 primary UDN:
+
+| Blocker | Reference |
+|---------|-----------|
+| Not supported for Layer2 CUDN (OCP 4.21 Advanced Networking) | Product docs; see `reference/osd-gcp-cudn-routing/KNOWLEDGE.md` |
+| OVN EgressIP flows broken on non–gateway-router nodes (`/32`-per-node platforms) | [OCPBUGS-48301](https://issues.redhat.com/browse/OCPBUGS-48301) |
+| Planned upstream fix (Layer2 transit router + EgressIP) | [OKEP-5094](https://ovn-kubernetes.io/okeps/okep-5094-layer2-transit-router/) — OCP 4.22+; ROSA delivery not confirmed |
+
+Do not substitute EgressIP for BGP peer placement or `SourceDestCheck` on speakers. Even if OKEP-5094 lands, it does not replace preserved-IP VPC routing for the external VM ↔ bastion gate.
+
 ## When to run this E2E
 
 - Changes to `clusters/virt/terraform.tfvars`, route-server module, EFS/BGP IAM, bootstrap pins, or `dev/virt` GitOps.
@@ -80,6 +102,7 @@ oc patch hyperconverged kubevirt-hyperconverged -n openshift-cnv --type=merge -p
 | Upload server `disk.img: file exists` after OOM | Partial clone on tmp EFS PVC | Delete `virt-e2e-test` namespace and tmp resources in `openshift-virtualization-os-images`; retry |
 | Target PVC Pending on `efs-sc` during clone | Normal until clone completes | Do not treat as EFS CSI failure while DV phase is `CloneInProgress` |
 | Destroy fails on Route Server peers | Stale BGP peers | Use `destroy_force` (runs `cleanup-route-server-bgp-peers.sh`); see destroy log |
+| VPC ↔ CUDN timeout; VM on default worker | VM not on BGP peer; #121 not landed | Move VM to `bgp_router` node; confirm `nodeSelector` — see [Known limitation](#known-limitation--cudn-vms-on-bgp-peers-only) |
 
 ## Step 6 — Smoke tests
 
@@ -106,7 +129,63 @@ Cleanup test namespace before teardown (optional; destroy does not require it):
 oc delete namespace virt-e2e-test --wait=false
 ```
 
-## Step 7 — Teardown
+### Step 6b — External VM ↔ bastion BGP test (optional)
+
+Validates CUDN VM (`10.100.0.0/16`) ↔ VPC host over BGP using HTTP caller-IP echo (osd-gcp pattern). **Off by default** — bastion is not in the main `terraform.tfvars`; enable only for this gate.
+
+**Agent flow:**
+
+1. **Apply bastion + worker SG rules (targeted, ~2 min)** — does not change default `enable_bastion = false` in `terraform.tfvars`. Worker SG rules require `bastion_enable_bgp_e2e=true` with `enable_route_server=true` (set in `bastion-e2e.tfvars` + main tfvars):
+
+```bash
+cd terraform
+export TF_DATA_DIR="../clusters/virt/.terraform"
+terraform init -reconfigure -input=false \
+  -backend-config="path=$(pwd)/../clusters/virt/infrastructure.tfstate"
+terraform apply \
+  -var="cluster_config_dir=virt" \
+  -var-file="../clusters/virt/terraform.tfvars" \
+  -var-file="../clusters/virt/bastion-e2e.tfvars" \
+  -target='module.bastion[0]' \
+  -target='module.cluster.aws_vpc_security_group_ingress_rule.bgp_e2e_vpc_all[0]'
+terraform output bastion_instance_id bastion_private_ip
+```
+
+2. **Run smoke test:**
+
+```bash
+VIRT_E2E_STRICT_HTTP_CROSS=1 ./scripts/cluster/test-virt-external-vm-ping.sh
+# Done when: VIRT_EXTERNAL_PING_EXIT:0 (strict HTTP both ways + ICMP)
+```
+
+3. **Cleanup test workloads:**
+
+```bash
+oc delete namespace virt-bgp-prod --wait=false
+```
+
+4. **Remove bastion (optional before full teardown)** — or rely on `make cluster.virt.destroy_force` (main tfvars has `enable_bastion = false`, so bastion is destroyed with the stack):
+
+```bash
+cd terraform
+export TF_DATA_DIR="../clusters/virt/.terraform"
+terraform apply \
+  -var="cluster_config_dir=virt" \
+  -var-file="../clusters/virt/terraform.tfvars" \
+  -var='enable_bastion=false' \
+  -var='bastion_enable_bgp_e2e=false' \
+  -target='module.bastion[0]'
+```
+
+**Done when:** `VIRT_EXTERNAL_PING_EXIT:0` with `VIRT_E2E_STRICT_HTTP_CROSS=1` — netshoot→VM and bastion↔VM HTTP caller-IP on `:8080`, plus bidirectional ICMP. Requires worker SG rules from `bastion_enable_bgp_e2e` (ROSA default SG allows ICMP/SSH from VPC but blocks other cross-boundary traffic until then). `:8080` is the smoke-test port only; SG rules allow all traffic from the VPC/CUDN CIDRs.
+
+Manifest: [`test-external-vm-ping.yaml`](test-external-vm-ping.yaml). Guest echo uses stdlib Python (no `podman pull` — CUDN lacks docker.io/repo egress). Bastion SG + worker SG + HTTP echo: `bastion_enable_bgp_e2e` in [`bastion-e2e.tfvars`](bastion-e2e.tfvars).
+
+## Step 7 — Teardown (operator-approved only)
+
+**Do not run teardown automatically** after smoke tests — ask the operator first. They may want to keep the cluster for manual checks, re-run tests, or inspect Argo/operators.
+
+When approved:
 
 ```bash
 make cluster.virt.destroy_force   # tmux; ~45–60 min; validates BGP endpoint/peer cleanup

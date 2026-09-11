@@ -85,6 +85,9 @@ module "bastion" {
 | instance_type | EC2 instance type for the bastion host | `string` | `"t3.micro"` | no |
 | tags | Tags to apply to all resources | `map(string)` | `{}` | no |
 | permissions_boundary_arn | ARN of the permission boundary policy for the bastion IAM role. If null, no boundary is applied | `string` | `null` | no |
+| bgp_e2e_ingress_cidrs | CIDR blocks for all-traffic ingress when running BGP e2e (empty = no extra rules) | `list(string)` | `[]` | no |
+| bgp_e2e_http_port | TCP port for BGP e2e caller-IP HTTP echo server (default :8080; SG is not port-specific) | `number` | `8080` | no |
+| enable_bgp_e2e_http_echo | Start Python caller-IP HTTP server on boot (BGP e2e smoke tests) | `bool` | `false` | no |
 
 ## Outputs
 

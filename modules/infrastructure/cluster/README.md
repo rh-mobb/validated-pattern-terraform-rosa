@@ -127,6 +127,7 @@ module "cluster" {
 | efs_kms_key_arn | KMS key ARN for EFS encryption (from IAM module output, required when enable_efs is true) | `string` | `null` |
 | enable_efs | Enable EFS file system creation | `bool` | `true` |
 | private_subnet_cidrs | List of private subnet CIDR blocks (required for EFS security group rules) | `list(string)` | `[]` |
+| enable_bgp_e2e_worker_sg | Add ROSA default worker SG ingress for all traffic from vpc_cidr (VPC↔CUDN BGP e2e; pair with bastion e2e) | `bool` | `false` |
 | private_subnet_ids | List of private subnet IDs (required for EFS mount targets and cluster creation) | `list(string)` | `[]` |
 | public_subnet_ids | List of public subnet IDs (for public clusters, will be concatenated with private_subnet_ids) | `list(string)` | `[]` |
 | control_plane_log_forwarding_role_arn | ARN of control plane log forwarding IAM role (from IAM module output, required when enable_control_plane_log_forwarding is true) | `string` | `null` |

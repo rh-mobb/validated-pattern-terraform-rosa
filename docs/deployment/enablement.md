@@ -704,7 +704,9 @@ Use the [virt](../../clusters/virt/terraform.tfvars) recipe (formerly `clusters/
 - Public multi-AZ ROSA HCP (`network_type = "public"`), OCP **4.21+** (example pins `4.22.2` / `fast-4.22`) for FRR-K8s / CUDN / CNV
 - `enable_efs = true` plus `enable_secrets_manager_iam = true`
 - Default workers `m7i.2xlarge` (GitOps / in-cluster operator image builds) — **no KVM**; do not schedule VMs here
-- One **Intel bare-metal** worker pool per AZ (`c5.metal`) labeled `bgp_router=true` (nested virt and Graviton metal are not supported for this path). Metal pools advertise `devices.kubevirt.io/kvm` and host both BGP routing and VM workloads in this recipe
+- One **Intel bare-metal** worker pool per AZ (`c5.metal`) labeled `bgp_router=true` (nested virt and Graviton metal are not supported for this path). Metal pools advertise `devices.kubevirt.io/kvm`, peer with Route Server, and host VM workloads in this recipe
+- **CUDN placement (until [bgp-cloud-connector#121](https://github.com/openshift/bgp-cloud-connector/issues/121)):** the BGP operator disables AWS `SourceDestCheck` only on `bgp_router` nodes. Preserved CUDN egress exits the **scheduling node’s ENI**; VMs (and VPC-reachable CUDN pods) must run on **BGP peers** — use `nodeSelector: { bgp_router: "true" }`. Do not rely on default workers for routable CUDN traffic until #121 or an interim all-worker forwarding workaround
+- **EgressIP not used:** SNAT to worker IP conflicts with BGP + RouteAdvertisements (preserved CUDN IPs). Layer2 CUDN EgressIP is unsupported/broken ([OCPBUGS-48301](https://issues.redhat.com/browse/OCPBUGS-48301)); future path is [OKEP-5094](https://ovn-kubernetes.io/okeps/okep-5094-layer2-transit-router/) — see [`clusters/virt/AGENTS.md`](../../clusters/virt/AGENTS.md#egressip-not-used-ruled-out)
 - GitOps path `dev/virt` installs ESO, `cluster-efs`, `rosa-virtualization`, and `cudn-bgp-routing-operator`
 - Set `enable_cluster_admin = true` for `make cluster.virt.login`
 
@@ -765,11 +767,24 @@ Manual fallback (no ESO): annotate the operator ServiceAccount with `bgp_operato
 ./scripts/cluster/test-virt-efs-live-migrate.sh
 ```
 
-VMs must use `nodeSelector: { bgp_router: "true" }` (or equivalent) on this recipe — regular workers lack KVM.
+**Optional — external VM ↔ bastion BGP test** (validates CUDN `10.100.0.0/16` ↔ VPC routing; off by default — bastion is not in main `terraform.tfvars`):
+
+1. Targeted apply for bastion + worker SG rules (~2 min) — see [`clusters/virt/AGENTS.md`](../../clusters/virt/AGENTS.md#step-6b--external-vm--bastion-bgp-test-optional) (uses [`bastion-e2e.tfvars`](../../clusters/virt/bastion-e2e.tfvars)).
+2. Run the smoke test:
+
+```bash
+VIRT_E2E_STRICT_HTTP_CROSS=1 ./scripts/cluster/test-virt-external-vm-ping.sh
+```
+
+**Done when:** `VIRT_EXTERNAL_PING_EXIT:0` (strict HTTP both ways + bidirectional ICMP). Requires `bastion_enable_bgp_e2e` with `enable_route_server` so ROSA default worker SG allows cross-boundary traffic to CUDN overlay IPs.
+
+VMs must use `nodeSelector: { bgp_router: "true" }` on this recipe — default workers lack KVM **and** (until [bgp-cloud-connector#121](https://github.com/openshift/bgp-cloud-connector/issues/121)) lack the operator-managed `SourceDestCheck=false` required for preserved CUDN egress to the VPC.
 
 **Agents:** Step-by-step E2E gates (CDI memory, BGP teardown, failure modes) — [`clusters/virt/AGENTS.md`](../../clusters/virt/AGENTS.md). Generic agent flow — [AGENTS.md](../../AGENTS.md#agent-guided-end-to-end-e2e-cluster-validation).
 
 #### Teardown
+
+Confirm you are finished validating (agents should ask before destroy). Then:
 
 ```bash
 make cluster.virt.destroy_force

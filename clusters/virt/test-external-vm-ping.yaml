@@ -1,0 +1,126 @@
+# CUDN VM + netshoot for BGP reachability (prod UDN 10.100.0.0/16).
+# Pair with scripts/cluster/test-virt-external-vm-ping.sh (Terraform bastion outside the cluster).
+# Pattern: osd-gcp-cudn-routing (HTTP :8080 curl IP verification).
+# Virt CUDN lacks docker.io/Fedora repo egress — guest uses stdlib Python echo (same caller-IP contract).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: virt-bgp-prod
+  labels:
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: privileged
+    k8s.ovn.org/primary-user-defined-network: ""
+    cluster-udn: prod
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netshoot-cudn
+  namespace: virt-bgp-prod
+spec:
+  containers:
+    - name: netshoot
+      image: nicolaka/netshoot
+      command: ["sleep", "infinity"]
+      securityContext:
+        privileged: true
+      volumeMounts:
+        - name: scratch
+          mountPath: /scratch
+  volumes:
+    - name: scratch
+      emptyDir: {}
+  restartPolicy: Never
+---
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: pingvm-root
+  namespace: virt-bgp-prod
+spec:
+  source:
+    pvc:
+      name: fedora-1217dcc8c58d
+      namespace: openshift-virtualization-os-images
+  storage:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 30Gi
+    storageClassName: gp3-csi
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: pingvm
+  namespace: virt-bgp-prod
+  labels:
+    app: virt-external-ping-test
+spec:
+  runStrategy: Always
+  template:
+    metadata:
+      labels:
+        app: virt-external-ping-test
+    spec:
+      # BGP peer required: KVM + SourceDestCheck=false (operator) until bgp-cloud-connector#121
+      nodeSelector:
+        bgp_router: "true"
+      domain:
+        cpu:
+          cores: 1
+        devices:
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              bridge: {}
+        machine:
+          type: pc-q35-rhel9.6.0
+        resources:
+          requests:
+            memory: 2Gi
+      networks:
+        - name: default
+          pod: {}
+      volumes:
+        - name: rootdisk
+          persistentVolumeClaim:
+            claimName: pingvm-root
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              hostname: pingvm
+              user: fedora
+              password: fedora
+              chpasswd:
+                expire: false
+              ssh_authorized_keys:
+                - __SSH_PUB_KEY__
+              ssh_pwauth: true
+              package_update: false
+              write_files:
+                - path: /usr/local/bin/icanhazip-e2e-fallback.py
+                  permissions: "0755"
+                  content: |
+                    from http.server import BaseHTTPRequestHandler, HTTPServer
+                    class H(BaseHTTPRequestHandler):
+                      def do_GET(self):
+                        self.send_response(200); self.end_headers()
+                        self.wfile.write(self.client_address[0].encode())
+                      def log_message(self, *a): pass
+                    HTTPServer(("0.0.0.0", 8080), H).serve_forever()
+              runcmd:
+                - systemctl stop firewalld || true
+                - systemctl disable firewalld || true
+                - >-
+                  nohup python3 /usr/local/bin/icanhazip-e2e-fallback.py
+                  >/var/log/icanhazip-e2e-fallback.log 2>&1 &

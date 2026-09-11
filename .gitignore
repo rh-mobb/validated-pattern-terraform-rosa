@@ -96,6 +96,7 @@ kubeconfig
 values.generated.yaml
 
 clusters/*/private-gitops.env
+clusters/*/.virt-e2e/
 
 # MkDocs local build
 .venv-docs/

@@ -134,6 +134,12 @@ output "bastion_instance_id" {
   sensitive   = false
 }
 
+output "bastion_private_ip" {
+  description = "Bastion private IP (VPC echo target for BGP e2e when bastion_enable_bgp_e2e is true)"
+  value       = var.enable_bastion && length(module.bastion) > 0 ? module.bastion[0].bastion_private_ip : null
+  sensitive   = false
+}
+
 output "bastion_ssm_command" {
   description = "Command to connect to bastion via SSM Session Manager"
   value       = var.enable_bastion && length(module.bastion) > 0 ? module.bastion[0].ssm_session_command : null
