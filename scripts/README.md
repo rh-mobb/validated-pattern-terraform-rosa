@@ -19,6 +19,8 @@ scripts/
 │   ├── cleanup-infrastructure.sh
 │   ├── bootstrap-gitops.sh
 │   ├── private-gitea.sh
+│   ├── test-virt-efs-live-migrate.sh
+│   ├── test-virt-external-vm-ping.sh
 │   └── README-bootstrap-gitops.md
 ├── dev/                   # Local multi-repo GitOps (see docs/guides/local-multi-repo-dev.md)
 │   ├── private-gitops-lib.sh
@@ -139,6 +141,21 @@ DEBUG=true make cluster.<cluster-name>.bootstrap
 ```
 
 See [cluster/README-bootstrap-gitops.md](cluster/README-bootstrap-gitops.md) for standalone usage and env vars.
+
+#### Virt cluster smoke tests (`clusters/virt`)
+
+Optional post-deploy checks after CNV and GitOps are healthy — see [OpenShift Virtualization](../docs/deployment/enablement.md#openshift-virtualization) and [`clusters/virt/AGENTS.md`](../clusters/virt/AGENTS.md).
+
+| Script | Exit marker | Purpose |
+|--------|-------------|---------|
+| `test-virt-efs-live-migrate.sh` | `EFS_LIVE_MIGRATE_EXIT:0` | Fedora DV → `efs-sc`, VM on metal, live migration between `bgp_router` nodes |
+| `test-virt-external-vm-ping.sh` | `VIRT_EXTERNAL_PING_EXIT:0` | CUDN VM ↔ VPC bastion over BGP (HTTP caller-IP + ICMP). Requires targeted bastion apply with [`bastion-e2e.tfvars`](../clusters/virt/bastion-e2e.tfvars). Strict cross-boundary HTTP: `VIRT_E2E_STRICT_HTTP_CROSS=1`. |
+
+```bash
+./scripts/cluster/test-virt-efs-live-migrate.sh
+# Optional Step 6b — see clusters/virt/AGENTS.md for targeted terraform apply first
+VIRT_E2E_STRICT_HTTP_CROSS=1 ./scripts/cluster/test-virt-external-vm-ping.sh
+```
 
 #### Local development scripts (`dev/`)
 

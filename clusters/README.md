@@ -37,7 +37,7 @@ For **live end-to-end validation** (deploy → bootstrap → Day-2 gates → smo
 
 | Cluster | Agent E2E doc |
 |---------|----------------|
-| `virt` | [virt/AGENTS.md](virt/AGENTS.md) — EFS, CNV, BGP, live migration |
+| `virt` | [virt/AGENTS.md](virt/AGENTS.md) — EFS, CNV, BGP, live migration, optional external VM ping |
 | Others | Generic flow only until a recipe-specific `AGENTS.md` is added |
 
 When you add features to a recipe, update its `AGENTS.md` (and enablement) in the same change — do not rely on ad-hoc coordinator scripts under `clusters/*/logs/`.

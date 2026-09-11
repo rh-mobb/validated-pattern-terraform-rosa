@@ -767,11 +767,24 @@ Manual fallback (no ESO): annotate the operator ServiceAccount with `bgp_operato
 ./scripts/cluster/test-virt-efs-live-migrate.sh
 ```
 
+**Optional — external VM ↔ bastion BGP test** (validates CUDN `10.100.0.0/16` ↔ VPC routing; off by default — bastion is not in main `terraform.tfvars`):
+
+1. Targeted apply for bastion + worker SG rules (~2 min) — see [`clusters/virt/AGENTS.md`](../../clusters/virt/AGENTS.md#step-6b--external-vm--bastion-bgp-test-optional) (uses [`bastion-e2e.tfvars`](../../clusters/virt/bastion-e2e.tfvars)).
+2. Run the smoke test:
+
+```bash
+VIRT_E2E_STRICT_HTTP_CROSS=1 ./scripts/cluster/test-virt-external-vm-ping.sh
+```
+
+**Done when:** `VIRT_EXTERNAL_PING_EXIT:0` (strict HTTP both ways + bidirectional ICMP). Requires `bastion_enable_bgp_e2e` with `enable_route_server` so ROSA default worker SG allows cross-boundary traffic to CUDN overlay IPs.
+
 VMs must use `nodeSelector: { bgp_router: "true" }` on this recipe — default workers lack KVM **and** (until [bgp-cloud-connector#121](https://github.com/openshift/bgp-cloud-connector/issues/121)) lack the operator-managed `SourceDestCheck=false` required for preserved CUDN egress to the VPC.
 
 **Agents:** Step-by-step E2E gates (CDI memory, BGP teardown, failure modes) — [`clusters/virt/AGENTS.md`](../../clusters/virt/AGENTS.md). Generic agent flow — [AGENTS.md](../../AGENTS.md#agent-guided-end-to-end-e2e-cluster-validation).
 
 #### Teardown
+
+Confirm you are finished validating (agents should ask before destroy). Then:
 
 ```bash
 make cluster.virt.destroy_force
