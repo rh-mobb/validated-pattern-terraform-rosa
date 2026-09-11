@@ -178,6 +178,13 @@ variable "private_subnet_cidrs" {
   nullable    = false
 }
 
+variable "enable_bgp_e2e_worker_sg" {
+  description = "When true, add ROSA default worker SG ingress for all traffic from vpc_cidr (VPC↔CUDN BGP e2e). Used with external bastion echo tests."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
 variable "private_subnet_ids" {
   description = "List of private subnet IDs (required for EFS mount targets and cluster creation)"
   type        = list(string)

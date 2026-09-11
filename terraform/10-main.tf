@@ -284,6 +284,9 @@ module "cluster" {
   enable_efs           = var.enable_efs != null ? var.enable_efs : true
   private_subnet_cidrs = local.network.private_subnet_cidrs
 
+  # BGP e2e: ROSA default worker SG allows ICMP/SSH from VPC but not CUDN HTTP; pair with bastion e2e.
+  enable_bgp_e2e_worker_sg = var.bastion_enable_bgp_e2e && var.enable_route_server
+
   # CloudWatch audit logging configuration (legacy - deprecated)
   enable_audit_logging              = var.enable_audit_logging
   cloudwatch_audit_logging_role_arn = module.iam.cloudwatch_audit_logging_role_arn
@@ -477,6 +480,9 @@ module "bastion" {
   bastion_public_ssh_key   = var.bastion_public_ssh_key
   persists_through_sleep   = local.effective_persists_network
   permissions_boundary_arn = var.custom_permissions_boundary_arn
+  bgp_e2e_ingress_cidrs    = var.bastion_enable_bgp_e2e ? var.bastion_bgp_e2e_cidrs : []
+  bgp_e2e_http_port        = var.bastion_bgp_e2e_http_port
+  enable_bgp_e2e_http_echo = var.bastion_enable_bgp_e2e
 
   tags = var.tags
 

@@ -69,6 +69,27 @@ variable "permissions_boundary_arn" {
   nullable    = true
 }
 
+variable "bgp_e2e_ingress_cidrs" {
+  description = "CIDR blocks allowed all-traffic ingress on the bastion SG for BGP e2e (empty = no extra rules)."
+  type        = list(string)
+  default     = []
+  nullable    = false
+}
+
+variable "bgp_e2e_http_port" {
+  description = "TCP port for the bastion caller-IP HTTP echo server (smoke test default :8080; bastion SG allows all traffic from bgp_e2e_ingress_cidrs)."
+  type        = number
+  default     = 8080
+  nullable    = false
+}
+
+variable "enable_bgp_e2e_http_echo" {
+  description = "When true, user_data starts a Python caller-IP HTTP server on bgp_e2e_http_port (BGP e2e smoke tests)."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
 # Sleep Protection Variable
 variable "persists_through_sleep" {
   description = "Set to false to put cluster in sleep mode (destroys resources). Default true keeps cluster active. To sleep cluster, set this to false and run terraform apply."

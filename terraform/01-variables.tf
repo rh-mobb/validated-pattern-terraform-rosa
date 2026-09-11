@@ -597,6 +597,33 @@ variable "bastion_public_ssh_key" {
   nullable    = false
 }
 
+variable "bastion_enable_bgp_e2e" {
+  description = <<-EOF
+    When true (with enable_bastion and enable_route_server), open bastion SG for all traffic from
+    bastion_bgp_e2e_cidrs, add matching ROSA default worker SG rules for all traffic from the VPC
+    CIDR, and start a caller-IP HTTP echo on the bastion at boot (default port
+    bastion_bgp_e2e_http_port). Off by default; use clusters/<name>/bastion-e2e.tfvars with a
+    targeted apply for virt external VM tests.
+  EOF
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "bastion_bgp_e2e_cidrs" {
+  description = "CIDR blocks allowed all-traffic ingress on the bastion when bastion_enable_bgp_e2e is true (prod/dev CUDN defaults)."
+  type        = list(string)
+  default     = ["10.100.0.0/16", "10.200.0.0/16"]
+  nullable    = false
+}
+
+variable "bastion_bgp_e2e_http_port" {
+  description = "TCP port for the bastion caller-IP HTTP echo server when bastion_enable_bgp_e2e is true (smoke test default; SG rules are not port-specific)."
+  type        = number
+  default     = 8080
+  nullable    = false
+}
+
 #------------------------------------------------------------------------------
 # AWS Client VPN (recommended for private cluster access)
 #------------------------------------------------------------------------------
