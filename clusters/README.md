@@ -156,8 +156,9 @@ This is a **feature recipe** on a public network, not a separate network topolog
 - `enable_efs = true` plus `enable_secrets_manager_iam = true` (platform metadata publishes `efsCsiRoleArn` / `efsFileSystemId`)
 - `enable_route_server = true` (ESO reads `{cluster}-bgp-config`)
 - OCP **4.21+** (example pins `4.22.2` / `fast-4.22`) for FRR-K8s / CUDN / CNV
-- One `c5.metal` pool per AZ labeled `bgp_router=true` (nested virt and Graviton metal are not supported for this path). Metal nodes advertise KVM and host VM workloads; default workers do not
-- Default workers `m7i.2xlarge` for GitOps / in-cluster operator builds (no KVM — do not schedule VMs here)
+- One `c5.metal` pool per AZ labeled `bgp_router=true` (nested virt and Graviton metal are not supported for this path). Metal nodes advertise KVM, peer with Route Server, and host VM workloads; default workers do not
+- **Until [bgp-cloud-connector#121](https://github.com/openshift/bgp-cloud-connector/issues/121):** schedule CUDN VMs on `bgp_router` nodes only — operator sets `SourceDestCheck=false` on BGP peers, not general workers
+- Default workers `m7i.2xlarge` for GitOps / in-cluster operator builds (no KVM — do not schedule VMs or VPC-routable CUDN workloads here)
 - GitOps path `dev/virt` installs ESO, `cluster-efs` (≥ 0.5.1: `efs-sc` uid/gid 107 for VM disks), OpenShift Virtualization, and `cudn-bgp-routing-operator`
 - `enable_cluster_admin = true` for `make cluster.virt.login`
 

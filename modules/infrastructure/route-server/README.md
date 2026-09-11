@@ -18,6 +18,12 @@ AWS VPC Route Server for BGP routing with the [BGP cloud connector](https://gith
 3. The cudn-bgp-routing-operator chart applies role ARN / region / routeServerIDs from the synced Secret
 4. The BGP operator discovers endpoints via `DescribeRouteServerEndpoints` and manages peers/FRR
 
+### CUDN workload placement (AWS)
+
+The operator disables **`SourceDestCheck`** on nodes matching `routerNodeSelector` (`bgp_router=true`) only. Preserved CUDN egress (RouteAdvertisements) exits the **scheduling worker’s ENI** with the overlay source IP. Until [bgp-cloud-connector#121](https://github.com/openshift/bgp-cloud-connector/issues/121), schedule **VPC-routable CUDN VMs/pods on BGP peer nodes** — see [`clusters/virt/AGENTS.md`](../../../clusters/virt/AGENTS.md#known-limitation--cudn-vms-on-bgp-peers-only).
+
+**EgressIP** is not an alternative: it SNATs away the CUDN IP (conflicts with BGP routing). Layer2 CUDN EgressIP is unsupported/broken ([OCPBUGS-48301](https://issues.redhat.com/browse/OCPBUGS-48301)); see [OKEP-5094](https://ovn-kubernetes.io/okeps/okep-5094-layer2-transit-router/) and AGENTS.md [EgressIP not used](../../../clusters/virt/AGENTS.md#egressip-not-used-ruled-out).
+
 ## Inputs
 
 | Name | Description | Type | Default | Required |

@@ -29,6 +29,8 @@ multi_az = true
 # m5.xlarge packed out during ESO + operator image builds (Pending pods).
 # Note: these nodes do not advertise devices.kubevirt.io/kvm — schedule VMs on the
 # bgp_router metal pools below (dual-purpose BGP router + Virt compute in this recipe).
+# Until bgp-cloud-connector#121, CUDN VMs must stay on bgp_router nodes (operator sets
+# SourceDestCheck=false only on BGP peers; preserved CUDN egress uses the scheduling ENI).
 default_instance_type = "m7i.2xlarge"
 default_min_replicas  = 1
 default_max_replicas  = 2
@@ -45,7 +47,8 @@ enable_secrets_manager_iam = true
 # Labels match the BGP operator's routerNodeSelector (bgp_router: "true")
 # and per-AZ selectors (bgp_router_subnet, az).
 # KVM (devices.kubevirt.io/kvm) is available on these metal nodes — use
-# nodeSelector bgp_router=true (or omit anti-affinity) for VM workloads.
+# nodeSelector bgp_router=true for VM workloads (required until bgp-cloud-connector#121
+# for VPC-routable CUDN egress; operator disables SourceDestCheck on speakers only).
 additional_machine_pools = {
   "bgp-router-0" = {
     subnet_index        = 0
@@ -113,6 +116,7 @@ gitops_git_target_revision = "HEAD"
 enable_persistent_dns_domain = true
 
 # Disable features not needed for Virt / BGP testing
+enable_bastion                      = false # Step 6b: targeted apply with bastion-e2e.tfvars for external VM test only
 enable_cert_manager_iam             = false
 enable_termination_protection       = false
 enable_cloudwatch_logging           = false
