@@ -10,7 +10,7 @@ terraform {
       # 1.7.4 adds rhcs_log_forwarder; 1.7.5 adds day-1 autoscaling hints on rhcs_cluster_rosa_hcp
       # 1.7.7 fixes AutoNode post-apply state inconsistency (OCM-25158)
       source  = "terraform-redhat/rhcs"
-      version = "~> 1.7.7"
+      version = "= 1.7.9"
     }
     null = {
       source  = "hashicorp/null"
