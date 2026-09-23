@@ -1,0 +1,73 @@
+# Purpose: Bind a built-in-OAuth directory identity to the shared namespaced workload role.
+# What this is not: This is not a machine identity; a built-in-OAuth cluster has no client-credentials path.
+# Prerequisites: A cluster using the built-in OpenShift OAuth server with an identity provider configured.
+# Authoritative references:
+# - https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+# - https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/authentication_and_authorization/understanding-authentication
+#
+# Use this file on a built-in-OAuth cluster. Use external-auth/
+# machine-identity-binding.yaml on a
+# cluster created with external_auth_providers_enabled = true. The two produce
+# DIFFERENT authenticated strings, and a binding copied between them matches
+# nothing: an issuer-qualified subject does not exist here, and a bare username
+# does not exist there.
+#
+# On a built-in-OAuth cluster the pipeline identity itself should be the
+# ServiceAccount in
+# service-account.yaml. The bindings below cover the human and group subjects
+# that share the same namespace and Role -- for the exception case where audit
+# policy requires a directory principal, and for granting a whole team at once.
+---
+# Covers: apiVersion, kind, metadata, name, namespace, roleRef, apiGroup, subjects
+# Does: Binds one OAuth-authenticated directory user to the shared namespaced workload role.
+# Why: The OAuth server presents the mapped username with no issuer prefix, so the subject is the bare name.
+# Change: Adding an issuer prefix, or using the provider's raw claim instead of the mapped username, stops the binding matching.
+# Trap: A binding that names a plausible-but-wrong string grants nothing and fails identically to a missing binding.
+# Evidence: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  # Keep this name distinct from the ServiceAccount binding so audit and removal
+  # can target one authentication path without disturbing the other.
+  name: <directory-user-binding>
+  # RoleBindings grant only inside this namespace, even when they reference a ClusterRole.
+  namespace: <pipeline-namespace>
+roleRef:
+  # Bind the companion Role rather than duplicating permissions per identity.
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: <pipeline-workload-role>
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    # Copy this from `oc whoami` while authenticated as the identity. It is the
+    # username the identity provider mapping produced, plus any prefix the
+    # provider configuration sets -- not the raw claim value from the token.
+    name: <oauth-username>
+---
+# Covers: apiVersion, kind, metadata, name, namespace, roleRef, apiGroup, subjects
+# Does: Binds one provider-supplied group so membership changes need no cluster edit.
+# Why: A group subject moves authorization to the identity provider, which is where joiners and leavers are already handled.
+# Change: Removing this binding leaves only per-user bindings, so every membership change becomes a cluster change.
+# Trap: The group exists only while a session carries the claim; a provider that stops emitting groups silently removes access.
+# Evidence: https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/authentication_and_authorization/understanding-authentication
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: <oauth-group-binding>
+  namespace: <pipeline-namespace>
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: <pipeline-workload-role>
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    # Confirm the realized value from an authenticated session with
+    #   oc auth whoami -o json | jq -r '.status.userInfo.groups[]?'
+    # which reports the groups THIS REQUEST carries. Do not use `oc get groups`:
+    # it lists cluster-scoped Group objects, an ordinary user is refused, and a
+    # provider group present in the token need not exist as an object at all.
+    # A group name is the claim value the provider emitted, which is not always
+    # the display name shown in the provider's console.
+    name: <oauth-group-name>

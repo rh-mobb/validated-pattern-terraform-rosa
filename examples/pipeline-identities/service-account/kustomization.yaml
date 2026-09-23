@@ -1,0 +1,19 @@
+# Purpose: Render the ServiceAccount identity and its least-privilege Role as one review unit.
+# What this is not: This does not create a token, a pipeline, or any binding for a directory identity.
+# Prerequisites: Replace every angle-bracket placeholder before applying.
+# Authoritative references:
+# - https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/
+# Covers: apiVersion, kind, resources
+# Does: Renders the namespace, the workload Role, the ServiceAccount and its RoleBinding together.
+# Why: These four objects are the complete cluster-side setup and are always applied as a set.
+# Change: Adding a binding here grants an additional identity the same Role.
+# Trap: The pipelines beside this file are not Kubernetes objects and are deliberately absent from this list.
+# Evidence: https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# This set is architecture-independent: apply it unchanged on a built-in-OAuth
+# cluster or an external-auth one.
+resources:
+  - namespace-and-role.yaml
+  - service-account.yaml
