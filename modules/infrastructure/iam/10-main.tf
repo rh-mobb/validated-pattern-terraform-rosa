@@ -83,6 +83,20 @@ module "operator_roles" {
   tags                 = local.common_tags
 }
 
+# OCM Role — org-level IAM role required for all ROSA customers (mandatory Oct 1 2026)
+# Not gated by persists_through_sleep — org-level resource, always persists once created
+module "ocm_role" {
+  count = var.create_ocm_role ? 1 : 0
+
+  source  = "terraform-redhat/rosa-hcp/rhcs//modules/ocm-role"
+  version = "~> 1.7"
+
+  ocm_role_prefix      = coalesce(var.ocm_role_prefix, var.cluster_name)
+  profile              = var.ocm_role_profile
+  permissions_boundary = var.rosa_permissions_boundary_arn
+  tags                 = local.common_tags
+}
+
 # Additional policy for worker role when zero_egress is enabled
 # Reference: ECR read-only access is required for egress-zero clusters to pull container images via VPC endpoints
 # The worker role name follows the pattern: {account_role_prefix}-HCP-ROSA-Worker-Role

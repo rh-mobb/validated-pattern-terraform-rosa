@@ -209,6 +209,11 @@ module "iam" {
   enable_autonode                    = var.enable_autonode
   autonode_kubernetes_cluster_tag_id = var.autonode_kubernetes_cluster_tag_id
 
+  # OCM Role
+  create_ocm_role  = var.create_ocm_role
+  ocm_role_prefix  = var.ocm_role_prefix
+  ocm_role_profile = var.ocm_role_profile
+
   # Permission boundaries
   rosa_permissions_boundary_arn   = var.rosa_permissions_boundary_arn
   custom_permissions_boundary_arn = var.custom_permissions_boundary_arn

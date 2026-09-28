@@ -147,3 +147,15 @@ output "autonode_role_arn" {
   value       = length(aws_iam_role.autonode_operator) > 0 ? aws_iam_role.autonode_operator[0].arn : null
   sensitive   = false
 }
+
+output "ocm_role_arn" {
+  description = "ARN of the OCM IAM role (null if create_ocm_role is false)"
+  value       = length(module.ocm_role) > 0 ? module.ocm_role[0].role_arn : null
+  sensitive   = false
+}
+
+output "ocm_role_name" {
+  description = "Name of the OCM IAM role (null if create_ocm_role is false)"
+  value       = length(module.ocm_role) > 0 ? module.ocm_role[0].role_name : null
+  sensitive   = false
+}
