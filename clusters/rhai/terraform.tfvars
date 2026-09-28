@@ -81,5 +81,8 @@ control_plane_log_cloudwatch_enabled = true
 enable_cert_manager_iam              = false
 enable_termination_protection        = false
 
+# OCM Role (mandatory for all ROSA customers by Oct 1 2026)
+create_ocm_role = true
+
 # Debug / Timing
 enable_timing = true

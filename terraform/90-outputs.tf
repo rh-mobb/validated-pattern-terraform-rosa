@@ -366,3 +366,8 @@ output "image_mirror_ids" {
   value       = module.cluster.image_mirror_ids
   sensitive   = false
 }
+
+output "ocm_role_arn" {
+  description = "ARN of the OCM IAM role (null if create_ocm_role is false)"
+  value       = module.iam.ocm_role_arn
+}

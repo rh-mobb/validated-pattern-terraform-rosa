@@ -209,3 +209,29 @@ variable "custom_permissions_boundary_arn" {
   default     = null
   nullable    = true
 }
+
+variable "create_ocm_role" {
+  description = "Create and link the OCM role for this AWS account. One per Red Hat org per AWS account. Required by Oct 1 2026."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "ocm_role_prefix" {
+  description = "Prefix for the OCM role name. Final name: {prefix}-OCM-Role-{org_external_id}. Defaults to cluster_name if null."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "ocm_role_profile" {
+  description = "Permission profile for the OCM role: no-console (minimal, CLI-only), standard (console support), or admin (wider permissions)."
+  type        = string
+  default     = "no-console"
+  nullable    = false
+
+  validation {
+    condition     = contains(["no-console", "standard", "admin"], var.ocm_role_profile)
+    error_message = "ocm_role_profile must be one of: no-console, standard, admin."
+  }
+}
