@@ -19,6 +19,19 @@ locals {
   # The keys of oidc_client_secrets are provider identifiers (e.g. "entra"),
   # not secret material. Extract them as nonsensitive for use in for_each filters.
   oidc_direct_secret_keys = nonsensitive(keys(var.oidc_client_secrets))
+
+  # AWS Secrets Manager's console offers two ways to store a value: "Plaintext"
+  # (secret_string IS the value) and "Key/value" (secret_string is a JSON
+  # object, e.g. {"entra":"<value>"}). Both are common and the console does
+  # not warn which one downstream code expects. Accept either shape here: try
+  # decoding as JSON and pulling this entry's own key out of it; if the secret
+  # isn't JSON, or doesn't contain that key, fall back to the raw string.
+  oidc_secretsmanager_resolved = {
+    for k, v in data.aws_secretsmanager_secret_version.oidc_identity_provider : k => try(
+      jsondecode(v.secret_string)[k],
+      v.secret_string,
+    )
+  }
 }
 
 data "aws_secretsmanager_secret_version" "oidc_identity_provider" {
@@ -29,6 +42,19 @@ data "aws_secretsmanager_secret_version" "oidc_identity_provider" {
   } : {}
 
   secret_id = each.value.client_secret_secret_id
+
+  lifecycle {
+    # Guard against the exact failure mode that caused this: a Key/Value
+    # secret whose JSON key doesn't match this provider's map key (or a
+    # deeply nested/multi-key secret) would otherwise silently fall through
+    # to the raw JSON string. Catch that here instead of an opaque
+    # post-deploy login failure. precondition/postcondition are only valid
+    # on resource, data, and output blocks — not on module blocks.
+    postcondition {
+      condition     = !can(regex("^\\s*[{\\[]", nonsensitive(try(jsondecode(self.secret_string)[each.key], self.secret_string))))
+      error_message = "Secret \"${each.value.client_secret_secret_id}\" still looks like a JSON object after resolution for oidc_identity_providers[\"${each.key}\"] — its Key/Value key name probably doesn't match \"${each.key}\". Store it as Plaintext, or as Key/Value with the key named exactly \"${each.key}\"."
+    }
+  }
 }
 
 module "oidc_identity_provider" {
@@ -43,7 +69,7 @@ module "oidc_identity_provider" {
   openid = {
     ca                         = each.value.ca
     client_id                  = each.value.client_id
-    client_secret              = contains(local.oidc_direct_secret_keys, each.key) ? var.oidc_client_secrets[each.key] : data.aws_secretsmanager_secret_version.oidc_identity_provider[each.key].secret_string
+    client_secret              = contains(local.oidc_direct_secret_keys, each.key) ? var.oidc_client_secrets[each.key] : local.oidc_secretsmanager_resolved[each.key]
     issuer                     = each.value.issuer
     extra_scopes               = each.value.extra_scopes
     extra_authorize_parameters = each.value.extra_authorize_parameters
