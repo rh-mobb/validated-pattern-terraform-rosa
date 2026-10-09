@@ -34,7 +34,7 @@ gitops_git_path         = "dev/rhai"
 additional_machine_pools = {
   "gpu" = {
     subnet_index        = 0
-    instance_type       = "g5.2xlarge"
+    instance_type       = "g6.2xlarge"
     autoscaling_enabled = false
     replicas            = 1
     labels = {
@@ -74,6 +74,8 @@ enable_persistent_dns_domain         = true
 enable_control_plane_log_forwarding  = true
 control_plane_log_cloudwatch_enabled = true
 enable_cert_manager_iam              = false
+enable_secrets_manager_iam           = true
+additional_secrets                   = ["rhai/maas/postgres-creds"]
 enable_termination_protection        = false
 
 # OCM Role (mandatory for all ROSA customers by Oct 1 2026)
