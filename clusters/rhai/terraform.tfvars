@@ -32,46 +32,41 @@ gitops_git_path         = "dev/rhai"
 
 # Additional Machine Pools
 additional_machine_pools = {
-  # "compute-0" = {
-  #   subnet_index        = 0
-  #   instance_type       = "m5.xlarge"
-  #   autoscaling_enabled = true
-  #   min_replicas        = 1
-  #   max_replicas        = 2
-  # }
-  # "compute-1" = {
-  #   subnet_index        = 0
-  #   instance_type       = "m5.xlarge"
-  #   autoscaling_enabled = false
-  #   replicas            = 1
-  # }
-  # "infra" = {
-  #   subnet_index          = 0
-  #   instance_type         = "m5.xlarge"
-  #   autoscaling_enabled   = false # Changed from True to False
-  #   replicas              = 3
-  #   # min_replicas        = 1   # Must be set to Null
-  #   # max_replicas        = 3   # Must be set to Null
-  #   version               = "4.22.4"
-  # }
+  "gpu" = {
+    subnet_index        = 0
+    instance_type       = "g5.2xlarge"
+    autoscaling_enabled = false
+    replicas            = 1
+    labels = {
+      "node-role.kubernetes.io/gpu" = ""
+    }
+    taints = [
+      {
+        key           = "nvidia.com/gpu"
+        value         = "true"
+        schedule_type = "NoSchedule"
+      }
+    ]
+    disk_size = 200
+  }
 }
 
 # Entra ID OIDC Identity Provider
 # Client secret stored in AWS Secrets Manager (ap-southeast-2)
-oidc_identity_providers = {
-  entra = {
-    name                    = "entra-id"
-    client_id               = "d33dc511-47f9-495a-b846-f4b8a6c5a49f"
-    client_secret_secret_id = "rhai/entra-id/client-secret"
-    issuer                  = "https://login.microsoftonline.com/64dc69e4-d083-49fc-9569-ebece1dd1408/v2.0"
-    extra_scopes            = ["email", "profile"]
-    claims = {
-      email              = ["email"]
-      name               = ["name"]
-      preferred_username = ["preferred_username", "upn"]
-    }
-  }
-}
+# oidc_identity_providers = {
+#   entra = {
+#     name                    = "entra-id"
+#     client_id               = "d33dc511-47f9-495a-b846-f4b8a6c5a49f"
+#     client_secret_secret_id = "rhai/entra-id/client-secret"
+#     issuer                  = "https://login.microsoftonline.com/64dc69e4-d083-49fc-9569-ebece1dd1408/v2.0"
+#     extra_scopes            = ["email", "profile"]
+#     claims = {
+#       email              = ["email"]
+#       name               = ["name"]
+#       preferred_username = ["preferred_username", "upn"]
+#     }
+#   }
+# }
 
 # Optional Features - minimal for lab/demo
 persists_through_sleep               = true
@@ -82,7 +77,7 @@ enable_cert_manager_iam              = false
 enable_termination_protection        = false
 
 # OCM Role (mandatory for all ROSA customers by Oct 1 2026)
-create_ocm_role = true
+create_ocm_role = false
 
 # Debug / Timing
 enable_timing = true
