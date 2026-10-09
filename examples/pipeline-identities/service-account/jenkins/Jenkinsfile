@@ -1,0 +1,79 @@
+// Purpose: Deploy to a ROSA HCP namespace from Jenkins using a ServiceAccount token held in the Jenkins credential store.
+// What this is not: This pipeline mints no token, creates no RBAC, and needs no directory identity.
+// Prerequisites: The sibling pod.yaml, a Secret Text credential holding the ServiceAccount bearer, and the namespace/Role from this example.
+// Authoritative references:
+// - https://www.jenkins.io/doc/book/pipeline/syntax/
+// - https://plugins.jenkins.io/kubernetes/
+// - https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/
+//
+// This is the ServiceAccount path: it works identically whether the target
+// cluster uses built-in OpenShift OAuth or external authentication.
+pipeline {
+  agent {
+    kubernetes {
+      yamlFile 'examples/pipeline-identities/service-account/jenkins/pod.yaml'
+      // Covers: yamlFile, defaultContainer
+      // Does: Runs every sh step in the oc container declared by the Pod template.
+      // Why: Without it the plugin runs shell steps in the built-in jnlp container, which has no oc and no reason to.
+      // Change: Removing this line makes every oc call fail with "command not found" while the Pod itself looks healthy.
+      // Trap: Declaring a container is not selecting one; the plugin's default is jnlp, so a template that provides oc still does not use it.
+      // Evidence: https://plugins.jenkins.io/kubernetes/
+      defaultContainer 'oc'
+    }
+  }
+  options {
+    // Covers: timeout, disableConcurrentBuilds
+    // Does: Bounds the run and prevents two builds sharing one credential window.
+    // Why: A hung deploy holding a bearer is a custody problem as well as a scheduling one.
+    // Change: A longer timeout widens the window in which the job-local kubeconfig exists.
+    // Trap: Concurrent builds can race on the same namespace and produce interleaved rollouts.
+    // Evidence: https://www.jenkins.io/doc/book/pipeline/syntax/
+    timeout(time: 20, unit: 'MINUTES')
+    disableConcurrentBuilds()
+  }
+  environment {
+    // Covers: env:PIPELINE_API_SERVER, env:PIPELINE_NAMESPACE, env:PIPELINE_SERVICE_ACCOUNT, env:MANIFEST_DIR, env:DEPLOYMENT_NAME, env:HOME, env:PIPELINE_TOKEN_EXPIRY
+    // Does: Names the target cluster, identity and manifests, and selects an isolated job credential directory.
+    // Why: Every value here is reviewed configuration, not a secret; the bearer is injected separately.
+    // Change: Pointing MANIFEST_DIR elsewhere changes what this identity is authorised to apply.
+    // Trap: PIPELINE_SERVICE_ACCOUNT must match the token's own ServiceAccount or the identity check fails closed.
+    // Evidence: https://www.jenkins.io/doc/book/pipeline/syntax/
+    PIPELINE_API_SERVER      = '<cluster-api-server-url>'
+    PIPELINE_NAMESPACE       = '<pipeline-namespace>'
+    PIPELINE_SERVICE_ACCOUNT = '<pipeline-service-account>'
+    MANIFEST_DIR             = '<reviewed-manifest-directory>'
+    DEPLOYMENT_NAME          = '<deployment-name>'
+    HOME                     = '/tmp'
+    // Optional, and deliberately not a credential: an expiry timestamp is
+    // metadata, not a secret. Set it to the `.status.expirationTimestamp` the
+    // minting administrator recorded beside the token and the helper applies an advisory
+    // 600-second margin; this does not prove validity for the remaining job. Left empty, the helper reports the
+    // expiry as unobserved rather than assuming it is fine. Binding it from the
+    // credential store instead would make an absent value a build failure,
+    // which is the opposite of optional.
+    PIPELINE_TOKEN_EXPIRY    = ''
+  }
+  stages {
+    stage('Authenticate and deploy') {
+      steps {
+        // The shared wrapper creates a fresh private directory, checks identity,
+        // deploys and removes that exact credential destination in one shell.
+        withCredentials([
+          string(credentialsId: '<jenkins-credential-id>', variable: 'PIPELINE_TOKEN'),
+        ]) {
+          sh 'examples/pipeline-identities/service-account/run-deployment.sh'
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      // Workspace cleanup is additional to the wrapper's credential cleanup.
+      // Neither post nor shell traps survive every agent loss or SIGKILL.
+      // Use an ephemeral agent with no retained credential volume; its owner
+      // must destroy stranded storage and apply the separate token lifecycle.
+      deleteDir()
+    }
+  }
+}

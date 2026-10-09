@@ -1,0 +1,40 @@
+# Purpose: Bind one direct-external application principal to the namespaced workload role.
+# What this is not: This does not create an OpenShift User object or grant cluster-wide install rights.
+# Prerequisites: A cluster created with external_auth_providers_enabled = true, and the exact username from SelfSubjectReview/oc auth whoami.
+# Authoritative references:
+# - https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+# - https://github.com/openshift/openshift-docs/blob/3fc89d132cac41b69f79d37fd8ee3f99d134700d/modules/external-auth-fields.adoc#L75-L97
+#
+# Use this file on a direct-external-authentication cluster only. On a
+# built-in-OAuth cluster the API server never authenticates a provider JWT, so
+# no subject of this shape is ever produced there -- use the built-in-oauth/
+# user-and-group-binding.yaml example
+# instead. Copying a binding between the two architectures produces a binding
+# that matches nothing and fails exactly like a missing one.
+# Covers: apiVersion, kind, metadata, name, namespace, roleRef, apiGroup, subjects
+# Does: Binds one exact issuer-qualified application subject to the namespaced workload role.
+# Why: Separate bindings preserve distinct machine and ServiceAccount audit identities with equal permissions.
+# Change: A different namespace or subject string changes which requests can use the role.
+# Trap: Omitting the issuer-qualified prefix produces a binding that never matches the realized identity.
+# Evidence: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  # Keep this name distinct from the ServiceAccount binding so audit and
+  # removal can target one authentication path without disturbing the other.
+  name: <external-pipeline-app-binding>
+  # RoleBindings grant only inside this namespace, even when they reference a ClusterRole.
+  namespace: <pipeline-namespace>
+roleRef:
+  # Bind the companion Role rather than duplicating permissions per identity.
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: <pipeline-workload-role>
+subjects:
+  # Copy the complete username from an authenticated SelfSubjectReview. On one
+  # ROSA HCP 4.20.30 direct-external cluster the application-only token rendered
+  # as <issuer>#<object-id>; the prefix is part of the subject and a bare object
+  # ID did not match. Observed behavior, not vendor-documented.
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: <issuer-url>#<machine-object-id>

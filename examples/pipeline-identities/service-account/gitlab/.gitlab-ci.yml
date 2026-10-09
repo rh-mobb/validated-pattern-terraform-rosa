@@ -1,0 +1,91 @@
+# Purpose: Deploy to a ROSA HCP namespace from GitLab CI using a ServiceAccount token held in a CI/CD variable.
+# What this is not: This pipeline mints no token, creates no RBAC, and needs no directory identity.
+# Prerequisites: A masked and protected PIPELINE_TOKEN CI/CD variable, an isolated ephemeral runner with Bash, Python 3, GNU timeout/date and oc, and the namespace/Role from this example.
+# Authoritative references:
+# - https://docs.gitlab.com/ee/ci/yaml/
+# - https://docs.gitlab.com/ee/ci/variables/
+# - https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/
+#
+# The body is deliberately near-identical to the Jenkins example: the same
+# helper, the same custody rules, the same identity check. Only the CI syntax
+# differs, which is the point -- neither system is doing anything special.
+
+# Covers: stages, image, default, before_script, interruptible
+# Does: Declares one deployment stage running in an image that already contains oc.
+# Why: Fetching a client at job time adds a network dependency to a job that must work on a restricted runner.
+# Change: A different image must still provide oc on PATH.
+# Trap: cancellation and runner loss can interrupt cleanup; the runner owner must dispose of ephemeral job storage.
+# Evidence: https://docs.gitlab.com/ee/ci/yaml/
+stages:
+  - deploy
+
+default:
+  image: <oc-capable-image>
+  interruptible: true
+
+# Covers: deploy, stage, timeout, cache
+# Does: Declares the single job and places it in the deployment stage.
+# Why: One job keeps the kubeconfig in one shell context, so the credential is never handed between jobs.
+# Change: Splitting authentication and deployment into two jobs requires passing the bearer between them, which is what this shape avoids.
+# Trap: GitLab artifacts are the usual way to pass state between jobs, and an artifact containing a kubeconfig is a published credential.
+# Evidence: https://docs.gitlab.com/ee/ci/yaml/
+deploy:
+  stage: deploy
+  # Reserve two minutes for cleanup verification after the script budget.
+  # Ref: https://docs.gitlab.com/ci/runners/configure_runners/#set-script-and-after_script-timeouts
+  timeout: 20m
+  cache: []
+  # Covers: RUNNER_SCRIPT_TIMEOUT, RUNNER_AFTER_SCRIPT_TIMEOUT, variables, PIPELINE_API_SERVER, PIPELINE_NAMESPACE, PIPELINE_SERVICE_ACCOUNT, MANIFEST_DIR, DEPLOYMENT_NAME, PIPELINE_TOKEN_EXPIRY
+  # Does: Names the target cluster, identity and manifests. None of these is a secret.
+  # Why: Keeping configuration in the file and the bearer in a protected variable makes the review surface obvious.
+  # Change: Pointing MANIFEST_DIR elsewhere changes what this identity is authorised to apply.
+  # Trap: PIPELINE_SERVICE_ACCOUNT must match the token's own ServiceAccount, or the helper's identity check fails closed. An empty PIPELINE_TOKEN_EXPIRY is reported as unobserved, not treated as valid.
+  # Evidence: https://docs.gitlab.com/ee/ci/variables/
+  variables:
+    PIPELINE_API_SERVER: "<cluster-api-server-url>"
+    PIPELINE_NAMESPACE: "<pipeline-namespace>"
+    PIPELINE_SERVICE_ACCOUNT: "<pipeline-service-account>"
+    MANIFEST_DIR: "<reviewed-manifest-directory>"
+    DEPLOYMENT_NAME: "<deployment-name>"
+    RUNNER_SCRIPT_TIMEOUT: 18m
+    RUNNER_AFTER_SCRIPT_TIMEOUT: 2m
+    # Optional, and set as a CI/CD variable rather than here when used: the
+    # expirationTimestamp the minting administrator recorded beside the token.
+    # The helper applies an advisory 600-second margin, not a proof of enough
+    # lifetime for the remaining job. Missing expiry remains unobserved.
+    PIPELINE_TOKEN_EXPIRY: ""
+  # Covers: rules, if, when
+  # Does: Runs the deployment only from the protected default branch.
+  # Why: PIPELINE_TOKEN is a protected variable, so it is not exposed to jobs on unprotected refs at all.
+  # Change: Widening this to any branch means the job runs without the credential and fails confusingly.
+  # Trap: A protected variable silently does not exist on an unprotected ref; the helper's `:?` guard turns that into a clear error.
+  # Evidence: https://docs.gitlab.com/ee/ci/variables/#protect-a-cicd-variable
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
+  # Covers: script
+  # Does: Runs authentication and deployment inside the shared custody wrapper.
+  # Why: One shell owns allocation and the exact cleanup destination.
+  # Change: Keep the deployment bound shorter than the runner script budget.
+  # Trap: The non-secret receipt verifies cleanup, not deployment health.
+  # Evidence: https://docs.gitlab.com/ci/runners/configure_runners/#set-script-and-after_script-timeouts
+  # The wrapper owns its random /tmp directory and its EXIT/TERM cleanup.
+  # Credential bytes never enter the project directory, artifacts or caches.
+  script:
+    - set +x
+    - export PIPELINE_CLEANUP_RECEIPT="$CI_PROJECT_DIR/.cleanup-$CI_JOB_ID"
+    - timeout --signal=TERM --kill-after=30s 15m examples/pipeline-identities/service-account/run-deployment.sh
+  # Covers: after_script
+  # Does: Checks that the shared wrapper recorded completed credential cleanup.
+  # Why: A successful deployment alone does not prove secret removal.
+  # Change: A different receipt path must remain unique to this CI job.
+  # Trap: Failure here does not change GitLab's script result; the runner owner must handle missing evidence.
+  # Evidence: https://docs.gitlab.com/ci/yaml/#after_script
+  # Verification only: this fresh shell cannot inherit the wrapper's random path.
+  # after_script failure does not change GitLab's script exit status. A missing
+  # receipt is a custody incident for the runner owner, not successful cleanup.
+  # No handler guarantees cleanup after SIGKILL, runner loss or storage failure.
+  # Ref: https://docs.gitlab.com/ci/yaml/#after_script
+  after_script:
+    - set +x
+    - test "$(cat "$CI_PROJECT_DIR/.cleanup-$CI_JOB_ID")" = complete

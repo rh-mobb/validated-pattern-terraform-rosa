@@ -1,0 +1,16 @@
+# Purpose: Render the RBAC bindings for directory identities on a built-in-OAuth cluster.
+# What this is not: This is not a pipeline identity; on this architecture that is the ServiceAccount.
+# Prerequisites: The service-account/ set applied first, for the namespace and Role these bindings reference.
+# Authoritative references:
+# - https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/
+# Covers: apiVersion, kind, resources
+# Does: Renders the bare-username and group bindings this architecture actually produces.
+# Why: Keeping them separate from the external-auth binding prevents applying a subject shape the cluster never emits.
+# Change: Applying this on an external-auth cluster creates bindings that match nothing.
+# Trap: These subjects are bare; the external-auth equivalents are issuer-qualified and are not interchangeable.
+# Evidence: https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - user-and-group-binding.yaml

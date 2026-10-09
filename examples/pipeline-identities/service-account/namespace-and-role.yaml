@@ -1,0 +1,33 @@
+# Purpose: Define a small namespaced deployment capability shared by both identity options.
+# What this is not: This is not an Operator-install role, RBAC-administration role, or product entitlement.
+# Prerequisites: Replace the example rules with the exact APIs and verbs used by the pipeline.
+# Authoritative references:
+# - https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+# Covers: apiVersion, kind, metadata, name, namespace, rules, apiGroups, resources, verbs
+# Does: Creates one workload namespace and a narrow deployment-observation Role shared by both identities.
+# Why: A common role makes authentication alternatives comparable without granting install or RBAC administration.
+# Change: Added resources or verbs expand capability; removing reads can break rollout acceptance checks.
+# Trap: Successful authentication does not justify cluster-wide or product-install permissions.
+# Evidence: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+apiVersion: v1
+kind: Namespace
+metadata:
+  # Isolate pipeline-owned workloads so a Role can remain namespace-scoped.
+  name: <pipeline-namespace>
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: <pipeline-workload-role>
+  namespace: <pipeline-namespace>
+rules:
+  # Replace this example with the exact workload APIs and verbs the pipeline
+  # needs. Authentication does not justify broad authorization. These verbs
+  # support declarative Deployment create/read/watch/update, not delete or RBAC.
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["create", "get", "list", "watch", "patch", "update"]
+  # Pod reads let the pipeline observe rollout state without mutating Pods directly.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
