@@ -252,6 +252,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Bootstrap skipped `rosa-platform-metadata`**: `install_gitops_hub` called `good_exit` after Helm install, which exited the script before `publish_platform_metadata` / storage-class steps. Hub install now returns to `main()` so metadata is published. ConfigMap data values are quoted strings so numeric `awsAccountId` applies cleanly.
 
 ### Changed
+- **`app-of-apps-infrastructure` pin 0.4.0**: Bump `app_of_apps_infrastructure_chart_version` default (hub bootstrap `targetRevision` for cluster-config) and the enablement pin table.
+- **rhai recipe — genai-workspace guardrails key**: Add `rhai/guardrails/demo/maas-key` to `additional_secrets` so ESO can sync the NemoGuardrails judge's MaaS API key into the `demo` GenAI workspace (validated-pattern-helm-charts `genai-workspace`).
 - **OpenShift Virtualization recipe**: Renamed `clusters/bgp` → `clusters/virt` (`cluster_name = "virt"`, `gitops_git_path = "dev/virt"`, `enable_efs = true`). Route Server + metal `bgp_router` pools remain. Make targets are `cluster.virt.*`.
 - **Sibling GitOps clones**: Agents must fetch a clean `origin/main` and create a feature branch before editing `reference/validated-pattern-helm-charts` or `reference/rosa-cluster-config` (never commit those remotes — or this repo — on `main`).
 - **`cluster-bootstrap` pin 0.5.20**: Bump `helm_chart_version` default and bootstrap script fallback for Virt-ready `efs-sc` uid/gid 107 alignment with `cluster-efs` (validated-pattern-helm-charts #135).

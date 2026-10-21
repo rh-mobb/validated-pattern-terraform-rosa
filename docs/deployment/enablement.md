@@ -347,7 +347,7 @@ flowchart LR
 
 | Chart | Variable | Default |
 |-------|----------|---------|
-| `app-of-apps-infrastructure` | `app_of_apps_infrastructure_chart_version` | `0.3.0` |
+| `app-of-apps-infrastructure` | `app_of_apps_infrastructure_chart_version` | `0.4.0` |
 | `app-of-apps-application` | `app_of_apps_application_chart_version` | `1.5.8` |
 | `app-of-apps-acm-team-onboarding` | `app_of_apps_acm_team_onboarding_chart_version` | `0.4.1` |
 | `cluster-bootstrap` | `helm_chart_version` | `0.5.20` |
@@ -1121,7 +1121,7 @@ These improvements are documented as future work:
 | `helm_chart_acm_spoke_version` | `0.6.14` | `cluster-bootstrap-acm-spoke` chart version |
 | `helm_chart_acm_hub_registration_version` | `0.2.2` | `cluster-bootstrap-acm-hub-registration` chart version |
 | `helm_chart_awspca_version` | `1.6.1` | `aws-privateca-issuer` chart version |
-| `app_of_apps_infrastructure_chart_version` | `0.3.0` | `app-of-apps-infrastructure` `targetRevision` in hub bootstrap values |
+| `app_of_apps_infrastructure_chart_version` | `0.4.0` | `app-of-apps-infrastructure` `targetRevision` in hub bootstrap values |
 | `app_of_apps_application_chart_version` | `1.5.8` | `app-of-apps-application` `targetRevision` (non-hub `acm_mode`) |
 | `app_of_apps_acm_team_onboarding_chart_version` | `0.4.1` | `app-of-apps-acm-team-onboarding` `targetRevision` (hub `acm_mode`) |
 | `gitops_tools_image` | `ghcr.io/rh-mobb/validated-pattern-terraform-rosa/gitops-tools:latest` | Optional CMP repo-server sidecar tooling image (used when `plugin: true`); re-host for egress-zero or registry policy — see [§3c](#gitops-cmp-tools-container-image) |

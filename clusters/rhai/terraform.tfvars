@@ -4,7 +4,8 @@
 cluster_name = "rhai"
 
 # Version pinning
-openshift_version = "4.22.8"
+openshift_version = "4.22.17"
+channel           = "fast-4.22"
 
 # Network Configuration
 network_type = "public"
@@ -32,9 +33,9 @@ gitops_git_path         = "dev/rhai"
 
 # Additional Machine Pools
 additional_machine_pools = {
-  "gpu" = {
+  "gpu3" = {
     subnet_index        = 0
-    instance_type       = "g6.2xlarge"
+    instance_type       = "g4dn.xlarge"
     autoscaling_enabled = false
     replicas            = 1
     labels = {
@@ -75,11 +76,15 @@ enable_control_plane_log_forwarding  = true
 control_plane_log_cloudwatch_enabled = true
 enable_cert_manager_iam              = false
 enable_secrets_manager_iam           = true
-additional_secrets                   = ["rhai/maas/postgres-creds"]
+additional_secrets                   = ["rhai/maas/postgres-creds", "rhai/gemini/api-key", "rhai/openai/api-key", "rhai/guardrails/demo/maas-key"]
 enable_termination_protection        = false
+
+# API endpoint ingress - additional CIDR blocks allowed to access the ROSA HCP API
+api_endpoint_allowed_cidrs = ["10.99.0.0/16"]
 
 # OCM Role (mandatory for all ROSA customers by Oct 1 2026)
 create_ocm_role = false
 
 # Debug / Timing
 enable_timing = true
+
