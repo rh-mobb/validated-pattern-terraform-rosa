@@ -672,7 +672,7 @@ variable "helm_chart_version" {
 variable "app_of_apps_infrastructure_chart_version" {
   description = "Helm chart version for app-of-apps-infrastructure (cluster-config Argo Application targetRevision in hub bootstrap values)"
   type        = string
-  default     = "0.3.0"
+  default     = "0.4.0"
   nullable    = false
 }
 
