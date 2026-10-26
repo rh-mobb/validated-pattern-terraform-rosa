@@ -1,0 +1,16 @@
+# Purpose: Render the RBAC binding for a directory machine identity on an external-auth cluster.
+# What this is not: This does not apply to a built-in-OAuth cluster, which never emits this subject shape.
+# Prerequisites: The service-account/ set applied first, for the namespace and Role this binding references.
+# Authoritative references:
+# - https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/
+# Covers: apiVersion, kind, resources
+# Does: Renders the issuer-qualified machine-identity binding.
+# Why: Keeping it separate from the built-in-OAuth bindings prevents applying a subject shape the cluster never emits.
+# Change: Applying this on a built-in-OAuth cluster creates a binding that matches nothing.
+# Trap: The subject is issuer-qualified; a bare username here grants nothing and fails exactly like a missing binding.
+# Evidence: https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - machine-identity-binding.yaml
