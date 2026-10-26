@@ -1352,6 +1352,8 @@ Replace `<name>` with the cluster directory (e.g. `public`, `virt`, `egress-zero
 
 **Teardown is operator-confirmed:** After Step 6 smoke tests pass, **stop and ask the operator** whether to tear down, keep the cluster for further manual testing, or run only partial cleanup (e.g. bastion). Do **not** start `destroy` / `destroy_force` unless they explicitly approve — expensive recipes (virt metal, hub/spoke) are often kept alive briefly for follow-up work.
 
+**Orphan cluster (no Terraform state):** If the cluster exists in OCM/AWS but `clusters/<name>/infrastructure.tfstate` is missing or empty (local directory deleted, never committed), **do not** import resources for teardown. Follow [docs/operations/orphan-cluster-cleanup.md](docs/operations/orphan-cluster-cleanup.md) — inventory → operator confirm → `rosa delete cluster` → AWS cleanup (VPC/NAT/EFS/S3/IAM/OIDC/secrets). Use tmux; log to `clusters/<name>/logs/*-orphan-*.log`. Update the runbook when you find gaps during a live cleanup.
+
 | Step | Action | Done when |
 |------|--------|-----------|
 | **0. Preflight** | Confirm AWS + RHCS auth, `clusters/<name>/terraform.tfvars` matches intent, state/plan paths under `clusters/<name>/`. | Credentials work; no stale lock file; operator approves cost/teardown if expensive. |

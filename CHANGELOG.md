@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Cluster credentials secret shell was not gated by sleep (secret version was already gated)
 
 ### Added
+- **Orphan cluster cleanup runbook**: Agent runbook at `docs/operations/orphan-cluster-cleanup.md` for ROSA HCP clusters created from this repo without a tracked `clusters/<name>/` directory or `infrastructure.tfstate` (inventory → operator confirm → `rosa delete` → AWS cleanup); linked from `mkdocs.yml`, `AGENTS.md`, `clusters/README.md`, and operations/scripts docs.
 - **Virt external VM↔bastion BGP smoke test**: `scripts/cluster/test-virt-external-vm-ping.sh`, `clusters/virt/test-external-vm-ping.yaml`, and optional `clusters/virt/bastion-e2e.tfvars` for targeted bastion + worker SG apply. Python stdlib caller-IP echo on bastion and VM (no podman/docker.io). Agent Step 6b in `clusters/virt/AGENTS.md`.
 
   administrator and its credentials secret follow explicit caller intent, so

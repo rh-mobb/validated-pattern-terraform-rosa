@@ -342,6 +342,12 @@ make cluster.<cluster-name>.bastion-connect
 
 ## Troubleshooting
 
+### Orphan cluster (no Terraform state)
+
+If a ROSA cluster was created from this repo but `clusters/<name>/` or `infrastructure.tfstate` is missing (for example a local-only recipe directory), **do not** use `make cluster.<name>.destroy` — it requires state.
+
+Follow the agent runbook: [Orphan cluster cleanup](../docs/operations/orphan-cluster-cleanup.md).
+
 ### Cluster Not Found
 
 If you get "Cluster directory does not exist":
