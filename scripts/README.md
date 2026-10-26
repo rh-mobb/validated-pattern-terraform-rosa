@@ -117,6 +117,8 @@ make cluster.byo-vpc.validate-network
 - **`destroy-infrastructure.sh`**: Destroy infrastructure (with confirmation)
 - **`cleanup-infrastructure.sh`**: Sleep infrastructure (destroy with preserved resources, auto-approve, CI/CD friendly)
 
+**Orphan clusters (no state):** `destroy-infrastructure.sh` requires `clusters/<name>/infrastructure.tfstate`. If the cluster directory or state file is missing, use the manual runbook [Orphan cluster cleanup](orphan-cluster-cleanup.md) instead of importing resources.
+
 #### GitOps Bootstrap Scripts
 
 - **`bootstrap-admin.sh`**: Create/destroy short-lived HTPasswd bootstrap admin (used by Make bootstrap)

@@ -114,5 +114,6 @@ nav:
       - Scripts: operations/scripts.md
       - GitOps Bootstrap: operations/bootstrap-gitops.md
       - Validation: operations/validation.md
+      - Orphan Cluster Cleanup: operations/orphan-cluster-cleanup.md
   - Reference:
       - Changelog: reference/changelog.md
