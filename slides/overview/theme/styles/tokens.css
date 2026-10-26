@@ -1,0 +1,75 @@
+:root {
+  /* Surface */
+  --slidev-rh-bg: var(--rh-color-surface-lightest, #FFFFFF);
+  /* Shorthand aliases used in slides and components */
+  --rh-red: var(--slidev-rh-brand-red, #EE0000);
+  --rh-blue: var(--slidev-rh-link, #0066CC);
+  --rh-green: #5BA352;
+  --rh-yellow: #F0AB00;
+  --rh-muted: var(--slidev-rh-text-secondary);
+  --rh-surface: var(--slidev-rh-surface);
+  --rh-border: var(--slidev-rh-border-subtle);
+  --slidev-rh-bg-alt: var(--rh-color-surface-lighter, #F2F2F2);
+  --slidev-rh-surface: var(--rh-color-surface-light, #E0E0E0);
+
+  /* Text */
+  --slidev-rh-text-primary: var(--rh-color-text-primary-on-light, #151515);
+  --slidev-rh-text-secondary: var(--rh-color-text-secondary-on-light, #4D4D4D);
+  --slidev-rh-text-brand: var(--rh-color-brand-red-on-light, #EE0000);
+
+  /* Brand */
+  --slidev-rh-brand-red: var(--rh-color-red-50, #EE0000);
+  --slidev-rh-brand-red-light: var(--rh-color-red-40, #F56E6E);
+  --slidev-rh-brand-red-dark: var(--rh-color-red-60, #A60000);
+
+  /* Accent / Interactive */
+  --slidev-rh-accent: var(--rh-color-accent-base-on-light, #0066CC);
+  --slidev-rh-link: var(--rh-color-interactive-primary-default-on-light, #0066CC);
+  --slidev-rh-link-hover: var(--rh-color-interactive-primary-hover-on-light, #003366);
+
+  /* Border */
+  --slidev-rh-border-strong: var(--rh-color-border-strong-on-light, #151515);
+  --slidev-rh-border-subtle: var(--rh-color-border-subtle-on-light, #C7C7C7);
+
+  /* Status */
+  --slidev-rh-status-danger: var(--rh-color-status-danger-on-light, #B1380B);
+  --slidev-rh-status-warning: var(--rh-color-status-warning-on-light, #DCA614);
+  --slidev-rh-status-success: var(--rh-color-status-success-on-light, #3D7317);
+  --slidev-rh-status-info: var(--rh-color-status-info-on-light, #5E40BE);
+
+  /* Typography */
+  --slidev-rh-font-heading: var(--rh-font-family-heading, 'Red Hat Display', Helvetica, Arial, sans-serif);
+  --slidev-rh-font-body: var(--rh-font-family-body-text, 'Red Hat Text', Helvetica, Arial, sans-serif);
+  --slidev-rh-font-code: var(--rh-font-family-code, 'Red Hat Mono', 'Courier New', Courier, monospace);
+
+  /* Spacing */
+  --slidev-rh-space-xs: var(--rh-space-xs, 4px);
+  --slidev-rh-space-sm: var(--rh-space-sm, 6px);
+  --slidev-rh-space-md: var(--rh-space-md, 8px);
+  --slidev-rh-space-lg: var(--rh-space-lg, 16px);
+  --slidev-rh-space-xl: var(--rh-space-xl, 24px);
+  --slidev-rh-space-2xl: var(--rh-space-2xl, 32px);
+  --slidev-rh-space-3xl: var(--rh-space-3xl, 48px);
+  --slidev-rh-space-4xl: var(--rh-space-4xl, 64px);
+}
+
+.dark {
+  --slidev-rh-bg: var(--rh-color-surface-darkest, #151515);
+  --slidev-rh-bg-alt: var(--rh-color-surface-darker, #1F1F1F);
+  --slidev-rh-surface: var(--rh-color-surface-dark, #383838);
+
+  --slidev-rh-text-primary: var(--rh-color-text-primary-on-dark, #FFFFFF);
+  --slidev-rh-text-secondary: var(--rh-color-text-secondary-on-dark, #C7C7C7);
+
+  --slidev-rh-accent: var(--rh-color-accent-base-on-dark, #92C5F9);
+  --slidev-rh-link: var(--rh-color-interactive-primary-default-on-dark, #92C5F9);
+  --slidev-rh-link-hover: var(--rh-color-interactive-primary-hover-on-dark, #B9DAFC);
+
+  --slidev-rh-border-strong: var(--rh-color-border-strong-on-dark, #FFFFFF);
+  --slidev-rh-border-subtle: var(--rh-color-border-subtle-on-dark, #707070);
+
+  --slidev-rh-status-danger: var(--rh-color-status-danger-on-dark, #F0561D);
+  --slidev-rh-status-warning: var(--rh-color-status-warning-on-dark, #FFCC17);
+  --slidev-rh-status-success: var(--rh-color-status-success-on-dark, #87BB62);
+  --slidev-rh-status-info: var(--rh-color-status-info-on-dark, #B6A6E9);
+}

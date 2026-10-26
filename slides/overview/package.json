@@ -1,0 +1,15 @@
+{
+  "name": "slides/overview-deck",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "slidev slides.md --open",
+    "build": "slidev build slides.md",
+    "export": "slidev export slides.md"
+  },
+  "dependencies": {
+    "@slidev/cli": "^0.49.0",
+    "slidev-theme-red-hat": "file:./theme",
+    "slidev-addon-red-hat-components": "file:./addon"
+  }
+}

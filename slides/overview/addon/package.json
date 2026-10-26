@@ -1,0 +1,28 @@
+{
+  "name": "slidev-addon-red-hat-components",
+  "version": "0.1.0",
+  "description": "Red Hat branded Vue components for Slidev presentations",
+  "keywords": [
+    "slidev",
+    "slidev-addon",
+    "red-hat",
+    "components",
+    "vue"
+  ],
+  "author": "Paul Czarkowski <paul@redhat.com>",
+  "license": "MIT",
+  "files": [
+    "components",
+    "index.ts"
+  ],
+  "main": "index.ts",
+  "types": "index.ts",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "peerDependencies": {
+    "@slidev/cli": "^0.49.0",
+    "@slidev/client": "^0.49.0",
+    "vue": "^3.0.0"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "slidev-theme-red-hat",
+  "version": "0.1.0",
+  "description": "A Slidev theme implementing Red Hat brand standards",
+  "keywords": ["slidev-theme", "slidev", "red-hat"],
+  "author": "Paul Czarkowski <paul@redhat.com>",
+  "license": "MIT",
+  "main": "index.ts",
+  "files": [
+    "styles",
+    "layouts",
+    "setup",
+    "public",
+    "index.ts"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "slidev": ">=0.49.0"
+  },
+  "dependencies": {
+    "@rhds/tokens": "^3.1.0"
+  },
+  "peerDependencies": {
+    "@slidev/cli": ">=0.49.0",
+    "@slidev/client": ">=0.49.0"
+  },
+  "slidev": {
+    "colorSchema": "both",
+    "defaults": {
+      "aspectRatio": "16/9",
+      "highlighter": "shiki"
+    }
+  }
+}
