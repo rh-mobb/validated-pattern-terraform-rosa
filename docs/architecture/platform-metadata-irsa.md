@@ -67,7 +67,7 @@ Charts that need IRSA or Terraform-owned secret names:
 
 **cluster-efs chart:** with `platformMetadata.enabled`, a sync Job writes the CSI credentials Secret and `efs-sc` StorageClass from `efsCsiRoleArn` / `efsFileSystemId`. The StorageClass sets EFS access-point `uid` / `gid` to **107** (qemu) by default (`cluster-efs` ≥ 0.5.1) so OpenShift Virtualization VM disks on RWX volumes provision without virt-handler chown failures. Do not hardcode `roleArn` / `fileSystemId` in portable recipes.
 
-**cluster-logging chart:** with `platformMetadata.enabled`, a sync Job writes `cloudwatch-credentials` and applies `ClusterLogForwarder` using `cloudwatchLoggingRoleArn`, `clusterName`, and `awsRegion` from metadata. Do not hardcode `credentials`, `roleArn`, `region`, or `clustername` in portable recipes when CloudWatch output is used.
+**cluster-logging chart:** with `platformMetadata.enabled`, Helm renders a placeholder `ClusterLogForwarder`; a sync Job writes `cloudwatch-credentials` and merge-patches CloudWatch `region` / `groupName` from `cloudwatchLoggingRoleArn`, `clusterName`, and `awsRegion`. Do not hardcode `credentials`, `roleArn`, `region`, or `clustername` in portable recipes when CloudWatch output is used. Future: evaluate [redhat-cop/patch-operator](https://github.com/redhat-cop/patch-operator) to replace per-chart Jobs ([#52](https://github.com/rh-mobb/validated-pattern-terraform-rosa/issues/52)).
 
 ### Precedent: cert-manager / AWS PCA
 
