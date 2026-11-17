@@ -338,6 +338,8 @@ module "cluster" {
   secrets_manager_role_arn     = module.iam.secrets_manager_role_arn
   bgp_config_secret_name       = var.enable_route_server ? "${var.cluster_name}-bgp-config" : null
   efs_csi_role_arn             = module.iam.efs_csi_role_arn
+  cloudwatch_logging_role_arn  = module.iam.cloudwatch_logging_role_arn
+  channel_group                = var.channel_group
   channel                      = var.channel
   openshift_version            = var.openshift_version
   upgrade_acknowledgements_for = var.upgrade_acknowledgements_for
