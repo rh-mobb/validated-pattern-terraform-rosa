@@ -192,6 +192,7 @@ output "gitops_bootstrap_env_exports" {
     var.bgp_config_secret_name != null && var.bgp_config_secret_name != "" ? "export BGP_CONFIG_SECRET_NAME='${var.bgp_config_secret_name}'" : "",
     var.efs_csi_role_arn != null && var.efs_csi_role_arn != "" ? "export EFS_CSI_ROLE_ARN='${var.efs_csi_role_arn}'" : "",
     local.bootstrap_efs_file_system_id != "" ? "export EFS_FILE_SYSTEM_ID='${local.bootstrap_efs_file_system_id}'" : "",
+    var.cloudwatch_logging_role_arn != null && var.cloudwatch_logging_role_arn != "" ? "export CLOUDWATCH_LOGGING_ROLE_ARN='${var.cloudwatch_logging_role_arn}'" : "",
     "export ENABLE='true'"
   ])) : null
   sensitive = false

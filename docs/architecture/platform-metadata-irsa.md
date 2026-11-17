@@ -49,6 +49,7 @@ Typical keys (omit empty):
 | `certManagerRoleArn` | Full ARN when cert-manager IAM is enabled |
 | `efsCsiRoleArn` | Full ARN for EFS CSI IRSA when `enable_efs` is true |
 | `efsFileSystemId` | EFS filesystem id (`fs-…`) when `enable_efs` is true |
+| `cloudwatchLoggingRoleArn` | Full ARN for OpenShift Logging CloudWatch output when `enable_cloudwatch_logging` is true |
 
 Prefer **full ARNs from Terraform outputs** over reconstructing names in charts (survives renames; multi-account safe).
 
@@ -65,6 +66,8 @@ Charts that need IRSA or Terraform-owned secret names:
 **CUDN BGP chart:** Terraform secret `{cluster}-bgp-config` holds operator role ARN / region / routeServerIDs (#51). Chart ExternalSecret + apply Job consume that secret. ESO role comes from platform metadata, not from BGP values.
 
 **cluster-efs chart:** with `platformMetadata.enabled`, a sync Job writes the CSI credentials Secret and `efs-sc` StorageClass from `efsCsiRoleArn` / `efsFileSystemId`. The StorageClass sets EFS access-point `uid` / `gid` to **107** (qemu) by default (`cluster-efs` ≥ 0.5.1) so OpenShift Virtualization VM disks on RWX volumes provision without virt-handler chown failures. Do not hardcode `roleArn` / `fileSystemId` in portable recipes.
+
+**cluster-logging chart:** with `platformMetadata.enabled`, a sync Job writes `cloudwatch-credentials` and applies `ClusterLogForwarder` using `cloudwatchLoggingRoleArn`, `clusterName`, and `awsRegion` from metadata. Do not hardcode `credentials`, `roleArn`, `region`, or `clustername` in portable recipes when CloudWatch output is used.
 
 ### Precedent: cert-manager / AWS PCA
 

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Platform metadata (cluster logging)**: Bootstrap publishes `cloudwatchLoggingRoleArn` when `enable_cloudwatch_logging` is applied; `gitops_bootstrap_env_exports` sets `CLOUDWATCH_LOGGING_ROLE_ARN` for bootstrap. `cluster-logging` chart can use `platformMetadata.enabled` (helm-charts PR) to read role, region, and cluster name from `rosa-platform-metadata`.
+
 ### Fixed
 - **BGP e2e worker security group**: When `bastion_enable_bgp_e2e` and `enable_route_server` are true, add ROSA default worker SG ingress for all traffic from the VPC CIDR (ROSA allows ICMP/SSH but blocks other cross-boundary traffic to CUDN overlay IPs). Bastion SG allows all traffic from configured CUDN CIDRs. Fixes virt external VM↔bastion connectivity tests (`modules/infrastructure/cluster/12-bgp-e2e-worker-sg.tf`, bastion module). `:8080` remains the default smoke-test echo port only.
 - **`persists_through_sleep` simplified and fixed**: Replaced three nullable override variables (`persists_through_sleep_cluster`, `persists_through_sleep_network`, `persists_through_sleep_iam`) with two simple booleans (`keep_network_on_sleep`, `keep_iam_on_sleep`) that only apply when sleeping. Cluster always follows the global `persists_through_sleep`. Fixes:

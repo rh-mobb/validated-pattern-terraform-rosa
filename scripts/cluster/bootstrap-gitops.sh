@@ -1118,6 +1118,7 @@ publish_platform_metadata() {
 	local bgp_config_secret_name="${BGP_CONFIG_SECRET_NAME:-}"
 	local efs_csi_role_arn="${EFS_CSI_ROLE_ARN:-}"
 	local efs_file_system_id="${EFS_FILE_SYSTEM_ID:-}"
+	local cloudwatch_logging_role_arn="${CLOUDWATCH_LOGGING_ROLE_ARN:-}"
 
 	# Construct predictable ARNs only when TF did not export them (legacy / partial apply)
 	if [[ -z "${secrets_manager_role_arn}" && -n "${aws_account_id}" && -n "${CLUSTER_NAME:-}" ]]; then
@@ -1167,11 +1168,14 @@ EOF
 	if [[ -n "${efs_file_system_id}" ]]; then
 		printf '  efsFileSystemId: "%s"\n' "${efs_file_system_id}" >>"${tmp}"
 	fi
+	if [[ -n "${cloudwatch_logging_role_arn}" ]]; then
+		printf '  cloudwatchLoggingRoleArn: "%s"\n' "${cloudwatch_logging_role_arn}" >>"${tmp}"
+	fi
 
 	oc apply -f "${tmp}"
 	rm -f "${tmp}"
 	echo "✓ Platform metadata published to ${ns}/${cm_name}"
-	oc -n "${ns}" get configmap "${cm_name}" -o yaml | grep -E '^(  )?(clusterName|awsAccountId|awsRegion|secretsManagerRoleArn|bgpConfigSecretName|certManagerRoleArn|efsCsiRoleArn|efsFileSystemId):' || true
+	oc -n "${ns}" get configmap "${cm_name}" -o yaml | grep -E '^(  )?(clusterName|awsAccountId|awsRegion|secretsManagerRoleArn|bgpConfigSecretName|certManagerRoleArn|efsCsiRoleArn|efsFileSystemId|cloudwatchLoggingRoleArn):' || true
 }
 
 # --- Configure storage classes ---

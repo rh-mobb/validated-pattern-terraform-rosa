@@ -729,7 +729,7 @@ Terraform publishes `{cluster_name}-bgp-config` to AWS Secrets Manager (`role_ar
 
 Architecture (do not hardcode ESO/operator ARNs in git):
 
-1. Bootstrap writes `rosa-platform-metadata` (`secretsManagerRoleArn`, `efsCsiRoleArn`, `efsFileSystemId`, `bgpConfigSecretName`, …) — [platform-metadata-irsa.md](../architecture/platform-metadata-irsa.md)
+1. Bootstrap writes `rosa-platform-metadata` (`secretsManagerRoleArn`, `efsCsiRoleArn`, `efsFileSystemId`, `cloudwatchLoggingRoleArn`, `bgpConfigSecretName`, …) — [platform-metadata-irsa.md](../architecture/platform-metadata-irsa.md)
 2. GitOps installs ESO and `cluster-efs` with `platformMetadata.enabled: true`
 3. `cudn-bgp-routing-operator` uses `externalSecret` for operator role / region / routeServerIDs from `{cluster}-bgp-config`
 

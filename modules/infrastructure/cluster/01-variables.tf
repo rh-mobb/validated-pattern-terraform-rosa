@@ -782,6 +782,13 @@ variable "efs_csi_role_arn" {
   nullable    = true
 }
 
+variable "cloudwatch_logging_role_arn" {
+  description = "ARN of the OpenShift Logging Operator CloudWatch IAM role (from IAM module output, for rosa-platform-metadata)"
+  type        = string
+  default     = null
+  nullable    = true
+}
+
 variable "awspca_csv" {
   description = "CSV for AWS Private CA Issuer operator"
   type        = string
