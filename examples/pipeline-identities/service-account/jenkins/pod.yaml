@@ -1,0 +1,57 @@
+# Purpose: Provide the Jenkins agent Pod that runs the ServiceAccount deployment pipeline.
+# What this is not: This Pod holds no cluster credential of its own; the bearer arrives from the Jenkins credential store.
+# Prerequisites: The Jenkins Kubernetes plugin, and an image containing Bash, Python 3, GNU timeout/date and oc on PATH.
+# Authoritative references:
+# - https://plugins.jenkins.io/kubernetes/
+# - https://kubernetes.io/docs/concepts/security/pod-security-standards/
+# Covers: apiVersion, kind, spec
+# Does: Declares the bare Pod the Jenkins Kubernetes plugin uses as a build agent.
+# Why: The plugin merges this into its own template, so only the fields that must differ from its defaults appear here.
+# Change: Adding metadata.name conflicts with the generated agent name the plugin assigns.
+# Trap: This is a Pod template fragment, not a Pod to apply directly; `oc apply` on it is not the intended use.
+# Evidence: https://plugins.jenkins.io/kubernetes/
+apiVersion: v1
+kind: Pod
+spec:
+  # Covers: automountServiceAccountToken
+  # Does: Stops Kubernetes projecting the agent's own ServiceAccount token into the Pod.
+  # Why: This pipeline authenticates to a DIFFERENT cluster with a supplied bearer; the local token is unused authority sitting in the filesystem.
+  # Change: Leaving it true gives every step in the job an ambient identity on the CI cluster.
+  # Trap: A projected token is mounted by default, so omitting this line silently grants that ambient identity.
+  # Evidence: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
+  automountServiceAccountToken: false
+  # Covers: securityContext, runAsNonRoot, seccompProfile, type
+  # Does: Meets the restricted Pod Security level so the agent runs on a namespace with that enforcement.
+  # Why: A deployment agent needs no root and no host access; the restricted profile is the default this pattern targets.
+  # Change: Relaxing these requires a namespace exception and a separate review.
+  # Trap: Container-level context does not inherit upward, so both levels are set where the profile requires it.
+  # Evidence: https://kubernetes.io/docs/concepts/security/pod-security-standards/
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  # Covers: containers, name, image, command, resources, requests, limits, cpu, memory, securityContext, allowPrivilegeEscalation, capabilities, drop
+  # Does: Runs a long-lived shell that Jenkins attaches build steps to, with no added privilege.
+  # Why: The agent only needs oc and a writable workspace; anything more widens the blast radius of a compromised build.
+  # Change: A different image must still contain oc and satisfy the restricted profile.
+  # Trap: An image whose entrypoint exits immediately makes the agent appear to fail scheduling.
+  # Evidence: https://plugins.jenkins.io/kubernetes/
+  #
+  # The requests and limits are a floor for an oc-and-shell agent, not a tuned
+  # value: raise them if your manifests are large or your rollout wait is long.
+  # There is deliberately no CPU limit, because throttling a deployment wait
+  # produces timeouts that look like cluster faults.
+  containers:
+    - name: oc
+      image: <oc-capable-image>
+      command: ["/bin/sh", "-c", "sleep infinity"]
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 512Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
