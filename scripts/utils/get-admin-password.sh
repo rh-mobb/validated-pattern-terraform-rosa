@@ -116,21 +116,52 @@ else
 		exit 1
 	fi
 
-	# Retrieve secret payload from AWS Secrets Manager
+	# Env keys from `aws configure export-credentials` (and AWS_CREDENTIAL_EXPIRATION)
+	# take precedence over AWS_PROFILE. Stale exports cause:
+	#   "Credentials were refreshed, but the refreshed credentials are still expired."
+	# When a profile is set, prefer the profile / aws-login cache for this lookup.
+	if [ -n "${AWS_PROFILE:-}" ]; then
+		if [ -n "${AWS_ACCESS_KEY_ID:-}" ] || [ -n "${AWS_SESSION_TOKEN:-}" ] || [ -n "${AWS_CREDENTIAL_EXPIRATION:-}" ]; then
+			echo -e "${BLUE}  Clearing stale AWS_* env credentials so AWS_PROFILE=${AWS_PROFILE} is used${NC}" >&2
+		fi
+		unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN AWS_CREDENTIAL_EXPIRATION
+	fi
+
+	# Retrieve secret payload from AWS Secrets Manager.
+	# Do NOT merge stderr into the secret string (2>&1): AWS errors were previously
+	# treated as the password, causing oc login 401 with a false "success" message.
+	AWS_ERR_FILE=$(mktemp)
+	set +e
 	SECRET_STRING=$(aws secretsmanager get-secret-value \
 		--secret-id "$SECRET_ARN" \
 		--region "$SECRET_REGION" \
 		--query SecretString \
-		--output text 2>&1 || echo "")
+		--output text 2>"$AWS_ERR_FILE")
+	AWS_EXIT=$?
+	set -e
 
-	if [ -z "$SECRET_STRING" ]; then
+	if [ "$AWS_EXIT" -ne 0 ] || [ -z "$SECRET_STRING" ]; then
 		echo -e "${YELLOW}Error: Failed to retrieve admin password from Secrets Manager.${NC}" >&2
 		echo -e "${YELLOW}Secret ARN: $SECRET_ARN${NC}" >&2
 		echo -e "${YELLOW}Region: $SECRET_REGION${NC}" >&2
+		if [ -s "$AWS_ERR_FILE" ]; then
+			echo -e "${YELLOW}AWS CLI:${NC}" >&2
+			sed 's/^/  /' "$AWS_ERR_FILE" >&2
+		fi
+		rm -f "$AWS_ERR_FILE"
 		echo -e "${YELLOW}You may need to:${NC}" >&2
-		echo -e "${YELLOW}  1. Ensure AWS credentials are configured${NC}" >&2
-		echo -e "${YELLOW}  2. Ensure you have permission to read the secret${NC}" >&2
-		echo -e "${YELLOW}  3. Or set TF_VAR_admin_password_override environment variable${NC}" >&2
+		echo -e "${YELLOW}  1. unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_CREDENTIAL_EXPIRATION${NC}" >&2
+		echo -e "${YELLOW}  2. Refresh AWS auth (aws login / aws sso login) for your profile${NC}" >&2
+		echo -e "${YELLOW}  3. export AWS_PROFILE=<your-profile>  (preferred over static env keys)${NC}" >&2
+		echo -e "${YELLOW}  4. Or set TF_VAR_admin_password_override${NC}" >&2
+		exit 1
+	fi
+	rm -f "$AWS_ERR_FILE"
+
+	# Reject payloads that look like CLI/SDK errors accidentally captured as stdout
+	if echo "$SECRET_STRING" | grep -qiE '^(aws: \[ERROR\]|An error occurred)'; then
+		echo -e "${YELLOW}Error: Secrets Manager returned an error payload, not a secret.${NC}" >&2
+		echo -e "${YELLOW}Check AWS_PROFILE / credentials, then retry.${NC}" >&2
 		exit 1
 	fi
 
